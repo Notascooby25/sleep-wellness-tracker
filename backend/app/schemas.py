@@ -1,56 +1,44 @@
-from typing import Optional, List
+# backend/app/schemas.py
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List
 
-
+# Use Pydantic v2 style: model_config with from_attributes True
 class CategoryBase(BaseModel):
     name: str
-
 
 class CategoryCreate(CategoryBase):
     pass
 
-
-class Category(CategoryBase):
+class CategoryResponse(BaseModel):
     id: int
-    created_at: datetime
+    name: str
+    created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class ActivityBase(BaseModel):
     name: str
     category_id: int
 
-
 class ActivityCreate(ActivityBase):
     pass
 
-
-class Activity(ActivityBase):
+class ActivityResponse(BaseModel):
     id: int
-    created_at: datetime
+    name: str
+    category_id: int
+    created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
-
-
-class MoodEntryBase(BaseModel):
-    mood_score: int
-    note: Optional[str] = None
-    timestamp: datetime
-    activity_ids: List[int]
-
+    model_config = {"from_attributes": True}
 
 
 class MoodEntryCreate(BaseModel):
     mood_score: int = Field(..., ge=1, le=5)
-    note: str | None = None
+    note: Optional[str] = None
     timestamp: datetime
-    activity_ids: List[int] = []
+    activity_ids: List[int] = Field(default_factory=list)
 
 
 class MoodEntry(BaseModel):
@@ -61,8 +49,8 @@ class MoodEntry(BaseModel):
     created_at: datetime
     activity_ids: List[int]
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
+
 
 class MoodEntryActivityResponse(BaseModel):
     activity_id: int
@@ -79,32 +67,3 @@ class MoodEntryResponse(BaseModel):
     activities: List[MoodEntryActivityResponse]
 
     model_config = {"from_attributes": True}
-
-class CategoryResponse(BaseModel):
-    id: int
-    name: str
-
-    model_config = {"from_attributes": True}
-
-
-class ActivityResponse(BaseModel):
-    id: int
-    name: str
-    category_id: int
-
-    model_config = {"from_attributes": True}
-
-class CategoryCreate(BaseModel):
-    name: str
-
-
-class ActivityCreate(BaseModel):
-    name: str
-    category_id: int
-class CategoryCreate(BaseModel):
-    name: str
-
-
-class ActivityCreate(BaseModel):
-    name: str
-    category_id: int
