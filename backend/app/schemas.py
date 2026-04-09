@@ -67,3 +67,7 @@ class MoodEntryResponse(BaseModel):
     activities: List[MoodEntryActivityResponse]
 
     model_config = {"from_attributes": True}
+
+# Compatibility aliases expected by routes
+Category = CategoryResponse
+Activity = ActivityResponse

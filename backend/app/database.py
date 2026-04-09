@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Local development: SQLite
-DATABASE_URL = "sqlite:///./local.db"
+DATABASE_URL = "sqlite:///./sleep.db"
 
 engine = create_engine(
     DATABASE_URL,
@@ -22,3 +22,5 @@ def get_db():
         yield db
     finally:
         db.close()
+
+        
