@@ -5,6 +5,9 @@ from datetime import datetime
 
 from ..database import get_db
 from .. import models, schemas
+from typing import List, Set
+from sqlalchemy.exc import IntegrityError
+
 
 router = APIRouter()
 
@@ -55,44 +58,75 @@ def create_mood_entry(entry: schemas.MoodEntryCreate, db: Session = Depends(get_
     if not (1 <= entry.mood_score <= 5):
         raise HTTPException(status_code=400, detail='mood_score must be between 1 and 5')
 
+    # Ensure activity ids exist
     db_activities = db.query(models.Activity).filter(models.Activity.id.in_(entry.activity_ids)).all()
     if len(db_activities) != len(entry.activity_ids):
         raise HTTPException(status_code=400, detail='One or more activity_ids do not exist')
 
-    db_entry = models.MoodEntry(
+    # Normalize timestamp (assumes entry.timestamp is already a datetime or ISO string)
+    ts = entry.timestamp
+    if isinstance(ts, str):
+        try:
+            ts = datetime.fromisoformat(ts)
+        except Exception:
+            raise HTTPException(status_code=422, detail="Invalid timestamp format")
+
+    requested_activity_ids: Set[int] = set(entry.activity_ids or [])
+
+    # 1) Look for existing candidate entries with same timestamp, mood_score and note
+    candidates = (
+        db.query(models.MoodEntry)
+        .filter(
+            models.MoodEntry.timestamp == ts,
+            models.MoodEntry.mood_score == entry.mood_score,
+            models.MoodEntry.note == entry.note,
+        )
+        .all()
+    )
+
+    # 2) Compare activity sets for each candidate; if identical, return it (idempotent)
+    for cand in candidates:
+        assoc_rows = (
+            db.query(models.MoodEntryActivity)
+            .filter(models.MoodEntryActivity.entry_id == cand.id)
+            .all()
+        )
+        cand_activity_ids = {a.activity_id for a in assoc_rows}
+        if cand_activity_ids == requested_activity_ids:
+            return cand
+
+    # 3) No identical entry found — attempt to create one
+    new_entry = models.MoodEntry(
         mood_score=entry.mood_score,
         note=entry.note,
-        timestamp=entry.timestamp,
-    )
-    db.add(db_entry)
-    db.commit()
-    db.refresh(db_entry)
-
-    # link activities
-    for act_id in entry.activity_ids:
-        link = models.MoodEntryActivity(entry_id=db_entry.id, activity_id=act_id)
-        db.add(link)
-
-    db.commit()
-
-    return schemas.MoodEntry(
-        id=db_entry.id,
-        mood_score=db_entry.mood_score,
-        note=db_entry.note,
-        timestamp=db_entry.timestamp,
-        created_at=db_entry.created_at,
-        activity_ids=entry.activity_ids
+        timestamp=ts,
     )
 
-@router.get("", include_in_schema=False)
-@router.get("/", response_model=List[schemas.MoodEntryResponse])
-def list_mood_entries(db: Session = Depends(get_db)):
-    entries = db.query(models.MoodEntry).all()
-    return entries
+    try:
+        db.add(new_entry)
+        db.flush()  # assign id without committing
 
-@router.get("/{entry_id}", response_model=schemas.MoodEntryResponse)
-def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(models.MoodEntry).filter(models.MoodEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Mood entry not found")
-    return entry
+        # create association rows
+        for aid in requested_activity_ids:
+            db.add(models.MoodEntryActivity(entry_id=new_entry.id, activity_id=aid))
+
+        db.commit()
+        db.refresh(new_entry)
+        return new_entry
+
+    except IntegrityError:
+        # Unique index prevented duplicate insert (race or double-post).
+        db.rollback()
+        # Find and return the existing row deterministically
+        existing = (
+            db.query(models.MoodEntry)
+            .filter(
+                models.MoodEntry.timestamp == ts,
+                models.MoodEntry.mood_score == entry.mood_score,
+                models.MoodEntry.note == entry.note,
+            )
+            .first()
+        )
+        if existing:
+            return existing
+        raise HTTPException(status_code=500, detail="Could not create or find mood entry")
