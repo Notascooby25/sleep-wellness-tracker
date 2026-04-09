@@ -130,3 +130,18 @@ def create_mood_entry(entry: schemas.MoodEntryCreate, db: Session = Depends(get_
         if existing:
             return existing
         raise HTTPException(status_code=500, detail="Could not create or find mood entry")
+
+@router.post("/mood", response_model=schemas.MoodEntry)
+def create_mood_entry(entry: schemas.MoodEntryCreate, db: Session = Depends(get_db)):
+    # ... same validation and idempotency checks as above ...
+
+    # When returning, build the response with activity_ids:
+    activity_ids_sorted = sorted(requested_activity_ids)
+    return schemas.MoodEntry(
+        id=new_entry.id,
+        mood_score=new_entry.mood_score,
+        note=new_entry.note,
+        timestamp=new_entry.timestamp,
+        created_at=new_entry.created_at,
+        activity_ids=activity_ids_sorted
+    )
