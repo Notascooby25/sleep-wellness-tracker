@@ -53,27 +53,4 @@ class MoodEntryActivity(Base):
 
     entry = relationship("MoodEntry", back_populates="activities")
 
-# inside Activity model (add this relationship)
-class Activity(Base):
-    __tablename__ = "activities"
-    id = Column(Integer, primary_key=True, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    category = relationship("Category", back_populates="activities")
-    mood_entries = relationship("MoodEntryActivity", back_populates="activity", cascade="all, delete")
-
-    __table_args__ = (UniqueConstraint("category_id", "name"),)
-
-
-# inside MoodEntryActivity (add activity relationship)
-class MoodEntryActivity(Base):
-    __tablename__ = "mood_entry_activities"
-
-    entry_id = Column(Integer, ForeignKey("mood_entries.id", ondelete="CASCADE"), primary_key=True)
-    activity_id = Column(Integer, ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True)
-
-    entry = relationship("MoodEntry", back_populates="activities")
-    activity = relationship("Activity", back_populates="mood_entries")
 
