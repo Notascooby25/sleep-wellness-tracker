@@ -1,20 +1,13 @@
-import os
+# backend/app/database.py
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
+import os
 
-# Local development: SQLite
-DATABASE_URL = "sqlite:///./sleep.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/postgres")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
-
+engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-from . import models  # noqa: E402
-
-models.Base.metadata.create_all(bind=engine)
+Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
@@ -22,5 +15,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-        
