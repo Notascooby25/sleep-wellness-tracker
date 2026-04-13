@@ -31,3 +31,9 @@ try:
 
         st.markdown(f"**{ts} — Mood {mood}**")
         if note:
+            st.write(f"Note: {note}")
+        st.write(f"Activities: {act_display}")
+        st.markdown("---")
+
+except Exception as err:
+    st.error(f"Failed to load entries: {err}")
