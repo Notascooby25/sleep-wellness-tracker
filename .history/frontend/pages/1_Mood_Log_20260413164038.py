@@ -77,21 +77,3 @@ if st.button("Log Entry"):
             st.error(f"Error: {response.text}")
     except Exception as e:
         st.error(f"Request failed: {e}")
-
-# -------------------------
-# Display recent entries
-# -------------------------
-st.subheader("Recent Mood Entries")
-
-try:
-    # Fetch all entries
-    entries = requests.get(f"{API_BASE}/mood/mood").json()
-
-    # Sort newest → oldest
-    entries = sorted(entries, key=lambda x: x["timestamp"], reverse=True)
-
-    # Fetch activity list so we can map IDs → names
-    activity_lookup = {a["id"]: a["name"] for a in activities}
-
-    for e in entries:
-        ts = e
