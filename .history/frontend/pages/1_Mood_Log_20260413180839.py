@@ -23,11 +23,10 @@ try:
         note = e.get("note", "")
 
         # Convert activity IDs → names
-        act_names = [
-            activity_lookup.get(aid, f"ID {aid}")
-            for aid in e.get("activity_ids", [])
-        ]
+        act_names = [activity_lookup.get(aid, f"ID {aid}") for aid in e.get("activity_ids", [])]
         act_display = ", ".join(act_names) if act_names else "None"
 
         st.markdown(f"**{ts} — Mood {mood}**")
         if note:
+            st.write(f"Note: {note}")
+        st.write(f"Activities
