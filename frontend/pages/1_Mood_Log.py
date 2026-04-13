@@ -7,8 +7,8 @@ st.title("Mood Log")
 st.subheader("Recent Mood Entries")
 
 try:
-    # Fetch all entries
-    entries = requests.get(f"{API_BASE}/mood/mood").json()
+    # Fetch all entries (correct endpoint)
+    entries = requests.get(f"{API_BASE}/mood").json()
 
     # Sort newest → oldest
     entries = sorted(entries, key=lambda x: x["timestamp"], reverse=True)
@@ -29,8 +29,4 @@ try:
         st.markdown(f"**{ts} — Mood {mood}**")
         if note:
             st.write(f"Note: {note}")
-        st.write(f"Activities: {act_display}")
-        st.markdown("---")
-
-except Exception as err:
-    st.error(f"Failed to load entries: {err}")
+        st.write(f"Activities
