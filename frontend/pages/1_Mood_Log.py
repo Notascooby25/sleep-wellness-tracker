@@ -65,4 +65,15 @@ if st.button("Log Entry"):
     payload = {
         "mood_score": mood_score,
         "note": note,
+        "timestamp": timestamp.isoformat(),
+        "activity_ids": selected_activity_ids
     }
+
+    try:
+        response = requests.post(f"{API_BASE}/mood/mood", json=payload)
+        if response.status_code in (200, 201):
+            st.success("Entry logged!")
+        else:
+            st.error(f"Error: {response.text}")
+    except Exception as e:
+        st.error(f"Request failed: {e}")
