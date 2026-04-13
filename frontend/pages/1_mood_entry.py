@@ -6,29 +6,76 @@ BACKEND_URL = "http://backend:8000"  # docker-compose service name
 
 st.title("Log Mood Entry")
 
-# --- Input fields ---
-mood_score = st.slider("Mood Score", min_value=1, max_value=5, value=3)
-note = st.text_area("Note (optional)")
-timestamp = st.datetime_input("Timestamp", value=datetime.now())
 
-# --- Submit button ---
-if st.button("Submit Mood Entry"):
+# -------------------------
+# Mood score
+# -------------------------
+st.subheader("How are you feeling?")
+mood_score = st.slider("Mood (1 = great, 5 = rubbish)", 1, 5, 3)
+
+
+# -------------------------
+# Fetch categories + activities
+# -------------------------
+categories = requests.get(f"{API_BASE}/categories").json()
+activities = requests.get(f"{API_BASE}/activities").json()
+
+# Organise activities by category
+activities_by_cat = {}
+for cat in categories:
+    activities_by_cat[cat["id"]] = {
+        "name": cat["name"],
+        "activities": [a for a in activities if a["category_id"] == cat["id"]]
+    }
+
+
+# -------------------------
+# Activity selection
+# -------------------------
+st.subheader("Activities")
+
+selected_activity_ids = []
+
+for cat_id, data in activities_by_cat.items():
+    st.markdown(f"### {data['name']}")
+    for act in data["activities"]:
+        if st.checkbox(act["name"], key=f"act_{act['id']}"):
+            selected_activity_ids.append(act["id"])
+
+
+# -------------------------
+# Notes
+# -------------------------
+st.subheader("Notes")
+note = st.text_area("Write anything you want to remember", "")
+
+
+# -------------------------
+# Timestamp
+# -------------------------
+st.subheader("When did this happen?")
+timestamp = st.datetime_input("Date & Time", datetime.now())
+
+
+# -------------------------
+# Submit
+# -------------------------
+if st.button("Log Entry"):
     payload = {
-        "timestamp": timestamp.isoformat(),
         "mood_score": mood_score,
-        "note": note
+        "note": note,
+        "timestamp": timestamp.isoformat(),
+        "activity_ids": selected_activity_ids
     }
 
     try:
-        response = requests.post(f"{BACKEND_URL}/mood/mood", json=payload)
+        response = requests.post(f"{API_BASE}/mood/mood", json=payload)
         if response.status_code in (200, 201):
-            st.success("Mood entry created successfully!")
+            st.success("Entry logged!")
         else:
             st.error(f"Error: {response.text}")
     except Exception as e:
         st.error(f"Request failed: {e}")
-
-st.divider()
 
 # --- Recent entries ---
 st.subheader("Recent Mood Entries")
