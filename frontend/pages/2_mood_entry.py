@@ -2,17 +2,15 @@ import streamlit as st
 import requests
 from datetime import datetime
 
-BACKEND_URL = "http://backend:8000"  # docker-compose service name
+API_BASE = "http://backend:8000"
 
-st.title("Log Mood Entry")
-
+st.title("Log Your Mood")
 
 # -------------------------
 # Mood score
 # -------------------------
 st.subheader("How are you feeling?")
-mood_score = st.slider("Mood (1 = great, 5 = rubbish)", 1, 5, 3)
-
+mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
 
 # -------------------------
 # Fetch categories + activities
@@ -28,7 +26,6 @@ for cat in categories:
         "activities": [a for a in activities if a["category_id"] == cat["id"]]
     }
 
-
 # -------------------------
 # Activity selection
 # -------------------------
@@ -42,20 +39,17 @@ for cat_id, data in activities_by_cat.items():
         if st.checkbox(act["name"], key=f"act_{act['id']}"):
             selected_activity_ids.append(act["id"])
 
-
 # -------------------------
 # Notes
 # -------------------------
 st.subheader("Notes")
 note = st.text_area("Write anything you want to remember", "")
 
-
 # -------------------------
 # Timestamp
 # -------------------------
 st.subheader("When did this happen?")
 timestamp = st.datetime_input("Date & Time", datetime.now())
-
 
 # -------------------------
 # Submit
@@ -76,17 +70,3 @@ if st.button("Log Entry"):
             st.error(f"Error: {response.text}")
     except Exception as e:
         st.error(f"Request failed: {e}")
-
-# --- Recent entries ---
-st.subheader("Recent Mood Entries")
-
-try:
-    entries = requests.get(f"{BACKEND_URL}/mood").json()
-    for entry in entries[::-1][:10]:  # show latest 10
-        st.write(f"**{entry['timestamp']}** — Mood {entry['mood_score']}")
-        if entry.get("note"):
-            st.caption(entry["note"])
-        st.write("---")
-except Exception as e:
-    st.error(f"Failed to load entries: {e}")
-    

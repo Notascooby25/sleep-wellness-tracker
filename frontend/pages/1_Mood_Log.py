@@ -4,7 +4,6 @@ import requests
 API_BASE = "http://backend:8000"
 
 st.title("Mood Log")
-
 st.subheader("Recent Mood Entries")
 
 try:
@@ -14,7 +13,7 @@ try:
     # Sort newest → oldest
     entries = sorted(entries, key=lambda x: x["timestamp"], reverse=True)
 
-    # Fetch activity list so we can map IDs → names
+    # Fetch activities so we can map IDs → names
     activities = requests.get(f"{API_BASE}/activities").json()
     activity_lookup = {a["id"]: a["name"] for a in activities}
 
