@@ -1,56 +1,27 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, UniqueConstraint
+# models.py
+from sqlalchemy import Table, Column, Integer, ForeignKey, DateTime, String, func
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from .database import Base  # adjust import to your project
 
-from sqlalchemy.orm import declarative_base
-Base = declarative_base()
+mood_activities = Table(
+    "mood_activities",
+    Base.metadata,
+    Column("mood_id", Integer, ForeignKey("moods.id"), primary_key=True),
+    Column("activity_id", Integer, ForeignKey("activities.id"), primary_key=True),
+)
 
-
-class Category(Base):
-    __tablename__ = "categories"
-
+class Mood(Base):
+    __tablename__ = "moods"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    activities = relationship("Activity", back_populates="category", cascade="all, delete")
-
+    mood_score = Column(Integer, nullable=False)
+    note = Column(String, nullable=True)
+    timestamp = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    activities = relationship("Activity", secondary=mood_activities, back_populates="moods")
 
 class Activity(Base):
     __tablename__ = "activities"
-
     id = Column(Integer, primary_key=True, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    category = relationship("Category", back_populates="activities")
-
-    __table_args__ = (UniqueConstraint("category_id", "name"),)
-
-
-class MoodEntry(Base):
-    __tablename__ = "mood_entries"
-
-    id = Column(Integer, primary_key=True, index=True)
-    mood_score = Column(Integer, nullable=False)
-    note = Column(Text)
-    timestamp = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    activities = relationship(
-        "MoodEntryActivity",
-        back_populates="entry",
-        cascade="all, delete"
-    )
-
-
-class MoodEntryActivity(Base):
-    __tablename__ = "mood_entry_activities"
-
-    entry_id = Column(Integer, ForeignKey("mood_entries.id", ondelete="CASCADE"), primary_key=True)
-    activity_id = Column(Integer, ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True)
-
-    entry = relationship("MoodEntry", back_populates="activities")
-
-
+    category_id = Column(Integer, ForeignKey("categories.id"))
+    moods = relationship("Mood", secondary=mood_activities, back_populates="activities")
