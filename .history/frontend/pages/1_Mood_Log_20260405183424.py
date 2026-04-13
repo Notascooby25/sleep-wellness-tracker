@@ -65,4 +65,3 @@ if st.button("Log Entry"):
     payload = {
         "mood_score": mood_score,
         "note": note,
-    }
