@@ -5,27 +5,22 @@ import time
 from requests.exceptions import RequestException
 from json import JSONDecodeError
 
+# Use environment-driven API base if available; fallback to service name
 API_BASE = "http://backend:8000"
 
-st.title("Log Your Mood")
-
-def fetch_categories(retries=5, delay=1.0):
-    url = f"{API_BASE}/categories"
+def fetch_json(path, retries=5, delay=1.0, timeout=3):
+    url = f"{API_BASE}{path}"
     for attempt in range(1, retries + 1):
         try:
-            resp = requests.get(url, timeout=3)
-            if resp.status_code == 200:
+            r = requests.get(url, timeout=timeout)
+            if r.status_code == 200:
                 try:
-                    data = resp.json()
-                    if isinstance(data, list):
-                        return data
-                    st.error("Unexpected categories format from backend.")
-                    return []
+                    return r.json()
                 except JSONDecodeError:
-                    st.error("Backend returned invalid JSON for categories.")
+                    st.error("Backend returned invalid JSON.")
                     return []
             else:
-                st.warning(f"Backend returned status {resp.status_code}")
+                st.warning(f"Backend returned status {r.status_code}")
                 return []
         except RequestException as e:
             if attempt == retries:
@@ -33,9 +28,27 @@ def fetch_categories(retries=5, delay=1.0):
                 return []
             time.sleep(delay)
 
-# call fetch_categories inside the page runtime, not at import time
-categories = fetch_categories()
+def post_json(path, payload, timeout=5):
+    url = f"{API_BASE}{path}"
+    try:
+        r = requests.post(url, json=payload, timeout=timeout)
+        return r
+    except RequestException as e:
+        st.error(f"Failed to reach backend when saving: {e}")
+        return None
 
+# Page UI
+st.title("Log Your Mood")
+
+with st.expander("Backend status"):
+    health = fetch_json("/health", retries=3, delay=0.5)
+    if isinstance(health, dict) and health.get("status") == "ok":
+        st.success("Backend reachable")
+    else:
+        st.warning("Backend not reachable or returned unexpected response")
+
+# Load categories at runtime
+categories = fetch_json("/categories", retries=5, delay=1.0)
 category_options = [c.get("name", f"id:{c.get('id')}") for c in categories] if categories else []
 
 st.header("How are you feeling?")
@@ -44,14 +57,15 @@ selected_category = st.selectbox("Category", ["(none)"] + category_options)
 note = st.text_area("Note (optional)")
 
 if st.button("Save"):
-    try:
-        r = requests.post(f"{API_BASE}/mood", json={
-            "mood_score": mood_score,
-            "note": note
-        }, timeout=5)
-        if r.ok:
-            st.success("Saved mood entry.")
-        else:
-            st.error(f"Failed to save mood entry: {r.status_code}")
-    except RequestException as e:
-        st.error(f"Failed to reach backend when saving: {e}")
+    payload = {
+        "mood_score": mood_score,
+        "note": note,
+        "category": selected_category if selected_category != "(none)" else None
+    }
+    resp = post_json("/mood", payload)
+    if resp is None:
+        st.error("Could not send request to backend.")
+    elif resp.ok:
+        st.success("Saved mood entry.")
+    else:
+        st.error(f"Failed to save mood entry: {resp.status_code}")
