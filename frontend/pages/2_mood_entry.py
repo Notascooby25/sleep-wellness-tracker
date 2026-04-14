@@ -4,6 +4,8 @@ import requests
 import time
 from requests.exceptions import RequestException
 from json import JSONDecodeError
+from datetime import datetime, timezone
+
 
 # Prefer environment variable (from .env via docker-compose)
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
@@ -119,14 +121,19 @@ if st.button("Save"):
         if a["name"] in selected_activities
     ]
 
+    # Backend expects a timestamp field
+    now_utc = datetime.now(timezone.utc).isoformat()
+
     payload = {
         "mood_score": mood_score,
         "note": note,
-        "activity_ids": selected_activity_ids
+        "timestamp": now_utc,
+        "activity_ids": selected_activity_ids,
     }
 
     with st.spinner("Saving entry..."):
         resp = post_json("/mood", payload)
+
 
     if resp is None:
         st.error("Could not send request to backend.")
