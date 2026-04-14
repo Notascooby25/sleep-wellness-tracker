@@ -1,24 +1,15 @@
-import sys
-import os
 from fastapi import FastAPI
+from .routes import mood, categories, activities
 
-# Ensure the project root is on sys.path so "app.*" imports resolve inside the container
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+app = FastAPI()
 
-from .routes import mood
+# Routers ALREADY have prefixes inside their files.
+# Do NOT add prefixes here.
 
-app = FastAPI(title="Sleep Wellness Tracker")
-
-# include the mood routes at root
-app.include_router(mood.router, prefix="/mood")
-from .routes import categories, activities
-
-app.include_router(categories.router, prefix="/categories")
-app.include_router(activities.router, prefix="/activities")
+app.include_router(mood.router)
+app.include_router(categories.router)
+app.include_router(activities.router)
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "sleep-wellness-tracker-backend"}
-
-
-
+    return {"status": "ok"}
