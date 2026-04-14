@@ -1,7 +1,13 @@
 services:
   db:
-    build: ./db
+    image: postgres:15
     container_name: sleep_db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres_password_here
+      - POSTGRES_DB=postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
     networks:
       - sleepnet
 
@@ -10,21 +16,16 @@ services:
     container_name: sleep_backend
     depends_on:
       - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres_password_here@db:5432/postgres
     ports:
       - "8000:8000"
-    networks:
-      - sleepnet
-
-  frontend:
-    build: ./frontend
-    container_name: sleep_frontend
-    depends_on:
-      - backend
-    ports:
-      - "8501:8501"
     networks:
       - sleepnet
 
 networks:
   sleepnet:
     driver: bridge
+
+volumes:
+  db_data:
