@@ -1,0 +1,30 @@
+services:
+  db:
+    build: ./db
+    container_name: sleep_db
+    networks:
+      - sleepnet
+
+  backend:
+    build: ./backend
+    container_name: sleep_backend
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    networks:
+      - sleepnet
+
+  frontend:
+    build: ./frontend
+    container_name: sleep_frontend
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    networks:
+      - sleepnet
+
+networks:
+  sleepnet:
+    driver: bridge
