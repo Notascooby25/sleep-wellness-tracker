@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
 
+# Base API URL (use docker-compose env or fallback to localhost)
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 # -----------------------------
-# Helpers
+# Safe fetch helper with retries
 # -----------------------------
 def fetch_json(path, retries=5, delay=1.0, timeout=3):
     url = f"{API_BASE}{path}"
@@ -31,6 +32,9 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
                 return []
             time.sleep(delay)
 
+# -----------------------------
+# Safe POST helper
+# -----------------------------
 def post_json(path, payload, timeout=5):
     url = f"{API_BASE}{path}"
     try:
@@ -39,86 +43,65 @@ def post_json(path, payload, timeout=5):
         st.error(f"Failed to reach backend when saving: {e}")
         return None
 
+# -----------------------------
+# Fetch activities for a category
+# -----------------------------
 def fetch_activities_for_category(category_id):
     all_activities = fetch_json("/activities/", retries=5, delay=1.0)
     return [a for a in all_activities if a.get("category_id") == category_id]
 
 # -----------------------------
-# Session state
+# Session state initialization
 # -----------------------------
 if "selected_activity_ids" not in st.session_state:
+    # dict: { category_id: set(activity_id, ...) }
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# Responsive CSS (improved)
+# Responsive CSS and chip styles
 # -----------------------------
 RESPONSIVE_CSS = """
 <style>
-/* Base app font sizing (desktop) */
-.stApp {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  font-size: 15px;
-  line-height: 1.2;
-}
-
-/* Card look */
+/* Card and chip base styles */
 .daylio-card {
-  padding: 10px;
+  padding: 12px;
   border-radius: 10px;
   border: 1px solid #e6e6e6;
   background: linear-gradient(180deg, #ffffff, #fbfbfb);
   margin-bottom: 12px;
 }
-
-/* Make Streamlit checkbox label fill the column and look like a chip */
-.stCheckbox > label {
-  display: block !important;
-  width: 100% !important;
-  padding: 8px 10px !important;
-  border-radius: 18px !important;
-  background: #f1f5f9 !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #111827 !important;
-  text-align: center !important;
-  margin: 6px 0 !important;
-  box-sizing: border-box !important;
-  font-size: 14px !important;
+.activity-chip {
+  display:inline-block;
+  margin:6px 8px 6px 0;
+  padding:6px 12px;
+  border-radius:18px;
+  background:#f1f5f9;
+  color:#111827;
+  font-size:14px;
+  border:1px solid #e2e8f0;
+}
+.activity-chip-selected {
+  background:#0ea5a4;
+  color:white;
+  border:1px solid #089e9c;
 }
 
-/* When the checkbox is checked, Streamlit adds aria-checked; style via sibling selector */
-.stCheckbox input[type="checkbox"]:checked + label {
-  background: #0ea5a4 !important;
-  color: #ffffff !important;
-  border-color: #089e9c !important;
+/* Make the Streamlit checkbox label area more compact */
+.css-1kyxreq .stCheckbox > div, .stCheckbox > label {
+  margin: 0;
+  padding: 0;
 }
 
-/* Remove extra padding around checkbox widget so chips align nicely */
-.stCheckbox {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Make columns use full width and remove inner padding so chips span available space */
-[data-testid="stVerticalBlock"] > div[role="list"] > div {
-  padding: 0 !important;
-}
-
-/* Responsive scaling for smaller screens */
+/* Responsive font scaling for small screens */
 @media (max-width: 900px) {
+  .daylio-card { padding: 10px; }
+  .activity-chip { font-size:13px; padding:5px 10px; margin:5px 6px 5px 0; }
   .stApp { font-size: 14px; }
-  .stCheckbox > label { font-size: 13px !important; padding: 7px 8px !important; }
 }
 @media (max-width: 600px) {
+  .daylio-card { padding: 8px; }
+  .activity-chip { font-size:12px; padding:4px 8px; margin:4px 6px 4px 0; }
   .stApp { font-size: 13px; }
-  .stCheckbox > label { font-size: 12px !important; padding: 6px 6px !important; }
-}
-
-/* Make the card content use CSS grid so chips wrap and fill space when columns are 1 */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-  align-items: start;
 }
 </style>
 """
@@ -129,6 +112,7 @@ st.markdown(RESPONSIVE_CSS, unsafe_allow_html=True)
 # -----------------------------
 st.title("Log Your Mood")
 
+# Backend status (non-blocking)
 with st.expander("Backend status"):
     health = fetch_json("/health", retries=2, delay=0.5)
     if isinstance(health, dict) and health.get("status") == "ok":
@@ -136,53 +120,62 @@ with st.expander("Backend status"):
     else:
         st.warning("Backend not reachable or returned unexpected response")
 
+# Load categories
 with st.spinner("Loading categories..."):
     categories = fetch_json("/categories/", retries=5, delay=1.0)
 
+# Mood input
 st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
+
+# Note
 note = st.text_area("Note (optional)")
 
-# Sidebar layout control (user override)
+# UI control: columns per row (user adjustable; default 4)
 st.sidebar.header("Layout")
 cols_choice = st.sidebar.selectbox(
-    "Columns per row for activity chips (override)",
+    "Columns per row for activity chips",
     options=[1, 2, 3, 4, 5, 6],
-    index=2,
-    help="Choose how many columns to use. For phones choose 1 or 2."
+    index=3,
+    help="Choose how many activity chips appear per row. Lower values are better for small screens."
 )
-st.sidebar.caption("Tip: set 1–2 for phones, 3–4 for tablets/desktop.")
 
+# Auto-adjust default for very small screens: provide a hint
+st.sidebar.caption("Tip: set 2 or 3 for mobile devices.")
+
+# -----------------------------
+# Category headers + activity cards
+# -----------------------------
 st.subheader("What have you been up to?")
 
 if not categories:
     st.info("No categories available. Add categories in Manage Categories.")
 else:
-    # Render each category as header + card
+    # Render each category as a header with a card-like container for activities
     for c in categories:
         cid = c.get("id")
         cname = c.get("name", f"Category {cid}")
 
+        # Category header (bigger, Daylio-like)
         st.markdown(f"#### {cname}")
+
+        # Card container (visual separation)
         st.markdown("<div class='daylio-card'>", unsafe_allow_html=True)
 
+        # Load activities for this category
         acts = fetch_activities_for_category(cid)
+
         if not acts:
             st.info("No activities for this category. Add some in Manage Activities.")
             st.markdown("</div>", unsafe_allow_html=True)
             continue
 
-        # Ensure state exists
+        # Ensure state exists for this category
         if cid not in st.session_state.selected_activity_ids:
             st.session_state.selected_activity_ids[cid] = set()
 
-        # Use a grid wrapper so chips fill available width when columns per row is 1
-        st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
-
-        # Render checkboxes but place them inside columns to control layout on larger screens
-        # We'll create N columns per row using st.columns, but the CSS above ensures labels fill width.
-        cols_per_row = int(cols_choice) if cols_choice and cols_choice > 0 else 3
-        # Render in rows of cols_per_row
+        # Render activity chips as checkboxes arranged in rows using the chosen columns per row
+        cols_per_row = int(cols_choice) if cols_choice and cols_choice > 0 else 4
         for i in range(0, len(acts), cols_per_row):
             row = acts[i : i + cols_per_row]
             cols = st.columns(cols_per_row)
@@ -192,32 +185,39 @@ else:
                 aname = a.get("name", f"Activity {aid}")
                 checked = aid in st.session_state.selected_activity_ids[cid]
                 cb_key = f"cb_{cid}_{aid}"
-                # Checkbox widget (label styled to look like chip and fill width)
+                # Use checkbox for stable multi-select behavior
                 val = col.checkbox(aname, value=checked, key=cb_key)
+                # Update session state set based on checkbox value
                 if val and aid not in st.session_state.selected_activity_ids[cid]:
                     st.session_state.selected_activity_ids[cid].add(aid)
                 if not val and aid in st.session_state.selected_activity_ids[cid]:
                     st.session_state.selected_activity_ids[cid].remove(aid)
 
         st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-# Quick actions
+# -----------------------------
+# Quick actions: clear selections
+# -----------------------------
 st.markdown("---")
-c1, c2, c3 = st.columns([1,1,2])
-with c1:
+cols = st.columns([1, 1, 2])
+with cols[0]:
     if st.button("Clear all selections"):
         st.session_state.selected_activity_ids = {}
         st.success("Cleared selections.")
-with c2:
+with cols[1]:
     if st.button("Clear empty categories"):
-        st.session_state.selected_activity_ids = {k: v for k, v in st.session_state.selected_activity_ids.items() if v}
+        st.session_state.selected_activity_ids = {
+            k: v for k, v in st.session_state.selected_activity_ids.items() if v
+        }
         st.success("Cleared empty category selections.")
-with c3:
-    st.caption("Select activities across categories. Use Clear to reset. Adjust Columns in the sidebar for layout.")
+with cols[2]:
+    st.caption("Select activities across categories. Use Clear to reset.")
 
-# Save
+# -----------------------------
+# Save button
+# -----------------------------
 if st.button("Save"):
+    # Collect selected IDs across all categories
     selected_ids = []
     for ids in st.session_state.selected_activity_ids.values():
         selected_ids.extend(list(ids))
@@ -236,6 +236,7 @@ if st.button("Save"):
         st.error("Could not send request to backend.")
     elif resp.ok:
         st.success("Saved mood entry.")
+        # Clear selections after successful save
         st.session_state.selected_activity_ids = {}
     else:
         try:
