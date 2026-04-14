@@ -16,6 +16,7 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
     for attempt in range(1, retries + 1):
         try:
             r = requests.get(url, timeout=timeout)
+
             if r.status_code == 200:
                 try:
                     return r.json()
@@ -25,6 +26,7 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
             else:
                 st.warning(f"Backend returned status {r.status_code}")
                 return []
+
         except RequestException as e:
             if attempt == retries:
                 st.error(f"Failed to reach backend after {retries} attempts: {e}")
@@ -37,7 +39,7 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
 st.title("Mood Log")
 st.subheader("Recent Mood Entries")
 
-# Check backend health
+# Backend health check
 with st.expander("Backend status"):
     health = fetch_json("/health", retries=3, delay=0.5)
     if isinstance(health, dict) and health.get("status") == "ok":
@@ -45,30 +47,45 @@ with st.expander("Backend status"):
     else:
         st.warning("Backend not reachable or returned unexpected response")
 
-# Fetch mood entries
-entries = fetch_json("/mood", retries=5, delay=1.0)
+# -----------------------------
+# Load mood entries
+# -----------------------------
+with st.spinner("Loading mood entries..."):
+    entries = fetch_json("/mood", retries=5, delay=1.0)
+
 if not entries:
-    st.info("No mood entries found or backend unavailable.")
-else:
-    # Sort newest → oldest
-    entries = sorted(entries, key=lambda x: x["timestamp"], reverse=True)
+    st.info("No mood entries found yet.")
+    st.stop()
 
-    # Fetch activities for ID → name mapping
+# Sort newest → oldest
+entries = sorted(entries, key=lambda x: x.get("timestamp", ""), reverse=True)
+
+# -----------------------------
+# Load activities for ID → name mapping
+# -----------------------------
+with st.spinner("Loading activities..."):
     activities = fetch_json("/activities", retries=5, delay=1.0)
-    activity_lookup = {a["id"]: a["name"] for a in activities} if activities else {}
 
-    # Render entries
-    for e in entries:
-        ts = e.get("timestamp", "Unknown time")
-        mood = e.get("mood_score", "?")
-        note = e.get("note", "")
+activity_lookup = {a["id"]: a["name"] for a in activities} if activities else {}
 
-        act_ids = e.get("activity_ids", [])
-        act_names = [activity_lookup.get(aid, f"ID {aid}") for aid in act_ids]
-        act_display = ", ".join(act_names) if act_names else "None"
+# -----------------------------
+# Render entries
+# -----------------------------
+for e in entries:
+    ts = e.get("timestamp", "Unknown time")
+    mood = e.get("mood_score", "?")
+    note = e.get("note", "")
 
-        st.markdown(f"**{ts} — Mood {mood}**")
-        if note:
-            st.write(f"Note: {note}")
-        st.write(f"Activities: {act_display}")
-        st.markdown("---")
+    # Convert activity IDs → names
+    act_ids = e.get("activity_ids", [])
+    act_names = [activity_lookup.get(aid, f"ID {aid}") for aid in act_ids]
+    act_display = ", ".join(act_names) if act_names else "None"
+
+    st.markdown(f"### {ts}")
+    st.write(f"**Mood:** {mood}")
+    st.write(f"**Activities:** {act_display}")
+
+    if note:
+        st.write(f"**Note:** {note}")
+
+    st.markdown("---")
