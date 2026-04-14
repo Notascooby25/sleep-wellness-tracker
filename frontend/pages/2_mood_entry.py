@@ -4,9 +4,10 @@ import requests
 import time
 from requests.exceptions import RequestException
 from json import JSONDecodeError
+import os
 
-# Use environment-driven API base if available; fallback to service name
-API_BASE = "http://backend:8000"
+# Prefer environment variable if set (from .env via docker-compose); fallback to service name
+API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 def fetch_json(path, retries=5, delay=1.0, timeout=3):
     url = f"{API_BASE}{path}"
