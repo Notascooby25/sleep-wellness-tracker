@@ -95,7 +95,7 @@ if st.button("Add Activity"):
         })
         if resp and resp.ok:
             st.success("Activity added.")
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("Failed to add activity.")
     else:
@@ -122,7 +122,7 @@ else:
                     resp = put_json(f"/activities/{a['id']}", {"name": new_name})
                     if resp and resp.ok:
                         st.success("Updated.")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.error("Failed to update.")
 
@@ -132,6 +132,6 @@ else:
                 resp = delete(f"/activities/{a['id']}")
                 if resp and resp.ok:
                     st.success("Deleted.")
-                    st.rerun()
+                    st.experimental_rerun()
                 else:
                     st.error("Failed to delete.")
