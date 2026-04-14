@@ -1,35 +1,30 @@
-version: "3.9"
-
 services:
+  db:
+    build: ./db
+    container_name: sleep_db
+    networks:
+      - sleepnet
+
   backend:
     build: ./backend
     container_name: sleep_backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/sleepdb
     depends_on:
       - db
+    ports:
+      - "8000:8000"
+    networks:
+      - sleepnet
 
   frontend:
     build: ./frontend
     container_name: sleep_frontend
-    ports:
-      - "8501:8501"
     depends_on:
       - backend
+    ports:
+      - "8501:8501"
+    networks:
+      - sleepnet
 
-  db:
-    build: ./db
-    container_name: sleep_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: sleepdb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data:Z
-
-
-
-volumes:
-  postgres_data:
+networks:
+  sleepnet:
+    driver: bridge
