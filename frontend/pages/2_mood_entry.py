@@ -1,12 +1,10 @@
 import os
-import json
 import streamlit as st
 import requests
 import time
 from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
-from streamlit.components.v1 import html as st_html
 
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
@@ -51,99 +49,115 @@ if "selected_activity_ids" not in st.session_state:
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# Sidebar
+# Sidebar toggle
 # -----------------------------
 st.sidebar.header("Display")
 compact_mode = st.sidebar.checkbox("Compact mobile mode", value=False)
 
 # -----------------------------
-# CSS (Base + Compact + Animation)
+# CSS
 # -----------------------------
-CSS = f"""
+BASE_CSS = """
 <style>
-:root {{
-  --chip-bg: #f3f4f6;
-  --chip-border: #e6e9ef;
-  --chip-text: #0f172a;
+.stApp {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+  font-size: 15px;
+  line-height: 1.25;
+}
 
-  --chip-selected-bg: #0ea5a4;
-  --chip-selected-text: #ffffff;
-  --chip-selected-border: #089e9c;
-}}
+.daylio-card {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: #ffffff;
+  margin-bottom: 14px;
+}
 
-.chip-grid {{
+.card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax({80 if compact_mode else 110}px, 1fr));
-  gap: {4 if compact_mode else 8}px;
-  margin-top: 6px;
-}}
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
 
-.chip {{
-  background: var(--chip-bg);
-  border: 1px solid var(--chip-border);
-  color: var(--chip-text);
-  padding: {4 if compact_mode else 8}px {6 if compact_mode else 10}px;
-  border-radius: {14 if compact_mode else 18}px;
-  font-size: {12 if compact_mode else 14}px;
-  font-weight: 500;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.12s ease-out;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  user-select: none;
-}}
+.stCheckbox > label {
+  display: block !important;
+  width: 100% !important;
+  padding: 8px 10px !important;
+  border-radius: 18px !important;
+  background: #f3f4f6 !important;
+  border: 1px solid #e6e9ef !important;
+  color: #0f172a !important;
+  text-align: center !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
 
-.chip.selected {{
-  background: var(--chip-selected-bg);
-  color: var(--chip-selected-text);
-  border-color: var(--chip-selected-border);
-  box-shadow: 0 2px 6px rgba(14,165,164,0.35);
-  transform: scale(1.05);
-}}
+.stCheckbox input[type="checkbox"]:checked + label {
+  background: #0ea5a4 !important;
+  color: #ffffff !important;
+  border-color: #089e9c !important;
+}
 
-.chip:active {{
-  transform: scale(1.05);
-  box-shadow: 0 2px 6px rgba(14,165,164,0.35);
-}}
+.stCheckbox {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .stApp { font-size: 14px; }
+  .stCheckbox > label { font-size: 13px !important; padding: 7px 8px !important; }
+  .card-grid { gap: 6px; }
+}
+
+@media (max-width: 600px) {
+  .stApp { font-size: 13px; }
+  .stCheckbox > label { font-size: 12px !important; padding: 6px 6px !important; }
+  .card-grid { gap: 6px; }
+}
 </style>
 """
-st.markdown(CSS, unsafe_allow_html=True)
 
-# -----------------------------
-# JS for chip toggle
-# -----------------------------
-JS = """
-<script>
-function initChipLogic() {
-    const chips = document.querySelectorAll('.chip');
-    const hiddenInput = document.getElementById('selected_ids_input');
-
-    chips.forEach(chip => {
-        chip.addEventListener('click', () => {
-            chip.classList.toggle('selected');
-
-            const selected = Array.from(document.querySelectorAll('.chip.selected'))
-                .map(c => c.dataset.id);
-
-            hiddenInput.value = JSON.stringify(selected);
-            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-    });
+COMPACT_CSS = """
+<style>
+.stApp {
+  font-size: 14px;
 }
-setTimeout(initChipLogic, 100);
-</script>
+
+.daylio-card {
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  background: #ffffff;
+  margin-bottom: 10px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 4px;
+  align-items: start;
+}
+
+.stCheckbox > label {
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  border-radius: 14px !important;
+  margin: 0 !important;
+}
+
+.stCheckbox input[type="checkbox"]:checked + label {
+  background: #0ea5a4 !important;
+  color: #ffffff !important;
+  border-color: #089e9c !important;
+}
+</style>
 """
-st_html(JS, height=0)
 
-# -----------------------------
-# Hidden input for chip state
-# -----------------------------
-selected_ids_json = st.text_input("selected_ids_input", "[]", key="selected_ids_input")
-
-try:
-    selected_ids = set(json.loads(selected_ids_json))
-except:
-    selected_ids = set()
+st.markdown(BASE_CSS, unsafe_allow_html=True)
+if compact_mode:
+    st.markdown(COMPACT_CSS, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -182,29 +196,60 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
             continue
 
-        st.markdown("<div class='chip-grid'>", unsafe_allow_html=True)
+        if cid not in st.session_state.selected_activity_ids:
+            st.session_state.selected_activity_ids[cid] = set()
+
+        st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
 
         for a in acts:
-            aid = str(a["id"])
+            aid = a["id"]
             aname = a["name"]
-            selected_class = "selected" if aid in selected_ids else ""
-            st.markdown(
-                f"<button class='chip {selected_class}' data-id='{aid}'>{aname}</button>",
-                unsafe_allow_html=True
-            )
+            checked = aid in st.session_state.selected_activity_ids[cid]
+            key = f"cb_{cid}_{aid}"
+
+            val = st.checkbox(aname, value=checked, key=key)
+            if val:
+                st.session_state.selected_activity_ids[cid].add(aid)
+            else:
+                st.session_state.selected_activity_ids[cid].discard(aid)
 
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# Quick actions
+# -----------------------------
+st.markdown("---")
+c1, c2, c3 = st.columns([1, 1, 2])
+
+with c1:
+    if st.button("Clear all selections"):
+        st.session_state.selected_activity_ids = {}
+        st.success("Cleared selections.")
+
+with c2:
+    if st.button("Clear empty categories"):
+        st.session_state.selected_activity_ids = {
+            k: v for k, v in st.session_state.selected_activity_ids.items() if v
+        }
+        st.success("Cleared empty category selections.")
+
+with c3:
+    st.caption("Select activities across categories. Use Clear to reset.")
 
 # -----------------------------
 # Save
 # -----------------------------
 if st.button("Save"):
+    selected_ids = []
+    for ids in st.session_state.selected_activity_ids.values():
+        selected_ids.extend(list(ids))
+
     payload = {
         "mood_score": mood_score,
         "note": note,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "activity_ids": list(selected_ids),
+        "activity_ids": selected_ids,
     }
 
     with st.spinner("Saving entry..."):
