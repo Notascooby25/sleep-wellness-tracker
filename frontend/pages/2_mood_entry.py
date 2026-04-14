@@ -24,7 +24,6 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
                     st.error("Backend returned invalid JSON.")
                     return []
             else:
-                # Non-200 is not fatal for UI; return empty list so UI can handle it
                 st.warning(f"Backend returned status {r.status_code} for {path}")
                 return []
         except RequestException as e:
@@ -58,8 +57,36 @@ if "selected_activity_ids" not in st.session_state:
     # dict: { category_id: set(activity_id, ...) }
     st.session_state.selected_activity_ids = {}
 
-if "focused_category" not in st.session_state:
-    st.session_state.focused_category = None
+# -----------------------------
+# Small CSS for card/chip look
+# -----------------------------
+CARD_STYLE = """
+<style>
+.daylio-card {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e6e6e6;
+  background: linear-gradient(180deg, #ffffff, #fbfbfb);
+  margin-bottom: 12px;
+}
+.activity-chip {
+  display:inline-block;
+  margin:4px 6px 4px 0;
+  padding:6px 10px;
+  border-radius:18px;
+  background:#f1f5f9;
+  color:#111827;
+  font-size:14px;
+  border:1px solid #e2e8f0;
+}
+.activity-chip-selected {
+  background:#0ea5a4;
+  color:white;
+  border:1px solid #089e9c;
+}
+</style>
+"""
+st.markdown(CARD_STYLE, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -98,53 +125,47 @@ else:
         cid = c.get("id")
         cname = c.get("name", f"Category {cid}")
 
-        # Category header
-        st.markdown(f"### {cname}")
+        # Category header (bigger, Daylio-like)
+        st.markdown(f"#### {cname}")
 
         # Card container (visual separation)
-        with st.container():
-            st.markdown("<div style='padding:8px;border-radius:8px;border:1px solid #eee;background:#fafafa'>", unsafe_allow_html=True)
+        st.markdown("<div class='daylio-card'>", unsafe_allow_html=True)
 
-            # Load activities for this category
-            acts = fetch_activities_for_category(cid)
+        # Load activities for this category
+        acts = fetch_activities_for_category(cid)
 
-            if not acts:
-                st.info("No activities for this category. Add some in Manage Activities.")
-                st.markdown("</div>", unsafe_allow_html=True)
-                continue
-
-            # Ensure state exists for this category
-            if cid not in st.session_state.selected_activity_ids:
-                st.session_state.selected_activity_ids[cid] = set()
-
-            # Layout: render activity chips as toggle buttons in rows
-            cols_per_row = 4
-            for i in range(0, len(acts), cols_per_row):
-                row = acts[i : i + cols_per_row]
-                cols = st.columns(cols_per_row)
-                for j, a in enumerate(row):
-                    col = cols[j]
-                    aid = a.get("id")
-                    aname = a.get("name", f"Activity {aid}")
-                    is_selected = aid in st.session_state.selected_activity_ids[cid]
-
-                    # Visual label: checkmark when selected
-                    label = f"✓ {aname}" if is_selected else aname
-
-                    # Use a unique key per activity button
-                    key = f"act_btn_{cid}_{aid}"
-
-                    if col.button(label, key=key):
-                        # Toggle selection
-                        if is_selected:
-                            st.session_state.selected_activity_ids[cid].remove(aid)
-                        else:
-                            st.session_state.selected_activity_ids[cid].add(aid)
-
+        if not acts:
+            st.info("No activities for this category. Add some in Manage Activities.")
             st.markdown("</div>", unsafe_allow_html=True)
+            continue
+
+        # Ensure state exists for this category
+        if cid not in st.session_state.selected_activity_ids:
+            st.session_state.selected_activity_ids[cid] = set()
+
+        # Render activity chips as checkboxes arranged in rows
+        cols_per_row = 4
+        for i in range(0, len(acts), cols_per_row):
+            row = acts[i : i + cols_per_row]
+            cols = st.columns(cols_per_row)
+            for j, a in enumerate(row):
+                col = cols[j]
+                aid = a.get("id")
+                aname = a.get("name", f"Activity {aid}")
+                checked = aid in st.session_state.selected_activity_ids[cid]
+                # Use checkbox for stable multi-select behavior
+                cb_key = f"cb_{cid}_{aid}"
+                val = col.checkbox(aname, value=checked, key=cb_key)
+                # Update session state set based on checkbox value
+                if val and aid not in st.session_state.selected_activity_ids[cid]:
+                    st.session_state.selected_activity_ids[cid].add(aid)
+                if not val and aid in st.session_state.selected_activity_ids[cid]:
+                    st.session_state.selected_activity_ids[cid].remove(aid)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # -----------------------------
-# Quick actions: clear selections per category
+# Quick actions: clear selections
 # -----------------------------
 st.markdown("---")
 cols = st.columns([1, 1, 2])
@@ -153,15 +174,14 @@ with cols[0]:
         st.session_state.selected_activity_ids = {}
         st.success("Cleared selections.")
 with cols[1]:
-    if st.button("Clear current category"):
-        focused = st.session_state.get("focused_category")
-        if focused and focused in st.session_state.selected_activity_ids:
-            st.session_state.selected_activity_ids[focused] = set()
-            st.success("Cleared selections for current category.")
-        else:
-            st.info("No focused category to clear.")
+    if st.button("Clear empty categories"):
+        # remove empty sets to keep state tidy
+        st.session_state.selected_activity_ids = {
+            k: v for k, v in st.session_state.selected_activity_ids.items() if v
+        }
+        st.success("Cleared empty category selections.")
 with cols[2]:
-    st.caption("Tap activities to toggle selection. Use Clear to reset.")
+    st.caption("Select activities across categories. Use Clear to reset.")
 
 # -----------------------------
 # Save button
@@ -189,7 +209,6 @@ if st.button("Save"):
         # Clear selections after successful save
         st.session_state.selected_activity_ids = {}
     else:
-        # Show backend error code and any returned JSON message if available
         try:
             err = resp.json()
         except Exception:
