@@ -1,4 +1,3 @@
-# backend/app/routes/mood.py
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
@@ -6,10 +5,9 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 
-# IMPORTANT: give the router a prefix
 router = APIRouter(prefix="/mood", tags=["mood"])
 
-@router.get("/", response_model=List[schemas.MoodRead])
+@router.get("", response_model=List[schemas.MoodRead])
 def list_mood_entries(db: Session = Depends(get_db)):
     rows = db.query(models.Mood).all()
     result = []
@@ -25,7 +23,7 @@ def list_mood_entries(db: Session = Depends(get_db)):
         })
     return result
 
-@router.post("/", response_model=schemas.MoodRead)
+@router.post("", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
     db_mood = models.Mood(
         mood_score=payload.mood_score,
