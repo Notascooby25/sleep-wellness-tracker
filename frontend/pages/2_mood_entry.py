@@ -1,72 +1,57 @@
+# frontend/pages/2_mood_entry.py
 import streamlit as st
 import requests
-from datetime import datetime
+import time
+from requests.exceptions import RequestException
+from json import JSONDecodeError
 
 API_BASE = "http://backend:8000"
 
 st.title("Log Your Mood")
 
-# -------------------------
-# Mood score
-# -------------------------
-st.subheader("How are you feeling?")
+def fetch_categories(retries=5, delay=1.0):
+    url = f"{API_BASE}/categories"
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(url, timeout=3)
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    if isinstance(data, list):
+                        return data
+                    st.error("Unexpected categories format from backend.")
+                    return []
+                except JSONDecodeError:
+                    st.error("Backend returned invalid JSON for categories.")
+                    return []
+            else:
+                st.warning(f"Backend returned status {resp.status_code}")
+                return []
+        except RequestException as e:
+            if attempt == retries:
+                st.error(f"Failed to reach backend after {retries} attempts: {e}")
+                return []
+            time.sleep(delay)
+
+# call fetch_categories inside the page runtime, not at import time
+categories = fetch_categories()
+
+category_options = [c.get("name", f"id:{c.get('id')}") for c in categories] if categories else []
+
+st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
+selected_category = st.selectbox("Category", ["(none)"] + category_options)
+note = st.text_area("Note (optional)")
 
-# -------------------------
-# Fetch categories + activities
-# -------------------------
-categories = requests.get(f"{API_BASE}/categories").json()
-activities = requests.get(f"{API_BASE}/activities").json()
-
-# Organise activities by category
-activities_by_cat = {}
-for cat in categories:
-    activities_by_cat[cat["id"]] = {
-        "name": cat["name"],
-        "activities": [a for a in activities if a["category_id"] == cat["id"]]
-    }
-
-# -------------------------
-# Activity selection
-# -------------------------
-st.subheader("Activities")
-
-selected_activity_ids = []
-
-for cat_id, data in activities_by_cat.items():
-    st.markdown(f"### {data['name']}")
-    for act in data["activities"]:
-        if st.checkbox(act["name"], key=f"act_{act['id']}"):
-            selected_activity_ids.append(act["id"])
-
-# -------------------------
-# Notes
-# -------------------------
-st.subheader("Notes")
-note = st.text_area("Write anything you want to remember", "")
-
-# -------------------------
-# Timestamp
-# -------------------------
-st.subheader("When did this happen?")
-timestamp = st.datetime_input("Date & Time", datetime.now())
-
-# -------------------------
-# Submit
-# -------------------------
-if st.button("Log Entry"):
-    payload = {
-        "mood_score": mood_score,
-        "note": note,
-        "timestamp": timestamp.isoformat(),
-        "activity_ids": selected_activity_ids
-    }
-
+if st.button("Save"):
     try:
-        response = requests.post(f"{API_BASE}/mood", json=payload)
-        if response.status_code in (200, 201):
-            st.success("Entry logged!")
+        r = requests.post(f"{API_BASE}/mood", json={
+            "mood_score": mood_score,
+            "note": note
+        }, timeout=5)
+        if r.ok:
+            st.success("Saved mood entry.")
         else:
-            st.error(f"Error: {response.text}")
-    except Exception as e:
-        st.error(f"Request failed: {e}")
+            st.error(f"Failed to save mood entry: {r.status_code}")
+    except RequestException as e:
+        st.error(f"Failed to reach backend when saving: {e}")
