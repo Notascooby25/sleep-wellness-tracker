@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
+# Mood schemas
 class MoodBase(BaseModel):
     mood_score: int
     note: Optional[str] = None
@@ -19,20 +20,29 @@ class MoodRead(MoodBase):
     class Config:
         from_attributes = True
 
-# Category and Activity schemas
-class CategoryCreate(BaseModel):
+# Category schemas
+class CategoryBase(BaseModel):
     name: str
 
-class CategoryResponse(CategoryCreate):
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryResponse(CategoryBase):
     id: int
+
     class Config:
         from_attributes = True
 
-class ActivityCreate(BaseModel):
+# Activity schemas
+class ActivityBase(BaseModel):
     name: str
     category_id: int
 
-class ActivityResponse(ActivityCreate):
+class ActivityCreate(ActivityBase):
+    pass
+
+class ActivityResponse(ActivityBase):
     id: int
+
     class Config:
         from_attributes = True
