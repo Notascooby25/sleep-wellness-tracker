@@ -46,118 +46,77 @@ def fetch_activities_for_category(category_id):
 # Session state
 # -----------------------------
 if "selected_activity_ids" not in st.session_state:
+    # { category_id: set(activity_ids) }
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# Sidebar toggle
+# Sidebar
 # -----------------------------
 st.sidebar.header("Display")
 compact_mode = st.sidebar.checkbox("Compact mobile mode", value=False)
 
 # -----------------------------
-# CSS
+# CSS (Base + Compact)
 # -----------------------------
-BASE_CSS = """
+CSS = f"""
 <style>
-.stApp {
+.stApp {{
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
   font-size: 15px;
   line-height: 1.25;
-}
+}}
 
-.daylio-card {
-  padding: 10px;
+.daylio-card {{
+  padding: {6 if compact_mode else 10}px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.06);
   background: #ffffff;
-  margin-bottom: 14px;
-}
+  margin-bottom: {10 if compact_mode else 14}px;
+}}
 
-.card-grid {
+.card-grid {{
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax({80 if compact_mode else 110}px, 1fr));
+  gap: {4 if compact_mode else 8}px;
   align-items: start;
-}
+}}
 
-.stCheckbox > label {
+.stCheckbox > label {{
   display: block !important;
   width: 100% !important;
-  padding: 8px 10px !important;
-  border-radius: 18px !important;
+  padding: {4 if compact_mode else 8}px {6 if compact_mode else 10}px !important;
+  border-radius: {14 if compact_mode else 18}px !important;
   background: #f3f4f6 !important;
   border: 1px solid #e6e9ef !important;
   color: #0f172a !important;
   text-align: center !important;
   margin: 0 !important;
-  font-size: 14px !important;
+  font-size: {12 if compact_mode else 14}px !important;
   font-weight: 500 !important;
-}
+  box-sizing: border-box !important;
+}}
 
-.stCheckbox input[type="checkbox"]:checked + label {
+.stCheckbox input[type="checkbox"]:checked + label {{
   background: #0ea5a4 !important;
   color: #ffffff !important;
   border-color: #089e9c !important;
-}
+}}
 
-.stCheckbox {
+.stCheckbox {{
   margin: 0 !important;
   padding: 0 !important;
-}
+}}
 
-@media (max-width: 900px) {
-  .stApp { font-size: 14px; }
-  .stCheckbox > label { font-size: 13px !important; padding: 7px 8px !important; }
-  .card-grid { gap: 6px; }
-}
+@media (max-width: 900px) {{
+  .stApp {{ font-size: 14px; }}
+}}
 
-@media (max-width: 600px) {
-  .stApp { font-size: 13px; }
-  .stCheckbox > label { font-size: 12px !important; padding: 6px 6px !important; }
-  .card-grid { gap: 6px; }
-}
+@media (max-width: 600px) {{
+  .stApp {{ font-size: 13px; }}
+}}
 </style>
 """
-
-COMPACT_CSS = """
-<style>
-.stApp {
-  font-size: 14px;
-}
-
-.daylio-card {
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.05);
-  background: #ffffff;
-  margin-bottom: 10px;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 4px;
-  align-items: start;
-}
-
-.stCheckbox > label {
-  padding: 4px 6px !important;
-  font-size: 12px !important;
-  border-radius: 14px !important;
-  margin: 0 !important;
-}
-
-.stCheckbox input[type="checkbox"]:checked + label {
-  background: #0ea5a4 !important;
-  color: #ffffff !important;
-  border-color: #089e9c !important;
-}
-</style>
-"""
-
-st.markdown(BASE_CSS, unsafe_allow_html=True)
-if compact_mode:
-    st.markdown(COMPACT_CSS, unsafe_allow_html=True)
+st.markdown(CSS, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -243,7 +202,8 @@ with c3:
 if st.button("Save"):
     selected_ids = []
     for ids in st.session_state.selected_activity_ids.values():
-        selected_ids.extend(list(ids))
+        # ensure we send ints, not sets or strings
+        selected_ids.extend(int(i) for i in ids)
 
     payload = {
         "mood_score": mood_score,
@@ -263,7 +223,7 @@ if st.button("Save"):
     else:
         try:
             err = resp.json()
-        except:
+        except Exception:
             err = None
         if err and isinstance(err, dict) and err.get("detail"):
             st.error(f"Failed to save mood entry: {resp.status_code} — {err['detail']}")
