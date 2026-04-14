@@ -7,8 +7,9 @@ from fastapi.encoders import jsonable_encoder
 from .. import models, schemas
 from ..database import get_db
 
-router = APIRouter(prefix="/categories", tags=["categories"])
+router = APIRouter()
 
+@router.get("", include_in_schema=False)
 @router.get("/", response_model=List[schemas.CategoryResponse])
 def list_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
@@ -20,6 +21,7 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Category not found")
     return category
 
+@router.post("", include_in_schema=False)
 @router.post("/", response_model=schemas.CategoryResponse)
 def create_category(payload: schemas.CategoryCreate, db: Session = Depends(get_db)):
     existing = db.query(models.Category).filter(models.Category.name == payload.name).first()
@@ -29,7 +31,7 @@ def create_category(payload: schemas.CategoryCreate, db: Session = Depends(get_d
     db.add(new_cat)
     db.commit()
     db.refresh(new_cat)
-    return new_cat
+    return JSONResponse(status_code=201, content=jsonable_encoder(new_cat))
 
 @router.put("/{category_id}", response_model=schemas.CategoryResponse)
 def update_category(category_id: int, payload: schemas.CategoryCreate, db: Session = Depends(get_db)):
