@@ -1,11 +1,9 @@
+# backend/app/schemas.py
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-# -------------------------
-# MOOD SCHEMAS
-# -------------------------
-
+# Mood schemas
 class MoodBase(BaseModel):
     mood_score: int
     note: Optional[str] = None
@@ -22,11 +20,7 @@ class MoodRead(MoodBase):
     class Config:
         from_attributes = True
 
-
-# -------------------------
-# CATEGORY SCHEMAS
-# -------------------------
-
+# Category schemas
 class CategoryBase(BaseModel):
     name: str
 
@@ -39,14 +33,10 @@ class CategoryResponse(CategoryBase):
     class Config:
         from_attributes = True
 
-
-# -------------------------
-# ACTIVITY SCHEMAS
-# -------------------------
-
+# Activity schemas
 class ActivityBase(BaseModel):
     name: str
-    category_id: Optional[int] = None
+    category_id: int
 
 class ActivityCreate(ActivityBase):
     pass
