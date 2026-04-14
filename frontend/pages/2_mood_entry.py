@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
 
-# Prefer environment variable (from .env via docker-compose)
+# Base API URL (use docker-compose env or fallback to localhost)
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 # -----------------------------
@@ -17,7 +17,6 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
     for attempt in range(1, retries + 1):
         try:
             r = requests.get(url, timeout=timeout)
-
             if r.status_code == 200:
                 try:
                     return r.json()
@@ -25,9 +24,9 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
                     st.error("Backend returned invalid JSON.")
                     return []
             else:
-                st.warning(f"Backend returned status {r.status_code}")
+                # Non-200 is not fatal for UI; return empty list so UI can handle it
+                st.warning(f"Backend returned status {r.status_code} for {path}")
                 return []
-
         except RequestException as e:
             if attempt == retries:
                 st.error(f"Failed to reach backend after {retries} attempts: {e}")
@@ -49,100 +48,135 @@ def post_json(path, payload, timeout=5):
 # Fetch activities for a category
 # -----------------------------
 def fetch_activities_for_category(category_id):
-    all_activities = fetch_json("/activities", retries=5, delay=1.0)
+    all_activities = fetch_json("/activities/", retries=5, delay=1.0)
     return [a for a in all_activities if a.get("category_id") == category_id]
 
 # -----------------------------
-# Session state for category selection
+# Session state initialization
 # -----------------------------
-if "selected_category" not in st.session_state:
-    st.session_state.selected_category = None
+if "selected_activity_ids" not in st.session_state:
+    # dict: { category_id: set(activity_id, ...) }
+    st.session_state.selected_activity_ids = {}
+
+if "focused_category" not in st.session_state:
+    st.session_state.focused_category = None
 
 # -----------------------------
 # Page UI
 # -----------------------------
 st.title("Log Your Mood")
 
-# Backend health check
+# Backend status (non-blocking)
 with st.expander("Backend status"):
-    health = fetch_json("/health", retries=3, delay=0.5)
+    health = fetch_json("/health", retries=2, delay=0.5)
     if isinstance(health, dict) and health.get("status") == "ok":
         st.success("Backend reachable")
     else:
         st.warning("Backend not reachable or returned unexpected response")
 
-# -----------------------------
 # Load categories
-# -----------------------------
 with st.spinner("Loading categories..."):
-    categories = fetch_json("/categories", retries=5, delay=1.0)
+    categories = fetch_json("/categories/", retries=5, delay=1.0)
 
+# Mood input
 st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
 
-# -----------------------------
-# Category selection (Option 3)
-# -----------------------------
-st.subheader("Category")
-
-if categories:
-    cols = st.columns(3)  # 3 buttons per row
-
-    for idx, c in enumerate(categories):
-        col = cols[idx % 3]
-
-        # Highlight selected category
-        is_selected = st.session_state.selected_category == c["id"]
-        label = f"👉 {c['name']}" if is_selected else c["name"]
-
-        if col.button(label):
-            st.session_state.selected_category = c["id"]
-else:
-    st.info("No categories available.")
-
-category_id = st.session_state.selected_category
-
-# -----------------------------
-# Load activities for selected category
-# -----------------------------
-activities_for_category = []
-if category_id:
-    activities_for_category = fetch_activities_for_category(category_id)
-
-# -----------------------------
-# Multi-select chips (Daylio style)
-# -----------------------------
-if activities_for_category:
-    activity_names = [a["name"] for a in activities_for_category]
-    selected_activities = st.multiselect(
-        "Activities",
-        activity_names,
-        default=[],
-        help="Select all activities that apply"
-    )
-else:
-    selected_activities = []
-
+# Note
 note = st.text_area("Note (optional)")
+
+# -----------------------------
+# Category headers + activity cards
+# -----------------------------
+st.subheader("What have you been up to?")
+
+if not categories:
+    st.info("No categories available. Add categories in Manage Categories.")
+else:
+    # Render each category as a header with a card-like container for activities
+    for c in categories:
+        cid = c.get("id")
+        cname = c.get("name", f"Category {cid}")
+
+        # Category header
+        st.markdown(f"### {cname}")
+
+        # Card container (visual separation)
+        with st.container():
+            st.markdown("<div style='padding:8px;border-radius:8px;border:1px solid #eee;background:#fafafa'>", unsafe_allow_html=True)
+
+            # Load activities for this category
+            acts = fetch_activities_for_category(cid)
+
+            if not acts:
+                st.info("No activities for this category. Add some in Manage Activities.")
+                st.markdown("</div>", unsafe_allow_html=True)
+                continue
+
+            # Ensure state exists for this category
+            if cid not in st.session_state.selected_activity_ids:
+                st.session_state.selected_activity_ids[cid] = set()
+
+            # Layout: render activity chips as toggle buttons in rows
+            cols_per_row = 4
+            for i in range(0, len(acts), cols_per_row):
+                row = acts[i : i + cols_per_row]
+                cols = st.columns(cols_per_row)
+                for j, a in enumerate(row):
+                    col = cols[j]
+                    aid = a.get("id")
+                    aname = a.get("name", f"Activity {aid}")
+                    is_selected = aid in st.session_state.selected_activity_ids[cid]
+
+                    # Visual label: checkmark when selected
+                    label = f"✓ {aname}" if is_selected else aname
+
+                    # Use a unique key per activity button
+                    key = f"act_btn_{cid}_{aid}"
+
+                    if col.button(label, key=key):
+                        # Toggle selection
+                        if is_selected:
+                            st.session_state.selected_activity_ids[cid].remove(aid)
+                        else:
+                            st.session_state.selected_activity_ids[cid].add(aid)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# Quick actions: clear selections per category
+# -----------------------------
+st.markdown("---")
+cols = st.columns([1, 1, 2])
+with cols[0]:
+    if st.button("Clear all selections"):
+        st.session_state.selected_activity_ids = {}
+        st.success("Cleared selections.")
+with cols[1]:
+    if st.button("Clear current category"):
+        focused = st.session_state.get("focused_category")
+        if focused and focused in st.session_state.selected_activity_ids:
+            st.session_state.selected_activity_ids[focused] = set()
+            st.success("Cleared selections for current category.")
+        else:
+            st.info("No focused category to clear.")
+with cols[2]:
+    st.caption("Tap activities to toggle selection. Use Clear to reset.")
 
 # -----------------------------
 # Save button
 # -----------------------------
 if st.button("Save"):
-    # Convert selected activity names → IDs
-    selected_activity_ids = [
-        a["id"] for a in activities_for_category
-        if a["name"] in selected_activities
-    ]
-
-    # Backend requires timestamp
-    now_utc = datetime.now(timezone.utc).isoformat()
+    # Collect selected IDs across all categories
+    selected_ids = []
+    for ids in st.session_state.selected_activity_ids.values():
+        selected_ids.extend(list(ids))
 
     payload = {
         "mood_score": mood_score,
         "note": note,
-        "timestamp": now_utc,
-        "activity_ids": selected_activity_ids
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "activity_ids": selected_ids,
     }
 
     with st.spinner("Saving entry..."):
@@ -152,5 +186,15 @@ if st.button("Save"):
         st.error("Could not send request to backend.")
     elif resp.ok:
         st.success("Saved mood entry.")
+        # Clear selections after successful save
+        st.session_state.selected_activity_ids = {}
     else:
-        st.error(f"Failed to save mood entry: {resp.status_code}")
+        # Show backend error code and any returned JSON message if available
+        try:
+            err = resp.json()
+        except Exception:
+            err = None
+        if err and isinstance(err, dict) and err.get("detail"):
+            st.error(f"Failed to save mood entry: {resp.status_code} — {err.get('detail')}")
+        else:
+            st.error(f"Failed to save mood entry: {resp.status_code}")
