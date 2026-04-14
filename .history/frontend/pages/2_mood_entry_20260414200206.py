@@ -1,4 +1,3 @@
-# frontend/pages/2_mood_entry.py
 import os
 import streamlit as st
 import requests
@@ -6,7 +5,6 @@ import time
 from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
-from streamlit.components.v1 import html as st_html
 
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
@@ -25,6 +23,7 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
                     st.error("Backend returned invalid JSON.")
                     return []
             else:
+                st.warning(f"Backend returned status {r.status_code} for {path}")
                 return []
         except RequestException as e:
             if attempt == retries:
@@ -51,122 +50,79 @@ if "selected_activity_ids" not in st.session_state:
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# Auto-detect viewport width (one-time)
+# Responsive CSS (improved)
 # -----------------------------
-AUTO_JS = """
-<script>
-(function(){
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has('cols')) {
-      const w = window.innerWidth || document.documentElement.clientWidth;
-      let cols = 3;
-      if (w < 420) cols = 1;
-      else if (w < 700) cols = 2;
-      else if (w < 1000) cols = 3;
-      else cols = 4;
-      params.set('cols', cols);
-      const newUrl = window.location.pathname + '?' + params.toString();
-      window.location.replace(newUrl);
-    }
-  } catch (e) {}
-})();
-</script>
-"""
-st_html(AUTO_JS, height=0)
-
-query_params = st.experimental_get_query_params()
-detected_cols = int(query_params.get("cols", [3])[0])
-
-# Sidebar override
-st.sidebar.header("Layout")
-cols_choice_override = st.sidebar.selectbox(
-    "Columns per row (override auto)",
-    options=[None, 1, 2, 3, 4, 5, 6],
-    index=0,
-    format_func=lambda x: "Auto" if x is None else str(x),
-)
-cols_per_row = int(cols_choice_override) if cols_choice_override else detected_cols
-
-# -----------------------------
-# Improved responsive CSS
-# -----------------------------
-STYLES = f"""
+RESPONSIVE_CSS = """
 <style>
-/* Base font */
-.stApp {{
+/* Base app font sizing (desktop) */
+.stApp {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
-  line-height: 1.25;
-}}
+  line-height: 1.2;
+}
 
 /* Card look */
-.daylio-card {{
+.daylio-card {
   padding: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: linear-gradient(180deg, #ffffff, #fcfcfd);
-  margin-bottom: 14px;
-}}
+  border-radius: 10px;
+  border: 1px solid #e6e6e6;
+  background: linear-gradient(180deg, #ffffff, #fbfbfb);
+  margin-bottom: 12px;
+}
 
-/* Grid wrapper: auto-fit so chips fill available space */
-.card-grid {{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 8px;
-  align-items: start;
-}}
-
-/* Make Streamlit checkbox label fill the grid cell and look like a chip */
-.stCheckbox > label {{
+/* Make Streamlit checkbox label fill the column and look like a chip */
+.stCheckbox > label {
   display: block !important;
   width: 100% !important;
   padding: 8px 10px !important;
   border-radius: 18px !important;
-  background: #f3f4f6 !important;
-  border: 1px solid #e6e9ef !important;
-  color: #0f172a !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #111827 !important;
   text-align: center !important;
-  margin: 0 !important;
+  margin: 6px 0 !important;
   box-sizing: border-box !important;
   font-size: 14px !important;
-  font-weight: 500 !important;
-}}
+}
 
-/* Checked state */
-.stCheckbox input[type="checkbox"]:checked + label {{
+/* When the checkbox is checked, Streamlit adds aria-checked; style via sibling selector */
+.stCheckbox input[type="checkbox"]:checked + label {
   background: #0ea5a4 !important;
   color: #ffffff !important;
   border-color: #089e9c !important;
-}}
+}
 
-/* Remove extra spacing around checkbox widget */
-.stCheckbox {{
+/* Remove extra padding around checkbox widget so chips align nicely */
+.stCheckbox {
   margin: 0 !important;
   padding: 0 !important;
-}}
+}
 
-/* Reduce margins Streamlit adds around vertical blocks */
-[data-testid="stVerticalBlock"] > div[role="list"] > div {{
+/* Make columns use full width and remove inner padding so chips span available space */
+[data-testid="stVerticalBlock"] > div[role="list"] > div {
   padding: 0 !important;
-}}
+}
 
-/* Responsive font scaling and chip sizing */
-@media (max-width: 900px) {{
-  .stApp {{ font-size: 14px; }}
-  .stCheckbox > label {{ font-size: 13px !important; padding: 7px 8px !important; }}
-  .card-grid {{ gap: 6px; }}
-}}
-@media (max-width: 600px) {{
-  .stApp {{ font-size: 13px; }}
-  .stCheckbox > label {{ font-size: 12px !important; padding: 6px 6px !important; }}
-  .card-grid {{ gap: 6px; }}
-}}
+/* Responsive scaling for smaller screens */
+@media (max-width: 900px) {
+  .stApp { font-size: 14px; }
+  .stCheckbox > label { font-size: 13px !important; padding: 7px 8px !important; }
+}
+@media (max-width: 600px) {
+  .stApp { font-size: 13px; }
+  .stCheckbox > label { font-size: 12px !important; padding: 6px 6px !important; }
+}
+
+/* Make the card content use CSS grid so chips wrap and fill space when columns are 1 */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
 </style>
 """
-st.markdown(STYLES, unsafe_allow_html=True)
+st.markdown(RESPONSIVE_CSS, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -187,11 +143,22 @@ st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
 note = st.text_area("Note (optional)")
 
+# Sidebar layout control (user override)
+st.sidebar.header("Layout")
+cols_choice = st.sidebar.selectbox(
+    "Columns per row for activity chips (override)",
+    options=[1, 2, 3, 4, 5, 6],
+    index=2,
+    help="Choose how many columns to use. For phones choose 1 or 2."
+)
+st.sidebar.caption("Tip: set 1–2 for phones, 3–4 for tablets/desktop.")
+
 st.subheader("What have you been up to?")
 
 if not categories:
     st.info("No categories available. Add categories in Manage Categories.")
 else:
+    # Render each category as header + card
     for c in categories:
         cid = c.get("id")
         cname = c.get("name", f"Category {cid}")
@@ -205,30 +172,39 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
             continue
 
+        # Ensure state exists
         if cid not in st.session_state.selected_activity_ids:
             st.session_state.selected_activity_ids[cid] = set()
 
-        # Grid wrapper: auto-fit columns will fill available width
+        # Use a grid wrapper so chips fill available width when columns per row is 1
         st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
 
-        # Render checkboxes sequentially; CSS grid will place them into columns
-        for a in acts:
-            aid = a.get("id")
-            aname = a.get("name", f"Activity {aid}")
-            checked = aid in st.session_state.selected_activity_ids[cid]
-            cb_key = f"cb_{cid}_{aid}"
-            val = st.checkbox(aname, value=checked, key=cb_key)
-            if val and aid not in st.session_state.selected_activity_ids[cid]:
-                st.session_state.selected_activity_ids[cid].add(aid)
-            if not val and aid in st.session_state.selected_activity_ids[cid]:
-                st.session_state.selected_activity_ids[cid].remove(aid)
+        # Render checkboxes but place them inside columns to control layout on larger screens
+        # We'll create N columns per row using st.columns, but the CSS above ensures labels fill width.
+        cols_per_row = int(cols_choice) if cols_choice and cols_choice > 0 else 3
+        # Render in rows of cols_per_row
+        for i in range(0, len(acts), cols_per_row):
+            row = acts[i : i + cols_per_row]
+            cols = st.columns(cols_per_row)
+            for j, a in enumerate(row):
+                col = cols[j]
+                aid = a.get("id")
+                aname = a.get("name", f"Activity {aid}")
+                checked = aid in st.session_state.selected_activity_ids[cid]
+                cb_key = f"cb_{cid}_{aid}"
+                # Checkbox widget (label styled to look like chip and fill width)
+                val = col.checkbox(aname, value=checked, key=cb_key)
+                if val and aid not in st.session_state.selected_activity_ids[cid]:
+                    st.session_state.selected_activity_ids[cid].add(aid)
+                if not val and aid in st.session_state.selected_activity_ids[cid]:
+                    st.session_state.selected_activity_ids[cid].remove(aid)
 
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 # Quick actions
 st.markdown("---")
-c1, c2, c3 = st.columns([1, 1, 2])
+c1, c2, c3 = st.columns([1,1,2])
 with c1:
     if st.button("Clear all selections"):
         st.session_state.selected_activity_ids = {}
@@ -238,7 +214,7 @@ with c2:
         st.session_state.selected_activity_ids = {k: v for k, v in st.session_state.selected_activity_ids.items() if v}
         st.success("Cleared empty category selections.")
 with c3:
-    st.caption("Select activities across categories. Use Clear to reset. Use the sidebar to override columns.")
+    st.caption("Select activities across categories. Use Clear to reset. Adjust Columns in the sidebar for layout.")
 
 # Save
 if st.button("Save"):
