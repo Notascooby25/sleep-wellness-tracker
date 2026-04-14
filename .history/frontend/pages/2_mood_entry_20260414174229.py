@@ -17,17 +17,20 @@ def fetch_json(path, retries=5, delay=1.0, timeout=3):
         try:
             r = requests.get(url, timeout=timeout)
 
+            # Success
             if r.status_code == 200:
                 try:
                     return r.json()
                 except JSONDecodeError:
                     st.error("Backend returned invalid JSON.")
                     return []
-            else:
-                st.warning(f"Backend returned status {r.status_code}")
-                return []
+
+            # Non-200 response
+            st.warning(f"Backend returned status {r.status_code}")
+            return []
 
         except RequestException as e:
+            # Final attempt → show error
             if attempt == retries:
                 st.error(f"Failed to reach backend after {retries} attempts: {e}")
                 return []
@@ -45,13 +48,6 @@ def post_json(path, payload, timeout=5):
         return None
 
 # -----------------------------
-# Fetch activities for a category
-# -----------------------------
-def fetch_activities_for_category(category_id):
-    all_activities = fetch_json("/activities", retries=5, delay=1.0)
-    return [a for a in all_activities if a.get("category_id") == category_id]
-
-# -----------------------------
 # Page UI
 # -----------------------------
 st.title("Log Your Mood")
@@ -64,65 +60,33 @@ with st.expander("Backend status"):
     else:
         st.warning("Backend not reachable or returned unexpected response")
 
-# Load categories
+# -----------------------------
+# Load categories safely
+# -----------------------------
 with st.spinner("Loading categories..."):
     categories = fetch_json("/categories", retries=5, delay=1.0)
 
-category_options = [c.get("name", f"id:{c.get('id')}") for c in categories] if categories else []
+category_options = (
+    [c.get("name", f"id:{c.get('id')}") for c in categories]
+    if categories else []
+)
 
+# -----------------------------
+# Mood entry form
+# -----------------------------
 st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
-
-# -----------------------------
-# Category selection
-# -----------------------------
-selected_category_name = st.selectbox("Category", ["(none)"] + category_options)
-
-# Find category ID
-category_id = None
-if selected_category_name != "(none)":
-    for c in categories:
-        if c["name"] == selected_category_name:
-            category_id = c["id"]
-            break
-
-# -----------------------------
-# Load activities for selected category
-# -----------------------------
-activities_for_category = []
-if category_id:
-    activities_for_category = fetch_activities_for_category(category_id)
-
-# -----------------------------
-# Multi-select chips (Daylio style)
-# -----------------------------
-if activities_for_category:
-    activity_names = [a["name"] for a in activities_for_category]
-    selected_activities = st.multiselect(
-        "Activities",
-        activity_names,
-        default=[],
-        help="Select all activities that apply"
-    )
-else:
-    selected_activities = []
-
+selected_category = st.selectbox("Category", ["(none)"] + category_options)
 note = st.text_area("Note (optional)")
 
 # -----------------------------
 # Save button
 # -----------------------------
 if st.button("Save"):
-    # Convert selected activity names → IDs
-    selected_activity_ids = [
-        a["id"] for a in activities_for_category
-        if a["name"] in selected_activities
-    ]
-
     payload = {
         "mood_score": mood_score,
         "note": note,
-        "activity_ids": selected_activity_ids
+        "category": selected_category if selected_category != "(none)" else None
     }
 
     with st.spinner("Saving entry..."):
