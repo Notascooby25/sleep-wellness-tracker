@@ -49,9 +49,15 @@ if "selected_activity_ids" not in st.session_state:
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# CSS (responsive auto-fit grid)
+# Sidebar toggle
 # -----------------------------
-CSS = """
+st.sidebar.header("Display")
+compact_mode = st.sidebar.checkbox("Compact mobile mode", value=False)
+
+# -----------------------------
+# CSS
+# -----------------------------
+BASE_CSS = """
 <style>
 .stApp {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
@@ -112,7 +118,46 @@ CSS = """
 }
 </style>
 """
-st.markdown(CSS, unsafe_allow_html=True)
+
+COMPACT_CSS = """
+<style>
+.stApp {
+  font-size: 14px;
+}
+
+.daylio-card {
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  background: #ffffff;
+  margin-bottom: 10px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 4px;
+  align-items: start;
+}
+
+.stCheckbox > label {
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  border-radius: 14px !important;
+  margin: 0 !important;
+}
+
+.stCheckbox input[type="checkbox"]:checked + label {
+  background: #0ea5a4 !important;
+  color: #ffffff !important;
+  border-color: #089e9c !important;
+}
+</style>
+"""
+
+st.markdown(BASE_CSS, unsafe_allow_html=True)
+if compact_mode:
+    st.markdown(COMPACT_CSS, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -136,7 +181,7 @@ note = st.text_area("Note (optional)")
 st.subheader("What have you been up to?")
 
 if not categories:
-    st.info("No categories available. Add categories in Manage Categories.")
+    st.info("No categories available.")
 else:
     for c in categories:
         cid = c["id"]
