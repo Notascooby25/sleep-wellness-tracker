@@ -2,9 +2,10 @@ import os
 import streamlit as st
 import requests
 import time
-from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
+from datetime import datetime, timezone
+
 
 # Prefer environment variable (from .env via docker-compose)
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
@@ -53,12 +54,6 @@ def fetch_activities_for_category(category_id):
     return [a for a in all_activities if a.get("category_id") == category_id]
 
 # -----------------------------
-# Session state for category selection
-# -----------------------------
-if "selected_category" not in st.session_state:
-    st.session_state.selected_category = None
-
-# -----------------------------
 # Page UI
 # -----------------------------
 st.title("Log Your Mood")
@@ -71,36 +66,27 @@ with st.expander("Backend status"):
     else:
         st.warning("Backend not reachable or returned unexpected response")
 
-# -----------------------------
 # Load categories
-# -----------------------------
 with st.spinner("Loading categories..."):
     categories = fetch_json("/categories", retries=5, delay=1.0)
+
+category_options = [c.get("name", f"id:{c.get('id')}") for c in categories] if categories else []
 
 st.header("How are you feeling?")
 mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
 
 # -----------------------------
-# Category selection (Option 3)
+# Category selection
 # -----------------------------
-st.subheader("Category")
+selected_category_name = st.selectbox("Category", ["(none)"] + category_options)
 
-if categories:
-    cols = st.columns(3)  # 3 buttons per row
-
-    for idx, c in enumerate(categories):
-        col = cols[idx % 3]
-
-        # Highlight selected category
-        is_selected = st.session_state.selected_category == c["id"]
-        label = f"👉 {c['name']}" if is_selected else c["name"]
-
-        if col.button(label):
-            st.session_state.selected_category = c["id"]
-else:
-    st.info("No categories available.")
-
-category_id = st.session_state.selected_category
+# Find category ID
+category_id = None
+if selected_category_name != "(none)":
+    for c in categories:
+        if c["name"] == selected_category_name:
+            category_id = c["id"]
+            break
 
 # -----------------------------
 # Load activities for selected category
@@ -135,18 +121,19 @@ if st.button("Save"):
         if a["name"] in selected_activities
     ]
 
-    # Backend requires timestamp
+    # Backend expects a timestamp field
     now_utc = datetime.now(timezone.utc).isoformat()
 
     payload = {
         "mood_score": mood_score,
         "note": note,
         "timestamp": now_utc,
-        "activity_ids": selected_activity_ids
+        "activity_ids": selected_activity_ids,
     }
 
     with st.spinner("Saving entry..."):
         resp = post_json("/mood", payload)
+
 
     if resp is None:
         st.error("Could not send request to backend.")
