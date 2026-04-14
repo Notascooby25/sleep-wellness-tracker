@@ -73,7 +73,7 @@ if st.button("Add Category"):
         resp = post_json("/categories/", {"name": new_name})
         if resp and resp.ok:
             st.success("Category added.")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Failed to add category.")
     else:
@@ -100,7 +100,7 @@ else:
                     resp = put_json(f"/categories/{c['id']}", {"name": new_name})
                     if resp and resp.ok:
                         st.success("Updated.")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Failed to update.")
 
@@ -110,6 +110,6 @@ else:
                 resp = delete(f"/categories/{c['id']}")
                 if resp and resp.ok:
                     st.success("Deleted.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Failed to delete.")
