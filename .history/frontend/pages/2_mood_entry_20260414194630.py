@@ -58,13 +58,12 @@ if "selected_activity_ids" not in st.session_state:
     st.session_state.selected_activity_ids = {}
 
 # -----------------------------
-# Responsive CSS and chip styles
+# Small CSS for card/chip look
 # -----------------------------
-RESPONSIVE_CSS = """
+CARD_STYLE = """
 <style>
-/* Card and chip base styles */
 .daylio-card {
-  padding: 12px;
+  padding: 10px;
   border-radius: 10px;
   border: 1px solid #e6e6e6;
   background: linear-gradient(180deg, #ffffff, #fbfbfb);
@@ -72,8 +71,8 @@ RESPONSIVE_CSS = """
 }
 .activity-chip {
   display:inline-block;
-  margin:6px 8px 6px 0;
-  padding:6px 12px;
+  margin:4px 6px 4px 0;
+  padding:6px 10px;
   border-radius:18px;
   background:#f1f5f9;
   color:#111827;
@@ -85,27 +84,9 @@ RESPONSIVE_CSS = """
   color:white;
   border:1px solid #089e9c;
 }
-
-/* Make the Streamlit checkbox label area more compact */
-.css-1kyxreq .stCheckbox > div, .stCheckbox > label {
-  margin: 0;
-  padding: 0;
-}
-
-/* Responsive font scaling for small screens */
-@media (max-width: 900px) {
-  .daylio-card { padding: 10px; }
-  .activity-chip { font-size:13px; padding:5px 10px; margin:5px 6px 5px 0; }
-  .stApp { font-size: 14px; }
-}
-@media (max-width: 600px) {
-  .daylio-card { padding: 8px; }
-  .activity-chip { font-size:12px; padding:4px 8px; margin:4px 6px 4px 0; }
-  .stApp { font-size: 13px; }
-}
 </style>
 """
-st.markdown(RESPONSIVE_CSS, unsafe_allow_html=True)
+st.markdown(CARD_STYLE, unsafe_allow_html=True)
 
 # -----------------------------
 # Page UI
@@ -130,18 +111,6 @@ mood_score = st.slider("Mood (1 = Great, 5 = Rubbish)", 1, 5, 3)
 
 # Note
 note = st.text_area("Note (optional)")
-
-# UI control: columns per row (user adjustable; default 4)
-st.sidebar.header("Layout")
-cols_choice = st.sidebar.selectbox(
-    "Columns per row for activity chips",
-    options=[1, 2, 3, 4, 5, 6],
-    index=3,
-    help="Choose how many activity chips appear per row. Lower values are better for small screens."
-)
-
-# Auto-adjust default for very small screens: provide a hint
-st.sidebar.caption("Tip: set 2 or 3 for mobile devices.")
 
 # -----------------------------
 # Category headers + activity cards
@@ -174,8 +143,8 @@ else:
         if cid not in st.session_state.selected_activity_ids:
             st.session_state.selected_activity_ids[cid] = set()
 
-        # Render activity chips as checkboxes arranged in rows using the chosen columns per row
-        cols_per_row = int(cols_choice) if cols_choice and cols_choice > 0 else 4
+        # Render activity chips as checkboxes arranged in rows
+        cols_per_row = 4
         for i in range(0, len(acts), cols_per_row):
             row = acts[i : i + cols_per_row]
             cols = st.columns(cols_per_row)
@@ -184,8 +153,8 @@ else:
                 aid = a.get("id")
                 aname = a.get("name", f"Activity {aid}")
                 checked = aid in st.session_state.selected_activity_ids[cid]
-                cb_key = f"cb_{cid}_{aid}"
                 # Use checkbox for stable multi-select behavior
+                cb_key = f"cb_{cid}_{aid}"
                 val = col.checkbox(aname, value=checked, key=cb_key)
                 # Update session state set based on checkbox value
                 if val and aid not in st.session_state.selected_activity_ids[cid]:
@@ -206,6 +175,7 @@ with cols[0]:
         st.success("Cleared selections.")
 with cols[1]:
     if st.button("Clear empty categories"):
+        # remove empty sets to keep state tidy
         st.session_state.selected_activity_ids = {
             k: v for k, v in st.session_state.selected_activity_ids.items() if v
         }
