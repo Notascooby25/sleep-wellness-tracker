@@ -57,47 +57,69 @@ def delete(path):
 # -----------------------------
 # Page UI
 # -----------------------------
-st.title("Manage Categories")
+st.title("Manage Activities")
 
-# Load categories
+# Load categories + activities
 categories = fetch_json("/categories")
+activities = fetch_json("/activities")
 
 # -----------------------------
-# Add new category
+# Category filter
 # -----------------------------
-st.subheader("Add Category")
-new_name = st.text_input("New category name")
+st.subheader("Filter by Category")
 
-if st.button("Add Category"):
+category_map = {c["name"]: c["id"] for c in categories} if categories else {}
+category_names = list(category_map.keys())
+
+selected_category = st.selectbox("Category", ["(all)"] + category_names)
+
+if selected_category == "(all)":
+    filtered = activities
+else:
+    cid = category_map[selected_category]
+    filtered = [a for a in activities if a["category_id"] == cid]
+
+# -----------------------------
+# Add new activity
+# -----------------------------
+st.subheader("Add Activity")
+
+new_name = st.text_input("Activity name")
+new_cat = st.selectbox("Category for new activity", category_names)
+
+if st.button("Add Activity"):
     if new_name.strip():
-        resp = post_json("/categories/", {"name": new_name})
+        resp = post_json("/activities/", {
+            "name": new_name,
+            "category_id": category_map[new_cat]
+        })
         if resp and resp.ok:
-            st.success("Category added.")
+            st.success("Activity added.")
             st.rerun()
         else:
-            st.error("Failed to add category.")
+            st.error("Failed to add activity.")
     else:
         st.warning("Name cannot be empty.")
 
 # -----------------------------
-# Existing categories
+# Existing activities
 # -----------------------------
-st.subheader("Existing Categories")
+st.subheader("Existing Activities")
 
-if not categories:
-    st.info("No categories found.")
+if not filtered:
+    st.info("No activities found.")
 else:
-    for c in categories:
-        st.markdown(f"### {c['name']} (ID {c['id']})")
+    for a in filtered:
+        st.markdown(f"### {a['name']} (ID {a['id']})")
 
         col1, col2 = st.columns(2)
 
         # Rename
         with col1:
-            new_name = st.text_input(f"Rename {c['name']}", key=f"rename_{c['id']}")
-            if st.button(f"Save {c['id']}", key=f"save_{c['id']}"):
+            new_name = st.text_input(f"Rename {a['name']}", key=f"rename_{a['id']}")
+            if st.button(f"Save {a['id']}", key=f"save_{a['id']}"):
                 if new_name.strip():
-                    resp = put_json(f"/categories/{c['id']}", {"name": new_name})
+                    resp = put_json(f"/activities/{a['id']}", {"name": new_name})
                     if resp and resp.ok:
                         st.success("Updated.")
                         st.rerun()
@@ -106,8 +128,8 @@ else:
 
         # Delete
         with col2:
-            if st.button(f"Delete {c['id']}", key=f"delete_{c['id']}"):
-                resp = delete(f"/categories/{c['id']}")
+            if st.button(f"Delete {a['id']}", key=f"delete_{a['id']}"):
+                resp = delete(f"/activities/{a['id']}")
                 if resp and resp.ok:
                     st.success("Deleted.")
                     st.rerun()
