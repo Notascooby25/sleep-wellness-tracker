@@ -1,17 +1,16 @@
-# File to change: backend/app/routes/mood.py
+# backend/app/routers/mood.py
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
 from sqlalchemy.orm import Session
-
-from .. import models, schemas
+from typing import List
 from ..database import get_db
+from ..models import Mood, Activity
+from ..schemas import MoodCreate, MoodRead
 
-router = APIRouter()
+router = APIRouter(prefix="/mood", tags=["mood"])
 
-@router.get("", response_model=List[schemas.MoodRead])
-@router.get("/", response_model=List[schemas.MoodRead])
-def list_mood_entries(db: Session = Depends(get_db)):
-    rows = db.query(models.Mood).all()
+@router.get("", response_model=List[MoodRead])
+def get_moods(db: Session = Depends(get_db)):
+    rows = db.query(Mood).all()
     result = []
     for r in rows:
         activity_ids = [a.id for a in r.activities]
@@ -25,18 +24,18 @@ def list_mood_entries(db: Session = Depends(get_db)):
         })
     return result
 
-@router.post("", response_model=schemas.MoodRead)
-@router.post("/", response_model=schemas.MoodRead)
-def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
-    db_mood = models.Mood(
-        mood_score=payload.mood_score,
-        note=payload.note,
-        timestamp=payload.timestamp
+@router.post("", response_model=MoodRead)
+def create_mood(mood: MoodCreate, db: Session = Depends(get_db)):
+    db_mood = Mood(
+        mood_score=mood.mood_score,
+        note=mood.note,
+        timestamp=mood.timestamp
     )
     db.add(db_mood)
     db.commit()
-    if payload.activity_ids:
-        activities = db.query(models.Activity).filter(models.Activity.id.in_(payload.activity_ids)).all()
+    # Attach activities if provided
+    if mood.activity_ids:
+        activities = db.query(Activity).filter(Activity.id.in_(mood.activity_ids)).all()
         db_mood.activities = activities
         db.commit()
         db.refresh(db_mood)
@@ -50,11 +49,11 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
         "activity_ids": activity_ids
     }
 
-@router.get("/{entry_id}", response_model=schemas.MoodRead)
-def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
-    m = db.query(models.Mood).filter(models.Mood.id == entry_id).first()
+@router.get("/{entry_id}", response_model=MoodRead)
+def get_mood(entry_id: int, db: Session = Depends(get_db)):
+    m = db.query(Mood).filter(Mood.id == entry_id).first()
     if not m:
-        raise HTTPException(status_code=404, detail="Mood entry not found")
+        raise HTTPException(status_code=404, detail="Not found")
     activity_ids = [a.id for a in m.activities]
     return {
         "id": m.id,

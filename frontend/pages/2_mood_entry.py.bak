@@ -63,7 +63,7 @@ if st.button("Log Entry"):
     }
 
     try:
-        response = requests.post(f"{API_BASE}/mood", json=payload)
+        response = requests.post(f"{API_BASE}/mood/mood", json=payload)
         if response.status_code in (200, 201):
             st.success("Entry logged!")
         else:

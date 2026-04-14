@@ -18,21 +18,3 @@ class MoodRead(MoodBase):
 
     class Config:
         from_attributes = True
-
-# Category and Activity schemas
-class CategoryCreate(BaseModel):
-    name: str
-
-class CategoryResponse(CategoryCreate):
-    id: int
-    class Config:
-        from_attributes = True
-
-class ActivityCreate(BaseModel):
-    name: str
-    category_id: int
-
-class ActivityResponse(ActivityCreate):
-    id: int
-    class Config:
-        from_attributes = True
