@@ -1,10 +1,12 @@
-import os
+# frontend/pages/2_mood_entry.py
 import streamlit as st
 import requests
 import time
 from requests.exceptions import RequestException
 from json import JSONDecodeError
+import os
 
+# Prefer environment variable if set (from .env via docker-compose); fallback to service name
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 def fetch_json(path, retries=5, delay=1.0, timeout=3):
