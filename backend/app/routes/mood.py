@@ -1,4 +1,4 @@
-# File to change: backend/app/routes/mood.py
+# backend/app/routes/mood.py
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 
-router = APIRouter()
+# IMPORTANT: give the router a prefix
+router = APIRouter(prefix="/mood", tags=["mood"])
 
-@router.get("", response_model=List[schemas.MoodRead])
 @router.get("/", response_model=List[schemas.MoodRead])
 def list_mood_entries(db: Session = Depends(get_db)):
     rows = db.query(models.Mood).all()
@@ -25,7 +25,6 @@ def list_mood_entries(db: Session = Depends(get_db)):
         })
     return result
 
-@router.post("", response_model=schemas.MoodRead)
 @router.post("/", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
     db_mood = models.Mood(
@@ -35,12 +34,17 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     )
     db.add(db_mood)
     db.commit()
+
     if payload.activity_ids:
-        activities = db.query(models.Activity).filter(models.Activity.id.in_(payload.activity_ids)).all()
+        activities = db.query(models.Activity).filter(
+            models.Activity.id.in_(payload.activity_ids)
+        ).all()
         db_mood.activities = activities
         db.commit()
-        db.refresh(db_mood)
+
+    db.refresh(db_mood)
     activity_ids = [a.id for a in db_mood.activities]
+
     return {
         "id": db_mood.id,
         "mood_score": db_mood.mood_score,
@@ -55,7 +59,9 @@ def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     m = db.query(models.Mood).filter(models.Mood.id == entry_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Mood entry not found")
+
     activity_ids = [a.id for a in m.activities]
+
     return {
         "id": m.id,
         "mood_score": m.mood_score,
