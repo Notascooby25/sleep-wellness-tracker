@@ -1,3 +1,4 @@
+# frontend/pages/2_mood_entry.py
 import streamlit as st
 import requests
 import datetime
@@ -10,23 +11,23 @@ st.set_page_config(page_title="Mood Entry", layout="centered")
 # -----------------------------
 # Reset handling (clear form on next run if requested)
 # -----------------------------
-if "reset_form" in st.session_state and st.session_state.reset_form:
+if st.session_state.get("reset_form", False):
     # Remove keys so widgets will be re-created with fresh defaults
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         if k in st.session_state:
-            del st.session_state[k]
+            try:
+                del st.session_state[k]
+            except Exception:
+                pass
     # clear selected activities and checkbox keys
-    if "selected_activities" in st.session_state:
-        st.session_state.selected_activities = set()
+    st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
         if key.startswith("act_"):
             try:
                 del st.session_state[key]
             except Exception:
                 pass
-    # clear the flag
-    st.session_state.reset_form = False
-    # Let the app continue to render with cleared session state
+    st.session_state["reset_form"] = False
 
 # -----------------------------
 # Load categories + activities
@@ -53,7 +54,7 @@ activities = load_activities()
 # Group activities by category_id
 activities_by_cat = {}
 for a in activities:
-    cid = a["category_id"]
+    cid = a.get("category_id")
     if cid not in activities_by_cat:
         activities_by_cat[cid] = []
     activities_by_cat[cid].append(a)
@@ -61,7 +62,8 @@ for a in activities:
 # -----------------------------
 # Custom CSS to make checkboxes look like chips
 # -----------------------------
-st.markdown("""
+st.markdown(
+    """
 <style>
 .chip-row {
     display: flex;
@@ -96,7 +98,9 @@ st.markdown("""
     font-weight: 600;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # -----------------------------
 # Session state for selected activities and form persistence
@@ -121,27 +125,30 @@ if "notes" not in st.session_state:
 # -----------------------------
 # UK Date + Time Pickers (persist via key)
 # -----------------------------
-# Note: do NOT reassign st.session_state keys after widget creation
 entry_date = st.date_input(
     "Entry Date",
     value=st.session_state.entry_date,
-    key="entry_date"
+    key="entry_date",
 )
 
 entry_time = st.time_input(
     "Entry Time",
     value=st.session_state.entry_time,
-    key="entry_time"
+    key="entry_time",
 )
 
 # Combine into timezone-aware datetime
-entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
+entry_dt = datetime.datetime.combine(
+    st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz
+)
 timestamp_iso = entry_dt.isoformat()
 
 # -----------------------------
 # Mood Score + Notes (persisted by keys)
 # -----------------------------
-mood_score = st.slider("Mood Score", 1, 10, st.session_state.mood_score, key="mood_score")
+mood_score = st.slider(
+    "Mood Score", 1, 10, st.session_state.mood_score, key="mood_score"
+)
 notes = st.text_area("Notes", st.session_state.notes, key="notes")
 
 # -----------------------------
@@ -149,7 +156,6 @@ notes = st.text_area("Notes", st.session_state.notes, key="notes")
 # -----------------------------
 st.markdown("### Activities")
 
-# Helper to render chips in rows using columns
 def render_chip_row(items, cols=4):
     col_objs = st.columns(cols)
     for idx, item in enumerate(items):
@@ -158,7 +164,6 @@ def render_chip_row(items, cols=4):
             aid = item["id"]
             key = f"act_{aid}"
             default_checked = aid in st.session_state.selected_activities
-            # Use checkbox with a stable key so Streamlit persists the checked state
             checked = st.checkbox(item["name"], value=default_checked, key=key)
             if checked and aid not in st.session_state.selected_activities:
                 st.session_state.selected_activities.add(aid)
@@ -166,8 +171,8 @@ def render_chip_row(items, cols=4):
                 st.session_state.selected_activities.remove(aid)
 
 for cat in categories:
-    st.markdown(f"<div class='category-title'>{cat['name']}</div>", unsafe_allow_html=True)
-    cid = cat["id"]
+    st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
+    cid = cat.get("id")
     cat_acts = activities_by_cat.get(cid, [])
     if not cat_acts:
         st.write("_No activities_")
@@ -180,41 +185,29 @@ for cat in categories:
 if st.button("Save Entry"):
     payload = {
         "mood_score": mood_score,
-        "notes": nif st.button("Save Entry"):
-    payload = {
-        "mood_score": mood_score,
-        "notes": n# Replace your existing Save branch with this snippet
-        
-if st.button("Save Entry"):
-    payload = {
-        "mood_score": mood_score,
         "notes": notes,
         "timestamp": timestamp_iso,
-        "activity_ids": sorted(list(st.session_state.selected_activities))
+        "activity_ids": sorted(list(st.session_state.selected_activities)),
     }
 
-    # Debug: show exactly what we're sending
+    # Debug: show outgoing payload and backend response for troubleshooting
     st.write("Outgoing payload:", payload)
 
     try:
         r = requests.post(f"{API_BASE}/mood/", json=payload)
-        # Debug: show raw backend response
         st.write("Backend response status:", r.status_code)
         try:
-            resp_json = r.json()
-            st.write("Backend response JSON:", resp_json)
+            st.write("Backend response JSON:", r.json())
         except Exception:
             st.write("Backend response text:", r.text)
 
-        if r.status_code == 200 or r.status_code == 201:
+        if r.status_code in (200, 201):
             st.success("Mood entry saved!")
-            # mark reset and force rerun safely
+            # mark form to be reset on next run
             st.session_state.reset_form = True
-            try:
-                st.experimental_rerun()
-            except Exception:
-                st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+            # Force other pages to refresh by bumping a counter (safe fallback)
+            st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
         else:
-            st.error(f"Error saving entry: {r.status_code} {r.text}")
+            st.error(f"Error: {r.status_code} {r.text}")
     except Exception as exc:
         st.error(f"Error saving entry: {exc}")
