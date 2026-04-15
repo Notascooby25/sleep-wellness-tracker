@@ -95,21 +95,25 @@ mood_score = st.slider("Mood Score", 1, 10, 5)
 notes = st.text_area("Notes", "")
 
 # -----------------------------
-# Render categories + chips
+# Hidden input for chip clicks
 # -----------------------------
-st.markdown("### Activities")
-
-# Hidden input to receive chip clicks
 clicked = st.text_input("chip-input", key="chip-input", label_visibility="collapsed")
 
-# Update session state when a chip is clicked
+# Handle chip click
 if clicked:
     aid = int(clicked)
     if aid in st.session_state.selected_activities:
         st.session_state.selected_activities.remove(aid)
     else:
         st.session_state.selected_activities.add(aid)
-    st.session_state["chip-input"] = ""  # reset
+
+    # Reset so next click is detected
+    st.session_state["chip-input"] = ""
+
+# -----------------------------
+# Render categories + chips
+# -----------------------------
+st.markdown("### Activities")
 
 for cat in categories:
     st.markdown(f"#### {cat['name']}")
@@ -120,6 +124,7 @@ for cat in categories:
     <script>
     function toggleChip(aid) {
         const input = window.parent.document.querySelector('input[id="chip-input"]');
+        if (!input) return;
         input.value = aid;
         input.dispatchEvent(new Event("input", { bubbles: true }));
     }
