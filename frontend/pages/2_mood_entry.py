@@ -191,8 +191,12 @@ if st.button("Save Entry"):
             st.success("Mood entry saved!")
             # Mark form to be reset on next run (deletion happens before widgets are created)
             st.session_state.reset_form = True
-            # Optionally keep date/time as-is; if you want to reset to now, leave as-is because reset_form will clear keys
-            st.experimental_rerun()
+            # Try to call experimental_rerun if available; otherwise force a rerun by toggling a session_state key
+            try:
+                st.experimental_rerun()
+            except Exception:
+                st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+
         else:
             st.error(f"Error: {r.text}")
     except Exception as exc:
