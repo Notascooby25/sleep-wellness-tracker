@@ -68,6 +68,10 @@ activity_map = {a["id"]: a["name"] for a in activities}
 
 entries = fetch_entries()
 
+# Debug raw entries (remove when confirmed)
+st.markdown("## Raw backend entries (debug)")
+st.write(entries)
+
 def render_mood_log(entries_list):
     if not entries_list:
         st.info("No mood entries yet.")
