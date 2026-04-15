@@ -13,15 +13,17 @@ st.set_page_config(page_title="Mood Entry", layout="centered")
 def load_categories():
     try:
         r = requests.get(f"{API_BASE}/categories/")
+        r.raise_for_status()
         return r.json()
-    except:
+    except Exception:
         return []
 
 def load_activities():
     try:
         r = requests.get(f"{API_BASE}/activities/")
+        r.raise_for_status()
         return r.json()
-    except:
+    except Exception:
         return []
 
 categories = load_categories()
@@ -76,34 +78,53 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# Session state for selected activities
+# Session state for selected activities and form persistence
 # -----------------------------
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
-# -----------------------------
-# UK Date + Time Pickers
-# -----------------------------
+# Ensure persistent keys for date/time so user edits don't reset
 uk_tz = ZoneInfo("Europe/London")
+now_uk = datetime.datetime.now(uk_tz)
 
+# Initialize session_state values only once
+if "entry_date" not in st.session_state:
+    st.session_state.entry_date = now_uk.date()
+if "entry_time" not in st.session_state:
+    # store as time object
+    st.session_state.entry_time = now_uk.time()
+
+# -----------------------------
+# UK Date + Time Pickers (persist via key)
+# -----------------------------
+# Using key= ensures Streamlit stores the widget value in session_state and won't reset to "now" on rerun.
 entry_date = st.date_input(
     "Entry Date",
-    datetime.datetime.now(uk_tz).date()
+    value=st.session_state.entry_date,
+    key="entry_date"
 )
 
 entry_time = st.time_input(
     "Entry Time",
-    datetime.datetime.now(uk_tz).time()
+    value=st.session_state.entry_time,
+    key="entry_time"
 )
 
-entry_dt = datetime.datetime.combine(entry_date, entry_time, tzinfo=uk_tz)
+# Keep session_state in sync (Streamlit updates keys automatically, but ensure local vars reflect them)
+st.session_state.entry_date = entry_date
+st.session_state.entry_time = entry_time
+
+# Combine into timezone-aware datetime
+entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
 # -----------------------------
-# Mood Score + Notes
+# Mood Score + Notes (persisted by keys if desired)
 # -----------------------------
-mood_score = st.slider("Mood Score", 1, 10, 5)
-notes = st.text_area("Notes", "")
+if "mood_score" not in st.session_state:
+    st.session_state.mood_score = 5
+mood_score = st.slider("Mood Score", 1, 10, st.session_state.mood_score, key="mood_score")
+notes = st.text_area("Notes", "", key="notes")
 
 # -----------------------------
 # Render categories + activity chips (checkbox-based)
@@ -112,17 +133,15 @@ st.markdown("### Activities")
 
 # Helper to render chips in rows using columns
 def render_chip_row(items, cols=4):
-    # create columns
     col_objs = st.columns(cols)
     for idx, item in enumerate(items):
         col = col_objs[idx % cols]
         with col:
             aid = item["id"]
             key = f"act_{aid}"
-            # default checked if in session_state.selected_activities
             default_checked = aid in st.session_state.selected_activities
+            # Use checkbox with a stable key so Streamlit persists the checked state
             checked = st.checkbox(item["name"], value=default_checked, key=key)
-            # update selected_activities set
             if checked and aid not in st.session_state.selected_activities:
                 st.session_state.selected_activities.add(aid)
             if (not checked) and (aid in st.session_state.selected_activities):
@@ -135,8 +154,6 @@ for cat in categories:
     if not cat_acts:
         st.write("_No activities_")
         continue
-
-    # Render chips in rows of 4 columns (adjust cols param if you want denser layout)
     render_chip_row(cat_acts, cols=4)
 
 # -----------------------------
@@ -150,15 +167,23 @@ if st.button("Save Entry"):
         "activity_ids": sorted(list(st.session_state.selected_activities))
     }
 
-    r = requests.post(f"{API_BASE}/mood/", json=payload)
-
-    if r.status_code == 200:
-        st.success("Mood entry saved!")
-        st.session_state.selected_activities = set()
-        # clear checkboxes by clearing keys (re-run will re-render defaults)
-        for a in activities:
-            key = f"act_{a['id']}"
-            if key in st.session_state:
-                del st.session_state[key]
-    else:
-        st.error(f"Error: {r.text}")
+    try:
+        r = requests.post(f"{API_BASE}/mood/", json=payload)
+        if r.status_code == 200:
+            st.success("Mood entry saved!")
+            # Reset selected activities and form fields
+            st.session_state.selected_activities = set()
+            # Clear checkbox keys so they re-render unchecked
+            for a in activities:
+                key = f"act_{a['id']}"
+                if key in st.session_state:
+                    del st.session_state[key]
+            # Optionally reset mood and notes but keep date/time as the user's choice
+            st.session_state.mood_score = 5
+            st.session_state.notes = ""
+            # Do not reset entry_date/entry_time so user can make multiple entries for same time/day
+            st.experimental_rerun()
+        else:
+            st.error(f"Error: {r.text}")
+    except Exception as exc:
+        st.error(f"Error saving entry: {exc}")
