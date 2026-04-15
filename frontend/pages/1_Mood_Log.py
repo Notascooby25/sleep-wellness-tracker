@@ -1,4 +1,4 @@
-# frontend/pages/3_mood_log.py
+# frontend/pages/1_mood_log.py
 import streamlit as st
 import requests
 import datetime
@@ -39,6 +39,10 @@ def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
     return f"{label}, {month} {day_ord}{year_part}"
 
 def parse_to_uk(dt_str: str) -> datetime.datetime:
+    """
+    Parse ISO timestamp string to a timezone-aware datetime in Europe/London.
+    Handles timezone-aware ISO strings and naive ISO strings (assume UTC).
+    """
     try:
         dt = datetime.datetime.fromisoformat(dt_str)
     except Exception:
@@ -51,9 +55,9 @@ def parse_to_uk(dt_str: str) -> datetime.datetime:
     return dt.astimezone(uk_tz)
 
 # -----------------------------
-# Fetch functions (no cache)
+# Fetch functions (no cache by default)
 # -----------------------------
-def fetch_activities():
+def fetch_activities(force_counter: int = 0):
     try:
         r = requests.get(f"{API_BASE}/activities/")
         r.raise_for_status()
@@ -61,7 +65,7 @@ def fetch_activities():
     except Exception:
         return []
 
-def fetch_entries():
+def fetch_entries(force_counter: int = 0):
     try:
         r = requests.get(f"{API_BASE}/mood/")
         r.raise_for_status()
@@ -70,14 +74,18 @@ def fetch_entries():
         return []
 
 # -----------------------------
-# Data
+# Use force counter from session_state to allow other pages to invalidate
 # -----------------------------
-activities = fetch_activities()
+force_counter = st.session_state.get("_force_rerun_counter", 0)
+
+activities = fetch_activities(force_counter)
 activity_map = {a["id"]: a["name"] for a in activities}
 
-entries = fetch_entries()
+entries = fetch_entries(force_counter)
 
-# Debug: show raw entries from backend so we can see whether notes exist
+# -----------------------------
+# Debug: show raw entries so we can confirm notes exist in backend response
+# -----------------------------
 st.markdown("## Raw backend entries (debug)")
 st.write(entries)
 
@@ -118,6 +126,7 @@ def render_mood_log(entries_list):
             notes = ent.get("notes", "")
             activity_ids = ent.get("activity_ids", []) or []
 
+            # Map activity ids to names
             activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
 
             cols = st.columns([1, 4, 3])
@@ -145,9 +154,13 @@ st.markdown("# Mood Log")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("Refresh"):
-        # simply re-run by toggling a session key
-        st.session_state["_refresh_trigger"] = st.session_state.get("_refresh_trigger", 0) + 1
-        st.experimental_rerun() if hasattr(st, "experimental_rerun") else None
+        # bump the force counter to invalidate other pages' caches
+        st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+        # trigger rerun: use experimental_rerun if available, otherwise toggle a key
+        try:
+            st.experimental_rerun()
+        except Exception:
+            st.session_state["_refresh_trigger"] = st.session_state.get("_refresh_trigger", 0) + 1
 with col2:
     st.write("Entries are shown in UK local time (Europe/London).")
 
