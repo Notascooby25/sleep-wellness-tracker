@@ -1,91 +1,157 @@
-import os
+# frontend/pages/3_mood_log.py
 import streamlit as st
 import requests
-import time
-from requests.exceptions import RequestException
-from json import JSONDecodeError
+import datetime
+from zoneinfo import ZoneInfo
+from collections import defaultdict
 
-# Prefer environment variable (from .env via docker-compose)
-API_BASE = os.getenv("API_BASE", "http://backend:8000")
+API_BASE = "http://backend:8000"
+uk_tz = ZoneInfo("Europe/London")
 
-# -----------------------------
-# Safe fetch helper with retries
-# -----------------------------
-def fetch_json(path, retries=5, delay=1.0, timeout=3):
-    url = f"{API_BASE}{path}"
-    for attempt in range(1, retries + 1):
-        try:
-            r = requests.get(url, timeout=timeout)
-
-            if r.status_code == 200:
-                try:
-                    return r.json()
-                except JSONDecodeError:
-                    st.error("Backend returned invalid JSON.")
-                    return []
-            else:
-                st.warning(f"Backend returned status {r.status_code}")
-                return []
-
-        except RequestException as e:
-            if attempt == retries:
-                st.error(f"Failed to reach backend after {retries} attempts: {e}")
-                return []
-            time.sleep(delay)
+st.set_page_config(page_title="Mood Log", layout="centered")
 
 # -----------------------------
-# Page UI
+# Utilities
 # -----------------------------
-st.title("Mood Log")
-st.subheader("Recent Mood Entries")
-
-# Backend health check
-with st.expander("Backend status"):
-    health = fetch_json("/health", retries=3, delay=0.5)
-    if isinstance(health, dict) and health.get("status") == "ok":
-        st.success("Backend reachable")
+def _ordinal(n: int) -> str:
+    if 10 <= (n % 100) <= 20:
+        suffix = "th"
     else:
-        st.warning("Backend not reachable or returned unexpected response")
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
+    if dt == today:
+        label = "Today"
+    elif dt == (today - datetime.timedelta(days=1)):
+        label = "Yesterday"
+    else:
+        days_diff = (today - dt).days
+        if 1 < days_diff <= 6:
+            label = dt.strftime("%A")  # Monday, Tuesday...
+        else:
+            label = dt.strftime("%A")  # fallback to weekday for consistency
+    month = dt.strftime("%B")
+    day_ord = _ordinal(dt.day)
+    # include year only if not current year
+    year_part = ""
+    if dt.year != today.year:
+        year_part = f", {dt.year}"
+    return f"{label}, {month} {day_ord}{year_part}"
+
+def parse_to_uk(dt_str: str) -> datetime.datetime:
+    """
+    Parse ISO timestamp string to a timezone-aware datetime in Europe/London.
+    Handles timezone-aware ISO strings and naive ISO strings (assume UTC).
+    """
+    try:
+        dt = datetime.datetime.fromisoformat(dt_str)
+    except Exception:
+        # fallback: try common format without microseconds
+        try:
+            dt = datetime.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            # last resort: current time
+            dt = datetime.datetime.now(datetime.timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(uk_tz)
 
 # -----------------------------
-# Load mood entries
+# Data fetching
 # -----------------------------
-with st.spinner("Loading mood entries..."):
-    entries = fetch_json("/mood", retries=5, delay=1.0)
+@st.cache_data(ttl=30)
+def fetch_activities():
+    try:
+        r = requests.get(f"{API_BASE}/activities/")
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
 
-if not entries:
-    st.info("No mood entries found yet.")
-    st.stop()
+@st.cache_data(ttl=15)
+def fetch_entries():
+    try:
+        r = requests.get(f"{API_BASE}/mood/")
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
 
-# Sort newest → oldest
-entries = sorted(entries, key=lambda x: x.get("timestamp", ""), reverse=True)
+activities = fetch_activities()
+activity_map = {a["id"]: a["name"] for a in activities}
+
+entries = fetch_entries()
 
 # -----------------------------
-# Load activities for ID → name mapping
+# Render logic
 # -----------------------------
-with st.spinner("Loading activities..."):
-    activities = fetch_json("/activities", retries=5, delay=1.0)
+def render_mood_log(entries_list):
+    if not entries_list:
+        st.info("No mood entries yet.")
+        return
 
-activity_lookup = {a["id"]: a["name"] for a in activities} if activities else {}
+    grouped = defaultdict(list)
+    for e in entries_list:
+        ts = e.get("timestamp")
+        if not ts:
+            continue
+        try:
+            local_dt = parse_to_uk(ts)
+        except Exception:
+            continue
+        e["_local_dt"] = local_dt
+        e["_local_date"] = local_dt.date()
+        grouped[e["_local_date"]].append(e)
+
+    sorted_dates = sorted(grouped.keys(), reverse=True)
+    today = datetime.datetime.now(uk_tz).date()
+
+    for d in sorted_dates:
+        heading = format_date_heading(d, today)
+        st.markdown(f"### {heading}")
+
+        day_entries = sorted(grouped[d], key=lambda x: x["_local_dt"], reverse=True)
+
+        for ent in day_entries:
+            dt = ent["_local_dt"]
+            time_str = dt.strftime("%H:%M")
+            mood = ent.get("mood_score", ent.get("mood", "—"))
+            notes = ent.get("notes", "")
+            activity_ids = ent.get("activity_ids", []) or []
+
+            # Map activity ids to names
+            activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
+
+            # Entry header row
+            cols = st.columns([1, 4, 2])
+            with cols[0]:
+                st.markdown(f"**{time_str}**")
+            with cols[1]:
+                st.markdown(f"**Mood {mood}**")
+                if notes:
+                    st.write(notes)
+            with cols[2]:
+                if activity_names:
+                    st.markdown("**Activities**")
+                    st.write(", ".join(activity_names))
+                else:
+                    st.write("")
+
+            st.markdown("---")
 
 # -----------------------------
-# Render entries
+# Controls and render call
 # -----------------------------
-for e in entries:
-    ts = e.get("timestamp", "Unknown time")
-    mood = e.get("mood_score", "?")
-    note = e.get("note", "")
+st.markdown("# Mood Log")
+col1, col2 = st.columns([1, 4])
+with col1:
+    if st.button("Refresh"):
+        # clear caches and re-run
+        fetch_entries.clear()
+        fetch_activities.clear()
+        st.experimental_rerun()
+with col2:
+    st.write("Entries are shown in UK local time (Europe/London).")
 
-    # Convert activity IDs → names
-    act_ids = e.get("activity_ids", [])
-    act_names = [activity_lookup.get(aid, f"ID {aid}") for aid in act_ids]
-    act_display = ", ".join(act_names) if act_names else "None"
-
-    st.markdown(f"### {ts}")
-    st.write(f"**Mood:** {mood}")
-    st.write(f"**Activities:** {act_display}")
-
-    if note:
-        st.write(f"**Note:** {note}")
-
-    st.markdown("---")
+render_mood_log(entries)
