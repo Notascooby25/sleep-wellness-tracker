@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import datetime
 from zoneinfo import ZoneInfo
+import streamlit.components.v1 as components
 
 API_BASE = "http://backend:8000"
 
@@ -36,21 +37,17 @@ for a in activities:
     activities_by_cat[cid].append(a)
 
 # -----------------------------
-# Custom CSS to make checkboxes look like chips
+# Custom HTML chip CSS
 # -----------------------------
 st.markdown("""
 <style>
-.chip-row {
+.chip-container {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 12px;
-    align-items: center;
 }
-.chip-checkbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+.chip {
     padding: 6px 12px;
     border-radius: 16px;
     background-color: #f0f0f0;
@@ -59,24 +56,16 @@ st.markdown("""
     font-size: 14px;
     user-select: none;
 }
-.chip-checkbox input[type="checkbox"] {
-    display: none;
-}
-.chip-checkbox.checked {
-    background-color: #4CAF50 !important;
-    color: white !important;
-    border-color: #4CAF50 !important;
-}
-.category-title {
-    margin-top: 12px;
-    margin-bottom: 6px;
-    font-weight: 600;
+.chip.selected {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# Session state for selected activities
+# Chip selection state
 # -----------------------------
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
@@ -106,48 +95,64 @@ mood_score = st.slider("Mood Score", 1, 10, 5)
 notes = st.text_area("Notes", "")
 
 # -----------------------------
-# Render categories + activity chips (checkbox-based)
+# Hidden input for chip clicks
+# -----------------------------
+clicked = st.text_input("chip-input", key="chip-input", label_visibility="collapsed")
+
+# Handle chip click
+if clicked:
+    aid = int(clicked)
+    if aid in st.session_state.selected_activities:
+        st.session_state.selected_activities.remove(aid)
+    else:
+        st.session_state.selected_activities.add(aid)
+
+    # Reset so next click is detected
+    st.session_state["chip-input"] = ""
+
+# -----------------------------
+# Render categories + chips
 # -----------------------------
 st.markdown("### Activities")
 
-# Helper to render chips in rows using columns
-def render_chip_row(items, cols=4):
-    # create columns
-    col_objs = st.columns(cols)
-    for idx, item in enumerate(items):
-        col = col_objs[idx % cols]
-        with col:
-            aid = item["id"]
-            key = f"act_{aid}"
-            # default checked if in session_state.selected_activities
-            default_checked = aid in st.session_state.selected_activities
-            checked = st.checkbox(item["name"], value=default_checked, key=key)
-            # update selected_activities set
-            if checked and aid not in st.session_state.selected_activities:
-                st.session_state.selected_activities.add(aid)
-            if (not checked) and (aid in st.session_state.selected_activities):
-                st.session_state.selected_activities.remove(aid)
-
 for cat in categories:
-    st.markdown(f"<div class='category-title'>{cat['name']}</div>", unsafe_allow_html=True)
+    st.markdown(f"#### {cat['name']}")
     cid = cat["id"]
     cat_acts = activities_by_cat.get(cid, [])
-    if not cat_acts:
-        st.write("_No activities_")
-        continue
 
-    # Render chips in rows of 4 columns (adjust cols param if you want denser layout)
-    render_chip_row(cat_acts, cols=4)
+    chip_html = """
+    <script>
+    function toggleChip(aid) {
+        const input = window.parent.document.querySelector('input[id="chip-input"]');
+        if (!input) return;
+        input.value = aid;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    </script>
+    <div class="chip-container">
+    """
+
+    for a in cat_acts:
+        selected_class = "selected" if a["id"] in st.session_state.selected_activities else ""
+        chip_html += f"""
+        <div class="chip {selected_class}" onclick="toggleChip({a['id']})">
+            {a['name']}
+        </div>
+        """
+
+    chip_html += "</div>"
+
+    components.html(chip_html, height=200)
 
 # -----------------------------
 # Submit Button
 # -----------------------------
 if st.button("Save Entry"):
     payload = {
-        "mood_score": mood_score,
+        "mood": mood_score,
         "notes": notes,
         "timestamp": timestamp_iso,
-        "activity_ids": sorted(list(st.session_state.selected_activities))
+        "activity_ids": list(st.session_state.selected_activities)
     }
 
     r = requests.post(f"{API_BASE}/mood/", json=payload)
@@ -155,10 +160,5 @@ if st.button("Save Entry"):
     if r.status_code == 200:
         st.success("Mood entry saved!")
         st.session_state.selected_activities = set()
-        # clear checkboxes by clearing keys (re-run will re-render defaults)
-        for a in activities:
-            key = f"act_{a['id']}"
-            if key in st.session_state:
-                del st.session_state[key]
     else:
         st.error(f"Error: {r.text}")
