@@ -39,10 +39,6 @@ def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
     return f"{label}, {month} {day_ord}{year_part}"
 
 def parse_to_uk(dt_str: str) -> datetime.datetime:
-    """
-    Parse ISO timestamp string to a timezone-aware datetime in Europe/London.
-    Handles timezone-aware ISO strings and naive ISO strings (assume UTC).
-    """
     try:
         dt = datetime.datetime.fromisoformat(dt_str)
     except Exception:
@@ -55,11 +51,9 @@ def parse_to_uk(dt_str: str) -> datetime.datetime:
     return dt.astimezone(uk_tz)
 
 # -----------------------------
-# Data fetching with cache invalidation support
+# Fetch functions (no cache)
 # -----------------------------
-# We include a force_counter parameter so cache keys change when the entry page increments the counter.
-@st.cache_data(ttl=5)
-def fetch_activities(force_counter: int = 0):
+def fetch_activities():
     try:
         r = requests.get(f"{API_BASE}/activities/")
         r.raise_for_status()
@@ -67,8 +61,7 @@ def fetch_activities(force_counter: int = 0):
     except Exception:
         return []
 
-@st.cache_data(ttl=5)
-def fetch_entries(force_counter: int = 0):
+def fetch_entries():
     try:
         r = requests.get(f"{API_BASE}/mood/")
         r.raise_for_status()
@@ -76,13 +69,17 @@ def fetch_entries(force_counter: int = 0):
     except Exception:
         return []
 
-# Use the force counter from session_state to invalidate cache when needed
-force_counter = st.session_state.get("_force_rerun_counter", 0)
-
-activities = fetch_activities(force_counter)
+# -----------------------------
+# Data
+# -----------------------------
+activities = fetch_activities()
 activity_map = {a["id"]: a["name"] for a in activities}
 
-entries = fetch_entries(force_counter)
+entries = fetch_entries()
+
+# Debug: show raw entries from backend so we can see whether notes exist
+st.markdown("## Raw backend entries (debug)")
+st.write(entries)
 
 # -----------------------------
 # Render logic
@@ -121,10 +118,8 @@ def render_mood_log(entries_list):
             notes = ent.get("notes", "")
             activity_ids = ent.get("activity_ids", []) or []
 
-            # Map activity ids to names
             activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
 
-            # Entry header row
             cols = st.columns([1, 4, 3])
             with cols[0]:
                 st.markdown(f"**{time_str}**")
@@ -132,6 +127,8 @@ def render_mood_log(entries_list):
                 st.markdown(f"**Mood {mood}**")
                 if notes:
                     st.write(notes)
+                else:
+                    st.write("_No notes_")
             with cols[2]:
                 if activity_names:
                     st.markdown("**Activities**")
@@ -148,16 +145,9 @@ st.markdown("# Mood Log")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("Refresh"):
-        # Clear cached data and force a re-fetch
-        try:
-            fetch_entries.clear()
-            fetch_activities.clear()
-        except Exception:
-            pass
-        # bump the force counter to invalidate cached results for other tabs
-        st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
-        # trigger rerun by updating a session key
-        st.experimental_rerun() if hasattr(st, "experimental_rerun") else st.session_state.setdefault("_refresh_trigger", 0)
+        # simply re-run by toggling a session key
+        st.session_state["_refresh_trigger"] = st.session_state.get("_refresh_trigger", 0) + 1
+        st.experimental_rerun() if hasattr(st, "experimental_rerun") else None
 with col2:
     st.write("Entries are shown in UK local time (Europe/London).")
 
