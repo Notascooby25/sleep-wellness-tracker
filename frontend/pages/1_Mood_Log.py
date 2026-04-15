@@ -10,9 +10,6 @@ uk_tz = ZoneInfo("Europe/London")
 
 st.set_page_config(page_title="Mood Log", layout="centered")
 
-# -----------------------------
-# Utilities
-# -----------------------------
 def _ordinal(n: int) -> str:
     if 10 <= (n % 100) <= 20:
         suffix = "th"
@@ -39,10 +36,6 @@ def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
     return f"{label}, {month} {day_ord}{year_part}"
 
 def parse_to_uk(dt_str: str) -> datetime.datetime:
-    """
-    Parse ISO timestamp string to a timezone-aware datetime in Europe/London.
-    Handles timezone-aware ISO strings and naive ISO strings (assume UTC).
-    """
     try:
         dt = datetime.datetime.fromisoformat(dt_str)
     except Exception:
@@ -54,10 +47,7 @@ def parse_to_uk(dt_str: str) -> datetime.datetime:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(uk_tz)
 
-# -----------------------------
-# Fetch functions (no cache by default)
-# -----------------------------
-def fetch_activities(force_counter: int = 0):
+def fetch_activities():
     try:
         r = requests.get(f"{API_BASE}/activities/")
         r.raise_for_status()
@@ -65,7 +55,7 @@ def fetch_activities(force_counter: int = 0):
     except Exception:
         return []
 
-def fetch_entries(force_counter: int = 0):
+def fetch_entries():
     try:
         r = requests.get(f"{API_BASE}/mood/")
         r.raise_for_status()
@@ -73,25 +63,15 @@ def fetch_entries(force_counter: int = 0):
     except Exception:
         return []
 
-# -----------------------------
-# Use force counter from session_state to allow other pages to invalidate
-# -----------------------------
-force_counter = st.session_state.get("_force_rerun_counter", 0)
-
-activities = fetch_activities(force_counter)
+activities = fetch_activities()
 activity_map = {a["id"]: a["name"] for a in activities}
 
-entries = fetch_entries(force_counter)
+entries = fetch_entries()
 
-# -----------------------------
-# Debug: show raw entries so we can confirm notes exist in backend response
-# -----------------------------
+# Debug raw entries (remove when confirmed)
 st.markdown("## Raw backend entries (debug)")
 st.write(entries)
 
-# -----------------------------
-# Render logic
-# -----------------------------
 def render_mood_log(entries_list):
     if not entries_list:
         st.info("No mood entries yet.")
@@ -123,10 +103,11 @@ def render_mood_log(entries_list):
             dt = ent["_local_dt"]
             time_str = dt.strftime("%H:%M")
             mood = ent.get("mood_score", ent.get("mood", "—"))
-            notes = ent.get("notes", "")
+            # Prefer backend 'note', fall back to frontend 'notes'
+            notes = ent.get("note")
+            if notes is None:
+                notes = ent.get("notes", "")
             activity_ids = ent.get("activity_ids", []) or []
-
-            # Map activity ids to names
             activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
 
             cols = st.columns([1, 4, 3])
@@ -147,16 +128,11 @@ def render_mood_log(entries_list):
 
             st.markdown("---")
 
-# -----------------------------
-# Controls and render call
-# -----------------------------
 st.markdown("# Mood Log")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("Refresh"):
-        # bump the force counter to invalidate other pages' caches
         st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
-        # trigger rerun: use experimental_rerun if available, otherwise toggle a key
         try:
             st.experimental_rerun()
         except Exception:
