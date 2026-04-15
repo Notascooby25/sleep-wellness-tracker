@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import datetime
-import pytz
+from zoneinfo import ZoneInfo
 import json
 
 API_BASE = "http://backend:8000"
@@ -79,7 +79,7 @@ def toggle_chip(aid):
 # -----------------------------
 # UK Date + Time Pickers
 # -----------------------------
-uk_tz = pytz.timezone("Europe/London")
+uk_tz = ZoneInfo("Europe/London")
 
 entry_date = st.date_input(
     "Entry Date",
@@ -91,10 +91,7 @@ entry_time = st.time_input(
     datetime.datetime.now(uk_tz).time()
 )
 
-entry_dt = uk_tz.localize(
-    datetime.datetime.combine(entry_date, entry_time)
-)
-
+entry_dt = datetime.datetime.combine(entry_date, entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
 # -----------------------------
