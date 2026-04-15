@@ -5,6 +5,20 @@ import time
 from datetime import datetime, timezone
 from requests.exceptions import RequestException
 from json import JSONDecodeError
+import datetime
+import pytz
+
+uk_tz = pytz.timezone("Europe/London")
+
+# Date selector
+entry_date = st.date_input("Entry Date", datetime.datetime.now(uk_tz).date())
+
+# Time selector
+entry_time = st.time_input("Entry Time", datetime.datetime.now(uk_tz).time())
+
+# Combine into a timezone-aware datetime
+entry_dt = uk_tz.localize(datetime.datetime.combine(entry_date, entry_time))
+
 
 API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
