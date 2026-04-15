@@ -8,14 +8,18 @@ API_BASE = "http://backend:8000"
 
 st.set_page_config(page_title="Mood Entry", layout="centered")
 
-# Reset handling
+# -----------------------------
+# Reset handling (clear form on next run if requested)
+# -----------------------------
 if st.session_state.get("reset_form", False):
+    # Remove keys so widgets will be re-created with fresh defaults
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         if k in st.session_state:
             try:
                 del st.session_state[k]
             except Exception:
                 pass
+    # clear selected activities and checkbox keys
     st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
         if key.startswith("act_"):
@@ -25,7 +29,9 @@ if st.session_state.get("reset_form", False):
                 pass
     st.session_state["reset_form"] = False
 
+# -----------------------------
 # Load categories + activities
+# -----------------------------
 def load_categories():
     try:
         r = requests.get(f"{API_BASE}/categories/")
@@ -45,6 +51,7 @@ def load_activities():
 categories = load_categories()
 activities = load_activities()
 
+# Group activities by category_id
 activities_by_cat = {}
 for a in activities:
     cid = a.get("category_id")
@@ -52,27 +59,60 @@ for a in activities:
         activities_by_cat[cid] = []
     activities_by_cat[cid].append(a)
 
-# CSS
+# -----------------------------
+# Custom CSS to make checkboxes look like chips
+# -----------------------------
 st.markdown(
     """
 <style>
-.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; }
-.chip-checkbox { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 16px; background-color: #f0f0f0; border: 1px solid #ccc; cursor: pointer; font-size: 14px; user-select: none; }
-.chip-checkbox input[type="checkbox"] { display: none; }
-.chip-checkbox.checked { background-color: #4CAF50 !important; color: white !important; border-color: #4CAF50 !important; }
-.category-title { margin-top: 12px; margin-bottom: 6px; font-weight: 600; }
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+.chip-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    font-size: 14px;
+    user-select: none;
+}
+.chip-checkbox input[type="checkbox"] {
+    display: none;
+}
+.chip-checkbox.checked {
+    background-color: #4CAF50 !important;
+    color: white !important;
+    border-color: #4CAF50 !important;
+}
+.category-title {
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Session state defaults
+# -----------------------------
+# Session state for selected activities and form persistence
+# -----------------------------
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
+# UK timezone and "now" for initial defaults
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
+# Initialize session_state defaults only if not present
 if "entry_date" not in st.session_state:
     st.session_state.entry_date = now_uk.date()
 if "entry_time" not in st.session_state:
@@ -82,17 +122,38 @@ if "mood_score" not in st.session_state:
 if "notes" not in st.session_state:
     st.session_state.notes = ""
 
-# Date/time widgets (persisted)
-entry_date = st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
-entry_time = st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
+# -----------------------------
+# UK Date + Time Pickers (persist via key)
+# -----------------------------
+entry_date = st.date_input(
+    "Entry Date",
+    value=st.session_state.entry_date,
+    key="entry_date",
+)
 
-entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
+entry_time = st.time_input(
+    "Entry Time",
+    value=st.session_state.entry_time,
+    key="entry_time",
+)
+
+# Combine into timezone-aware datetime
+entry_dt = datetime.datetime.combine(
+    st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz
+)
 timestamp_iso = entry_dt.isoformat()
 
-mood_score = st.slider("Mood Score", 1, 10, st.session_state.mood_score, key="mood_score")
+# -----------------------------
+# Mood Score + Notes (persisted by keys)
+# -----------------------------
+mood_score = st.slider(
+    "Mood Score", 1, 10, st.session_state.mood_score, key="mood_score"
+)
 notes = st.text_area("Notes", st.session_state.notes, key="notes")
 
-# Activities rendering
+# -----------------------------
+# Render categories + activity chips (checkbox-based)
+# -----------------------------
 st.markdown("### Activities")
 
 def render_chip_row(items, cols=4):
@@ -118,17 +179,18 @@ for cat in categories:
         continue
     render_chip_row(cat_acts, cols=4)
 
-# Save button: send both 'notes' and 'note' (temporary compatibility)
+# -----------------------------
+# Submit Button
+# -----------------------------
 if st.button("Save Entry"):
     payload = {
         "mood_score": mood_score,
-        "notes": notes,        # frontend canonical key
-        "note": notes,         # backend expects this key (temporary duplicate)
+        "notes": notes,
         "timestamp": timestamp_iso,
         "activity_ids": sorted(list(st.session_state.selected_activities)),
     }
 
-    # Debug output (remove when confirmed)
+    # Debug: show outgoing payload and backend response for troubleshooting
     st.write("Outgoing payload:", payload)
 
     try:
@@ -141,7 +203,9 @@ if st.button("Save Entry"):
 
         if r.status_code in (200, 201):
             st.success("Mood entry saved!")
+            # mark form to be reset on next run
             st.session_state.reset_form = True
+            # Force other pages to refresh by bumping a counter (safe fallback)
             st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
         else:
             st.error(f"Error: {r.status_code} {r.text}")
