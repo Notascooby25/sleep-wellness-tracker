@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import datetime
 from zoneinfo import ZoneInfo
-import streamlit.components.v1 as components
+import json
 
 API_BASE = "http://backend:8000"
 
@@ -70,6 +70,12 @@ st.markdown("""
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
+def toggle_chip(aid):
+    if aid in st.session_state.selected_activities:
+        st.session_state.selected_activities.remove(aid)
+    else:
+        st.session_state.selected_activities.add(aid)
+
 # -----------------------------
 # UK Date + Time Pickers
 # -----------------------------
@@ -99,45 +105,25 @@ notes = st.text_area("Notes", "")
 # -----------------------------
 st.markdown("### Activities")
 
-# Hidden input to receive chip clicks
-clicked = st.text_input("chip-input", key="chip-input", label_visibility="collapsed")
-
-# Update session state when a chip is clicked
-if clicked:
-    aid = int(clicked)
-    if aid in st.session_state.selected_activities:
-        st.session_state.selected_activities.remove(aid)
-    else:
-        st.session_state.selected_activities.add(aid)
-    st.session_state["chip-input"] = ""  # reset
-
 for cat in categories:
     st.markdown(f"#### {cat['name']}")
     cid = cat["id"]
     cat_acts = activities_by_cat.get(cid, [])
 
-    chip_html = """
-    <script>
-    function toggleChip(aid) {
-        const input = window.parent.document.querySelector('input[id="chip-input"]');
-        input.value = aid;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    </script>
-    <div class="chip-container">
-    """
-
+    chip_html = '<div class="chip-container">'
     for a in cat_acts:
         selected_class = "selected" if a["id"] in st.session_state.selected_activities else ""
         chip_html += f"""
-        <div class="chip {selected_class}" onclick="toggleChip({a['id']})">
+        <div class="chip {selected_class}" onclick="fetch('/_chip_toggle?aid={a['id']}')">
             {a['name']}
         </div>
         """
-
     chip_html += "</div>"
 
-    components.html(chip_html, height=200)
+    st.markdown(chip_html, unsafe_allow_html=True)
+
+# Hidden endpoint to toggle chips
+st.experimental_connection("chip_toggle", type="http")
 
 # -----------------------------
 # Submit Button
