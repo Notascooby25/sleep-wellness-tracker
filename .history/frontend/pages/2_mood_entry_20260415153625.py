@@ -224,7 +224,6 @@ if st.button("Save"):
         "note": note,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "activity_ids": selected_ids,
-        "timestamp": entry_dt.isoformat()
     }
 
     with st.spinner("Saving entry..."):
