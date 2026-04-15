@@ -180,24 +180,41 @@ for cat in categories:
 if st.button("Save Entry"):
     payload = {
         "mood_score": mood_score,
+        "notes": nif st.button("Save Entry"):
+    payload = {
+        "mood_score": mood_score,
+        "notes": n# Replace your existing Save branch with this snippet
+        
+if st.button("Save Entry"):
+    payload = {
+        "mood_score": mood_score,
         "notes": notes,
         "timestamp": timestamp_iso,
         "activity_ids": sorted(list(st.session_state.selected_activities))
     }
 
+    # Debug: show exactly what we're sending
+    st.write("Outgoing payload:", payload)
+
     try:
         r = requests.post(f"{API_BASE}/mood/", json=payload)
-        if r.status_code == 200:
+        # Debug: show raw backend response
+        st.write("Backend response status:", r.status_code)
+        try:
+            resp_json = r.json()
+            st.write("Backend response JSON:", resp_json)
+        except Exception:
+            st.write("Backend response text:", r.text)
+
+        if r.status_code == 200 or r.status_code == 201:
             st.success("Mood entry saved!")
-            # Mark form to be reset on next run (deletion happens before widgets are created)
+            # mark reset and force rerun safely
             st.session_state.reset_form = True
-            # Try to call experimental_rerun if available; otherwise force a rerun by toggling a session_state key
             try:
                 st.experimental_rerun()
             except Exception:
                 st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
-
         else:
-            st.error(f"Error: {r.text}")
+            st.error(f"Error saving entry: {r.status_code} {r.text}")
     except Exception as exc:
         st.error(f"Error saving entry: {exc}")
