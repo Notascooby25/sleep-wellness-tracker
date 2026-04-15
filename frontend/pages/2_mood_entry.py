@@ -8,6 +8,27 @@ API_BASE = "http://backend:8000"
 st.set_page_config(page_title="Mood Entry", layout="centered")
 
 # -----------------------------
+# Reset handling (clear form on next run if requested)
+# -----------------------------
+if "reset_form" in st.session_state and st.session_state.reset_form:
+    # Remove keys so widgets will be re-created with fresh defaults
+    for k in ["entry_date", "entry_time", "mood_score", "notes"]:
+        if k in st.session_state:
+            del st.session_state[k]
+    # clear selected activities and checkbox keys
+    if "selected_activities" in st.session_state:
+        st.session_state.selected_activities = set()
+    for key in list(st.session_state.keys()):
+        if key.startswith("act_"):
+            try:
+                del st.session_state[key]
+            except Exception:
+                pass
+    # clear the flag
+    st.session_state.reset_form = False
+    # Let the app continue to render with cleared session state
+
+# -----------------------------
 # Load categories + activities
 # -----------------------------
 def load_categories():
@@ -83,21 +104,24 @@ st.markdown("""
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
-# Ensure persistent keys for date/time so user edits don't reset
+# UK timezone and "now" for initial defaults
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
-# Initialize session_state values only once
+# Initialize session_state defaults only if not present
 if "entry_date" not in st.session_state:
     st.session_state.entry_date = now_uk.date()
 if "entry_time" not in st.session_state:
-    # store as time object
     st.session_state.entry_time = now_uk.time()
+if "mood_score" not in st.session_state:
+    st.session_state.mood_score = 5
+if "notes" not in st.session_state:
+    st.session_state.notes = ""
 
 # -----------------------------
 # UK Date + Time Pickers (persist via key)
 # -----------------------------
-# Using key= ensures Streamlit stores the widget value in session_state and won't reset to "now" on rerun.
+# Note: do NOT reassign st.session_state keys after widget creation
 entry_date = st.date_input(
     "Entry Date",
     value=st.session_state.entry_date,
@@ -110,21 +134,15 @@ entry_time = st.time_input(
     key="entry_time"
 )
 
-# Keep session_state in sync (Streamlit updates keys automatically, but ensure local vars reflect them)
-st.session_state.entry_date = entry_date
-st.session_state.entry_time = entry_time
-
 # Combine into timezone-aware datetime
 entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
 # -----------------------------
-# Mood Score + Notes (persisted by keys if desired)
+# Mood Score + Notes (persisted by keys)
 # -----------------------------
-if "mood_score" not in st.session_state:
-    st.session_state.mood_score = 5
 mood_score = st.slider("Mood Score", 1, 10, st.session_state.mood_score, key="mood_score")
-notes = st.text_area("Notes", "", key="notes")
+notes = st.text_area("Notes", st.session_state.notes, key="notes")
 
 # -----------------------------
 # Render categories + activity chips (checkbox-based)
@@ -171,17 +189,9 @@ if st.button("Save Entry"):
         r = requests.post(f"{API_BASE}/mood/", json=payload)
         if r.status_code == 200:
             st.success("Mood entry saved!")
-            # Reset selected activities and form fields
-            st.session_state.selected_activities = set()
-            # Clear checkbox keys so they re-render unchecked
-            for a in activities:
-                key = f"act_{a['id']}"
-                if key in st.session_state:
-                    del st.session_state[key]
-            # Optionally reset mood and notes but keep date/time as the user's choice
-            st.session_state.mood_score = 5
-            st.session_state.notes = ""
-            # Do not reset entry_date/entry_time so user can make multiple entries for same time/day
+            # Mark form to be reset on next run (deletion happens before widgets are created)
+            st.session_state.reset_form = True
+            # Optionally keep date/time as-is; if you want to reset to now, leave as-is because reset_form will clear keys
             st.experimental_rerun()
         else:
             st.error(f"Error: {r.text}")
