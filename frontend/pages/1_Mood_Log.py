@@ -28,12 +28,11 @@ def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
     else:
         days_diff = (today - dt).days
         if 1 < days_diff <= 6:
-            label = dt.strftime("%A")  # Monday, Tuesday...
+            label = dt.strftime("%A")
         else:
-            label = dt.strftime("%A")  # fallback to weekday for consistency
+            label = dt.strftime("%A")
     month = dt.strftime("%B")
     day_ord = _ordinal(dt.day)
-    # include year only if not current year
     year_part = ""
     if dt.year != today.year:
         year_part = f", {dt.year}"
@@ -47,21 +46,20 @@ def parse_to_uk(dt_str: str) -> datetime.datetime:
     try:
         dt = datetime.datetime.fromisoformat(dt_str)
     except Exception:
-        # fallback: try common format without microseconds
         try:
             dt = datetime.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
         except Exception:
-            # last resort: current time
             dt = datetime.datetime.now(datetime.timezone.utc)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(uk_tz)
 
 # -----------------------------
-# Data fetching
+# Data fetching with cache invalidation support
 # -----------------------------
-@st.cache_data(ttl=30)
-def fetch_activities():
+# We include a force_counter parameter so cache keys change when the entry page increments the counter.
+@st.cache_data(ttl=5)
+def fetch_activities(force_counter: int = 0):
     try:
         r = requests.get(f"{API_BASE}/activities/")
         r.raise_for_status()
@@ -69,8 +67,8 @@ def fetch_activities():
     except Exception:
         return []
 
-@st.cache_data(ttl=15)
-def fetch_entries():
+@st.cache_data(ttl=5)
+def fetch_entries(force_counter: int = 0):
     try:
         r = requests.get(f"{API_BASE}/mood/")
         r.raise_for_status()
@@ -78,10 +76,13 @@ def fetch_entries():
     except Exception:
         return []
 
-activities = fetch_activities()
+# Use the force counter from session_state to invalidate cache when needed
+force_counter = st.session_state.get("_force_rerun_counter", 0)
+
+activities = fetch_activities(force_counter)
 activity_map = {a["id"]: a["name"] for a in activities}
 
-entries = fetch_entries()
+entries = fetch_entries(force_counter)
 
 # -----------------------------
 # Render logic
@@ -124,7 +125,7 @@ def render_mood_log(entries_list):
             activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
 
             # Entry header row
-            cols = st.columns([1, 4, 2])
+            cols = st.columns([1, 4, 3])
             with cols[0]:
                 st.markdown(f"**{time_str}**")
             with cols[1]:
@@ -147,10 +148,16 @@ st.markdown("# Mood Log")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("Refresh"):
-        # clear caches and re-run
-        fetch_entries.clear()
-        fetch_activities.clear()
-        st.experimental_rerun()
+        # Clear cached data and force a re-fetch
+        try:
+            fetch_entries.clear()
+            fetch_activities.clear()
+        except Exception:
+            pass
+        # bump the force counter to invalidate cached results for other tabs
+        st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+        # trigger rerun by updating a session key
+        st.experimental_rerun() if hasattr(st, "experimental_rerun") else st.session_state.setdefault("_refresh_trigger", 0)
 with col2:
     st.write("Entries are shown in UK local time (Europe/London).")
 
