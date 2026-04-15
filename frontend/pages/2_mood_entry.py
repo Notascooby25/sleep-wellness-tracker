@@ -128,17 +128,8 @@ if st.button("Save Entry"):
         "activity_ids": sorted(list(st.session_state.selected_activities)),
     }
 
-    # Debug output (remove when confirmed)
-    st.write("Outgoing payload:", payload)
-
     try:
         r = requests.post(f"{API_BASE}/mood/", json=payload)
-        st.write("Backend response status:", r.status_code)
-        try:
-            st.write("Backend response JSON:", r.json())
-        except Exception:
-            st.write("Backend response text:", r.text)
-
         if r.status_code in (200, 201):
             st.success("Mood entry saved!")
             st.session_state.reset_form = True
