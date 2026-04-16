@@ -15,10 +15,12 @@ services:
       - sleepnet
 
   backend:
-    build:
-      dockerfile: Dockerfile
-    image: sleep-wellness-tracker-backend:latest
-    container_name: sleep_backend
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  image: sleep-wellness-tracker-backend:latest
+  container_name: sleep_backend
+
     env_file: .env
     environment:
       - DATABASE_URL
