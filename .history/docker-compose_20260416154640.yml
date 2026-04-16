@@ -31,7 +31,6 @@ services:
     - sleepnet
 
 
-
   frontend:
     build: ./frontend
     container_name: sleep_frontend
