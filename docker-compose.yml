@@ -16,18 +16,20 @@ services:
 
   backend:
     build:
+      context: ./backend
       dockerfile: Dockerfile
     image: sleep-wellness-tracker-backend:latest
     container_name: sleep_backend
     env_file: .env
     environment:
-      - DATABASE_URL
+    - DATABASE_URL
     depends_on:
-      - db
+    - db
     ports:
-      - "8000:8000"
+    - "8000:8000"
     networks:
-      - sleepnet
+    - sleepnet
+
 
   frontend:
     build: ./frontend
