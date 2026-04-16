@@ -14,12 +14,11 @@ class MoodBase(BaseModel):
     activity_ids: Optional[List[int]] = []
 
     class Config:
-        populate_by_name = True  # allow using field names even when alias exists
-
+        # allow both "notes" and "note" in incoming JSON
+        populate_by_name = True
 
 class MoodCreate(MoodBase):
     pass
-
 
 class MoodRead(MoodBase):
     id: int
