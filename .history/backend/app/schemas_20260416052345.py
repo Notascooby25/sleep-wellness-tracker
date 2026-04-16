@@ -8,17 +8,17 @@ from datetime import datetime
 
 class MoodBase(BaseModel):
     mood_score: int
+    # Canonical field is `notes`, but accept incoming `note` as alias
     notes: Optional[str] = Field(None, alias="note")
     timestamp: datetime
     activity_ids: Optional[List[int]] = []
 
     class Config:
+        # allow both "notes" and "note" in incoming JSON
         populate_by_name = True
-
 
 class MoodCreate(MoodBase):
     pass
-
 
 class MoodRead(MoodBase):
     id: int
@@ -27,7 +27,6 @@ class MoodRead(MoodBase):
     class Config:
         from_attributes = True
         populate_by_name = True
-
 
 
 # -------------------------
