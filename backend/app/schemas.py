@@ -8,12 +8,18 @@ from datetime import datetime
 
 class MoodBase(BaseModel):
     mood_score: int
-    notes: Optional[str] = Field(None, alias="note")
+    notes: Optional[str] = Field(
+        None,
+        alias="note",
+        serialization_alias="notes"
+    )
     timestamp: datetime
     activity_ids: Optional[List[int]] = []
 
     class Config:
         populate_by_name = True
+
+
 
 
 class MoodCreate(MoodBase):
@@ -27,6 +33,7 @@ class MoodRead(MoodBase):
     class Config:
         from_attributes = True
         populate_by_name = True
+
 
 
 
