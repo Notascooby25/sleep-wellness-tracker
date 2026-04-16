@@ -16,19 +16,21 @@ def list_mood_entries(db: Session = Depends(get_db)):
         result.append({
             "id": r.id,
             "mood_score": r.mood_score,
-            "note": r.note,
+            # API now returns `notes`, still reading DB column `note`
+            "notes": r.note,
             "timestamp": r.timestamp,
             "created_at": r.created_at,
-            "activity_ids": activity_ids
+            "activity_ids": activity_ids,
         })
     return result
 
 @router.post("", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
+    # payload.notes is populated whether client sent "note" or "notes"
     db_mood = models.Mood(
         mood_score=payload.mood_score,
-        note=payload.note,
-        timestamp=payload.timestamp
+        note=payload.notes,
+        timestamp=payload.timestamp,
     )
     db.add(db_mood)
     db.commit()
@@ -46,10 +48,10 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     return {
         "id": db_mood.id,
         "mood_score": db_mood.mood_score,
-        "note": db_mood.note,
+        "notes": db_mood.note,
         "timestamp": db_mood.timestamp,
         "created_at": db_mood.created_at,
-        "activity_ids": activity_ids
+        "activity_ids": activity_ids,
     }
 
 @router.get("/{entry_id}", response_model=schemas.MoodRead)
@@ -63,8 +65,8 @@ def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     return {
         "id": m.id,
         "mood_score": m.mood_score,
-        "note": m.note,
+        "notes": m.note,
         "timestamp": m.timestamp,
         "created_at": m.created_at,
-        "activity_ids": activity_ids
+        "activity_ids": activity_ids,
     }
