@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: sleep_db
+    env_file: .env
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - sleepnet
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sleep-wellness-tracker-backend:latest
+    container_name: sleep_backend
+    env_file: .env
+    environment:
+      - DATABASE_URL
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    networks:
+      - sleepnet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sleep_frontend
+    env_file: .env
+    environment:
+      - API_BASE
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    networks:
+      - sleepnet
+
+networks:
+  sleepnet:
+    driver: bridge
+
+volumes:
+  db_data:
