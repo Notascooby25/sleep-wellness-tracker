@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -8,9 +8,14 @@ from datetime import datetime
 
 class MoodBase(BaseModel):
     mood_score: int
-    note: Optional[str] = None
+    # Canonical field is `notes`, but accept incoming `note` as alias
+    notes: Optional[str] = Field(None, alias="note")
     timestamp: datetime
     activity_ids: Optional[List[int]] = []
+
+    class Config:
+        # allow both "notes" and "note" in incoming JSON
+        populate_by_name = True
 
 class MoodCreate(MoodBase):
     pass
@@ -21,7 +26,7 @@ class MoodRead(MoodBase):
 
     class Config:
         from_attributes = True
-
+        populate_by_name = True
 
 # -------------------------
 # CATEGORY SCHEMAS
