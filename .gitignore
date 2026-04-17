@@ -6,3 +6,6 @@ __pycache__/
 backups/*.tar
 backups/*.tar
 backups/*.tar
+backups/*.tar
+backend.tar
+frontend.tar
