@@ -1,0 +1,52 @@
+name: sleep-wellness-tracker
+
+services:
+  db:
+    image: postgres:15
+    container_name: sleep_db
+    env_file: .env
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sleep-wellness-tracker-backend:latest
+    container_name: sleep_backend
+    env_file: .env
+    environment:
+      - DATABASE_URL
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app:Z
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sleep_frontend
+    env_file: .env
+    environment:
+      - API_BASE
+      - STREAMLIT_SERVER_RUN_ON_SAVE=true
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=watchdog
+    depends_on:
+      - backend
+    command: streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.runOnSave=true --server.fileWatcherType=watchdog
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./frontend/main.py:/app/main.py:Z
+      - ./frontend/pages:/app/pages:Z
+
+volumes:
+  db_data:
