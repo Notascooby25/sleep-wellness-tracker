@@ -17,7 +17,7 @@ def list_mood_entries(db: Session = Depends(get_db)):
             "id": r.id,
             "mood_score": r.mood_score,
             # API now returns `notes`, still reading DB column `note`
-            "notes": r.note,
+            "notes": r.notes,
             "timestamp": r.timestamp,
             "created_at": r.created_at,
             "activity_ids": activity_ids,
@@ -29,7 +29,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     # payload.notes is populated whether client sent "note" or "notes"
     db_mood = models.Mood(
         mood_score=payload.mood_score,
-        note=payload.notes,
+        notes=payload.notes,
         timestamp=payload.timestamp,
     )
     db.add(db_mood)
@@ -48,7 +48,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     return {
         "id": db_mood.id,
         "mood_score": db_mood.mood_score,
-        "notes": db_mood.note,
+        "notes": db_mood.notes,
         "timestamp": db_mood.timestamp,
         "created_at": db_mood.created_at,
         "activity_ids": activity_ids,
@@ -65,7 +65,7 @@ def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     return {
         "id": m.id,
         "mood_score": m.mood_score,
-        "notes": m.note,
+        "notes": m.notes,
         "timestamp": m.timestamp,
         "created_at": m.created_at,
         "activity_ids": activity_ids,

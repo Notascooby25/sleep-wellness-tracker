@@ -50,19 +50,42 @@ st.markdown(
 
 /* Mobile: tighten checkbox spacing to reduce scrolling */
 @media (max-width: 768px) {
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
+
+    section[data-testid="stMain"] .block-container {
+        max-width: 100% !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
+
     div[data-testid="stHorizontalBlock"] {
         gap: 0.25rem !important;
+        align-items: flex-start !important;
     }
+
+    div[data-testid="column"] {
+        min-width: 0 !important;
+    }
+
     div[data-testid="stCheckbox"] {
         padding-bottom: 0 !important;
-        margin-bottom: -8px !important;
+        margin-bottom: 0.15rem !important;
     }
+
     div[data-testid="stCheckbox"] label {
-        font-size: 0.78rem !important;
-        line-height: 1.15 !important;
+        align-items: flex-start !important;
+        gap: 0.2rem !important;
     }
+
+    div[data-testid="stCheckbox"] label p,
     div[data-testid="stCheckbox"] label span {
-        font-size: 0.78rem !important;
+        font-size: 0.72rem !important;
+        line-height: 1.15 !important;
+        white-space: normal !important;
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
     }
 }
 </style>
@@ -99,15 +122,18 @@ notes = st.text_area("Notes", st.session_state.notes, key="notes")
 # Activities
 st.markdown("### Activities")
 
-def render_chip_row(items, cols=4):
-    for item in items:
-        aid = item["id"]
-        key = f"act_{aid}"
-        checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
-        if checked:
-            st.session_state.selected_activities.add(aid)
-        else:
-            st.session_state.selected_activities.discard(aid)
+def render_chip_row(items, cols=5):
+    col_objs = st.columns(cols)
+    for idx, item in enumerate(items):
+        col = col_objs[idx % cols]
+        with col:
+            aid = item["id"]
+            key = f"act_{aid}"
+            checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
+            if checked:
+                st.session_state.selected_activities.add(aid)
+            else:
+                st.session_state.selected_activities.discard(aid)
 
 for cat in categories:
     st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
