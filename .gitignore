@@ -9,3 +9,6 @@ backups/*.tar
 backups/*.tar
 backend.tar
 frontend.tar
+backups/*.tar
+backend.tar
+frontend.tar
