@@ -23,7 +23,8 @@ def mood_colour(score):
     }
     return colours.get(score, "#999999")
 
-# Fetch entries
+
+# Fetch mood entries
 def load_entries():
     try:
         r = requests.get(f"{API_BASE}/mood/")
@@ -32,9 +33,23 @@ def load_entries():
     except Exception:
         return []
 
-entries = load_entries()
 
-# Group by date
+# Fetch activities so we can map IDs → names
+def load_activities():
+    try:
+        r = requests.get(f"{API_BASE}/activities/")
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
+
+
+entries = load_entries()
+activities_list = load_activities()
+activity_lookup = {a["id"]: a["name"] for a in activities_list}
+
+
+# Group entries by date
 grouped = {}
 for e in entries:
     ts = datetime.datetime.fromisoformat(e["timestamp"]).astimezone(uk_tz)
@@ -49,6 +64,7 @@ sorted_days = sorted(grouped.keys(), reverse=True)
 # Divider style
 DIVIDER = "<hr style='margin: 10px 0; opacity: 0.25;'>"
 
+
 for day in sorted_days:
     day_label = day.strftime("%A, %B %d")
     st.markdown(f"### {day_label}")
@@ -59,7 +75,7 @@ for day in sorted_days:
     for idx, (ts, e) in enumerate(day_entries):
         mood = e["mood_score"]
         notes = e.get("notes") or "No notes"
-        acts = e.get("activities", [])
+        activity_ids = e.get("activity_ids", [])
 
         colour = mood_colour(mood)
 
@@ -77,8 +93,10 @@ for day in sorted_days:
         )
 
         # Activities
-        if acts:
-            act_names = ", ".join(a["name"] for a in acts)
+        if activity_ids:
+            act_names = ", ".join(
+                activity_lookup.get(aid, f"Unknown ({aid})") for aid in activity_ids
+            )
             st.markdown(
                 f"<div style='font-size: 13px; margin-top: 4px;'><b>Activities:</b> {act_names}</div>",
                 unsafe_allow_html=True,
