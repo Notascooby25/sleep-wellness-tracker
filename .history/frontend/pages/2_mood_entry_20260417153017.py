@@ -87,7 +87,6 @@ if "selected_activities" not in st.session_state:
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
-
 st.session_state.setdefault("entry_date", now_uk.date())
 st.session_state.setdefault("entry_time", now_uk.time())
 st.session_state.setdefault("mood_score", 3)

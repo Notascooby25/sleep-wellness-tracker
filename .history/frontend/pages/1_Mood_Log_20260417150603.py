@@ -89,3 +89,4 @@ for day in sorted_days:
         # Divider between entries
         if idx < len(day_entries) - 1:
             st.markdown(DIVIDER, unsafe_allow_html=True)
+            

@@ -51,30 +51,6 @@ st.markdown(
 .chip-checkbox input[type="checkbox"] { display: none; }
 .chip-checkbox.checked { background-color: #4CAF50 !important; color: white !important; border-color: #4CAF50 !important; }
 .category-title { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
-
-/* Mobile refinement: make activity checkboxes denser to reduce scrolling */
-@media (max-width: 768px) {
-    div[data-testid="stCheckbox"] {
-        display: inline-block;
-        width: 20%;
-        min-width: 20%;
-        margin: 0 0 6px 0;
-        vertical-align: top;
-    }
-
-    div[data-testid="stCheckbox"] label {
-        font-size: 0.74rem;
-        line-height: 1.1;
-    }
-}
-
-/* Very narrow phones: use 4 columns for readability */
-@media (max-width: 480px) {
-    div[data-testid="stCheckbox"] {
-        width: 25%;
-        min-width: 25%;
-    }
-}
 </style>
 """,
     unsafe_allow_html=True,
@@ -86,7 +62,6 @@ if "selected_activities" not in st.session_state:
 
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
-
 
 st.session_state.setdefault("entry_date", now_uk.date())
 st.session_state.setdefault("entry_time", now_uk.time())
@@ -110,14 +85,17 @@ notes = st.text_area("Notes", st.session_state.notes, key="notes")
 st.markdown("### Activities")
 
 def render_chip_row(items, cols=4):
-    for item in items:
-        aid = item["id"]
-        key = f"act_{aid}"
-        checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
-        if checked:
-            st.session_state.selected_activities.add(aid)
-        else:
-            st.session_state.selected_activities.discard(aid)
+    col_objs = st.columns(cols)
+    for idx, item in enumerate(items):
+        col = col_objs[idx % cols]
+        with col:
+            aid = item["id"]
+            key = f"act_{aid}"
+            checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
+            if checked:
+                st.session_state.selected_activities.add(aid)
+            else:
+                st.session_state.selected_activities.discard(aid)
 
 for cat in categories:
     st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
