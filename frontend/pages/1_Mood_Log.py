@@ -1,61 +1,30 @@
-# frontend/pages/1_mood_log.py
 import streamlit as st
 import requests
 import datetime
 from zoneinfo import ZoneInfo
-from collections import defaultdict
 
 API_BASE = "http://backend:8000"
-uk_tz = ZoneInfo("Europe/London")
 
 st.set_page_config(page_title="Mood Log", layout="centered")
 
-def _ordinal(n: int) -> str:
-    if 10 <= (n % 100) <= 20:
-        suffix = "th"
-    else:
-        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{suffix}"
+st.title("Mood Log")
+st.caption("Entries are shown in UK local time (Europe/London).")
 
-def format_date_heading(dt: datetime.date, today: datetime.date) -> str:
-    if dt == today:
-        label = "Today"
-    elif dt == (today - datetime.timedelta(days=1)):
-        label = "Yesterday"
-    else:
-        days_diff = (today - dt).days
-        if 1 < days_diff <= 6:
-            label = dt.strftime("%A")
-        else:
-            label = dt.strftime("%A")
-    month = dt.strftime("%B")
-    day_ord = _ordinal(dt.day)
-    year_part = ""
-    if dt.year != today.year:
-        year_part = f", {dt.year}"
-    return f"{label}, {month} {day_ord}{year_part}"
+uk_tz = ZoneInfo("Europe/London")
 
-def parse_to_uk(dt_str: str) -> datetime.datetime:
-    try:
-        dt = datetime.datetime.fromisoformat(dt_str)
-    except Exception:
-        try:
-            dt = datetime.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
-        except Exception:
-            dt = datetime.datetime.now(datetime.timezone.utc)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
-    return dt.astimezone(uk_tz)
+# Colour map for 1–5 scale
+def mood_colour(score):
+    colours = {
+        1: "#2ecc71",   # green (great)
+        2: "#a3e635",   # lime
+        3: "#facc15",   # amber
+        4: "#f97316",   # orange
+        5: "#ef4444",   # red (rubbish)
+    }
+    return colours.get(score, "#999999")
 
-def fetch_activities():
-    try:
-        r = requests.get(f"{API_BASE}/activities/")
-        r.raise_for_status()
-        return r.json()
-    except Exception:
-        return []
-
-def fetch_entries():
+# Fetch entries
+def load_entries():
     try:
         r = requests.get(f"{API_BASE}/mood/")
         r.raise_for_status()
@@ -63,77 +32,60 @@ def fetch_entries():
     except Exception:
         return []
 
-activities = fetch_activities()
-activity_map = {a["id"]: a["name"] for a in activities}
+entries = load_entries()
 
-entries = fetch_entries()
+# Group by date
+grouped = {}
+for e in entries:
+    ts = datetime.datetime.fromisoformat(e["timestamp"]).astimezone(uk_tz)
+    date_key = ts.date()
+    if date_key not in grouped:
+        grouped[date_key] = []
+    grouped[date_key].append((ts, e))
 
-def render_mood_log(entries_list):
-    if not entries_list:
-        st.info("No mood entries yet.")
-        return
+# Sort newest → oldest
+sorted_days = sorted(grouped.keys(), reverse=True)
 
-    grouped = defaultdict(list)
-    for e in entries_list:
-        ts = e.get("timestamp")
-        if not ts:
-            continue
-        try:
-            local_dt = parse_to_uk(ts)
-        except Exception:
-            continue
-        e["_local_dt"] = local_dt
-        e["_local_date"] = local_dt.date()
-        grouped[e["_local_date"]].append(e)
+# Divider style
+DIVIDER = "<hr style='margin: 10px 0; opacity: 0.25;'>"
 
-    sorted_dates = sorted(grouped.keys(), reverse=True)
-    today = datetime.datetime.now(uk_tz).date()
+for day in sorted_days:
+    day_label = day.strftime("%A, %B %d")
+    st.markdown(f"### {day_label}")
 
-    for d in sorted_dates:
-        heading = format_date_heading(d, today)
-        st.markdown(f"### {heading}")
+    # Sort entries newest → oldest
+    day_entries = sorted(grouped[day], key=lambda x: x[0], reverse=True)
 
-        day_entries = sorted(grouped[d], key=lambda x: x["_local_dt"], reverse=True)
+    for idx, (ts, e) in enumerate(day_entries):
+        mood = e["mood_score"]
+        notes = e.get("notes") or "No notes"
+        acts = e.get("activities", [])
 
-        for ent in day_entries:
-            dt = ent["_local_dt"]
-            time_str = dt.strftime("%H:%M")
-            mood = ent.get("mood_score", ent.get("mood", "—"))
-            # Prefer backend 'note', fall back to frontend 'notes'
-            notes = ent.get("note")
-            if notes is None:
-                notes = ent.get("notes", "")
-            activity_ids = ent.get("activity_ids", []) or []
-            activity_names = [activity_map.get(aid, str(aid)) for aid in activity_ids]
+        colour = mood_colour(mood)
 
-            cols = st.columns([1, 4, 3])
-            with cols[0]:
-                st.markdown(f"**{time_str}**")
-            with cols[1]:
-                st.markdown(f"**Mood {mood}**")
-                if notes:
-                    st.write(notes)
-                else:
-                    st.write("_No notes_")
-            with cols[2]:
-                if activity_names:
-                    st.markdown("**Activities**")
-                    st.write(", ".join(activity_names))
-                else:
-                    st.write("")
+        # Compact card
+        st.markdown(
+            f"""
+            <div style='padding: 8px 12px; border-radius: 8px; background: #fafafa;'>
+                <div style='font-size: 14px; opacity: 0.7;'>{ts.strftime("%H:%M")}</div>
+                <div style='font-size: 18px; font-weight: 600; color:{colour};'>
+                    Mood {mood}
+                </div>
+                <div style='margin-top: 4px; font-size: 14px;'>{notes}</div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-            st.markdown("---")
+        # Activities
+        if acts:
+            act_names = ", ".join(a["name"] for a in acts)
+            st.markdown(
+                f"<div style='font-size: 13px; margin-top: 4px;'><b>Activities:</b> {act_names}</div>",
+                unsafe_allow_html=True,
+            )
 
-st.markdown("# Mood Log")
-col1, col2 = st.columns([1, 4])
-with col1:
-    if st.button("Refresh"):
-        st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
-        try:
-            st.experimental_rerun()
-        except Exception:
-            st.session_state["_refresh_trigger"] = st.session_state.get("_refresh_trigger", 0) + 1
-with col2:
-    st.write("Entries are shown in UK local time (Europe/London).")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-render_mood_log(entries)
+        # Divider between entries
+        if idx < len(day_entries) - 1:
+            st.markdown(DIVIDER, unsafe_allow_html=True)

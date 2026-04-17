@@ -1,4 +1,3 @@
-# frontend/pages/2_mood_entry.py
 import streamlit as st
 import requests
 import datetime
@@ -11,18 +10,11 @@ st.set_page_config(page_title="Mood Entry", layout="centered")
 # Reset handling
 if st.session_state.get("reset_form", False):
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
-        if k in st.session_state:
-            try:
-                del st.session_state[k]
-            except Exception:
-                pass
+        st.session_state.pop(k, None)
     st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
         if key.startswith("act_"):
-            try:
-                del st.session_state[key]
-            except Exception:
-                pass
+            st.session_state.pop(key, None)
     st.session_state["reset_form"] = False
 
 # Load categories + activities
@@ -48,82 +40,94 @@ activities = load_activities()
 activities_by_cat = {}
 for a in activities:
     cid = a.get("category_id")
-    if cid not in activities_by_cat:
-        activities_by_cat[cid] = []
-    activities_by_cat[cid].append(a)
+    activities_by_cat.setdefault(cid, []).append(a)
 
-# CSS
+# CSS for compact chips
 st.markdown(
     """
 <style>
-.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; }
-.chip-checkbox { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 16px; background-color: #f0f0f0; border: 1px solid #ccc; cursor: pointer; font-size: 14px; user-select: none; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip-checkbox { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 14px; background-color: #f0f0f0; border: 1px solid #ccc; cursor: pointer; font-size: 13px; }
 .chip-checkbox input[type="checkbox"] { display: none; }
 .chip-checkbox.checked { background-color: #4CAF50 !important; color: white !important; border-color: #4CAF50 !important; }
-.category-title { margin-top: 12px; margin-bottom: 6px; font-weight: 600; }
+.category-title { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
+
+/* Mobile refinement: make activity checkboxes denser to reduce scrolling */
+@media (max-width: 768px) {
+    div[data-testid="stCheckbox"] {
+        display: inline-block;
+        width: 20%;
+        min-width: 20%;
+        margin: 0 0 6px 0;
+        vertical-align: top;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.74rem;
+        line-height: 1.1;
+    }
+}
+
+/* Very narrow phones: use 4 columns for readability */
+@media (max-width: 480px) {
+    div[data-testid="stCheckbox"] {
+        width: 25%;
+        min-width: 25%;
+    }
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Session state defaults
+# Session defaults
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
-if "entry_date" not in st.session_state:
-    st.session_state.entry_date = now_uk.date()
-if "entry_time" not in st.session_state:
-    st.session_state.entry_time = now_uk.time()
-if "mood_score" not in st.session_state:
-    st.session_state.mood_score = 5
-if "notes" not in st.session_state:
-    st.session_state.notes = ""
 
-# Date/time widgets (persisted)
+st.session_state.setdefault("entry_date", now_uk.date())
+st.session_state.setdefault("entry_time", now_uk.time())
+st.session_state.setdefault("mood_score", 3)
+st.session_state.setdefault("notes", "")
+
+# Date/time
 entry_date = st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
 entry_time = st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
 
 entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
-mood_score = st.slider("Mood Score", 1, 10, st.session_state.mood_score, key="mood_score")
+# Mood score (1–5)
+mood_score = st.slider("Mood Score (1 = Great, 5 = Rubbish)", 1, 5, st.session_state.mood_score, key="mood_score")
+
+# Notes
 notes = st.text_area("Notes", st.session_state.notes, key="notes")
 
-# Activities rendering
+# Activities
 st.markdown("### Activities")
 
 def render_chip_row(items, cols=4):
-    col_objs = st.columns(cols)
-    for idx, item in enumerate(items):
-        col = col_objs[idx % cols]
-        with col:
-            aid = item["id"]
-            key = f"act_{aid}"
-            default_checked = aid in st.session_state.selected_activities
-            checked = st.checkbox(item["name"], value=default_checked, key=key)
-            if checked and aid not in st.session_state.selected_activities:
-                st.session_state.selected_activities.add(aid)
-            if (not checked) and (aid in st.session_state.selected_activities):
-                st.session_state.selected_activities.remove(aid)
+    for item in items:
+        aid = item["id"]
+        key = f"act_{aid}"
+        checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
+        if checked:
+            st.session_state.selected_activities.add(aid)
+        else:
+            st.session_state.selected_activities.discard(aid)
 
 for cat in categories:
     st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
-    cid = cat.get("id")
-    cat_acts = activities_by_cat.get(cid, [])
-    if not cat_acts:
-        st.write("_No activities_")
-        continue
-    render_chip_row(cat_acts, cols=4)
+    render_chip_row(activities_by_cat.get(cat["id"], []), cols=4)
 
-# Save button: send both 'notes' and 'note' (temporary compatibility)
+# Save
 if st.button("Save Entry"):
     payload = {
         "mood_score": mood_score,
-        "notes": notes,        # frontend canonical key
-        "note": notes,         # backend expects this key (temporary duplicate)
+        "notes": notes,
         "timestamp": timestamp_iso,
         "activity_ids": sorted(list(st.session_state.selected_activities)),
     }
