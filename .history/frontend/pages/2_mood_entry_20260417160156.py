@@ -50,42 +50,19 @@ st.markdown(
 
 /* Mobile: tighten checkbox spacing to reduce scrolling */
 @media (max-width: 768px) {
-    section[data-testid="stSidebar"] {
-        display: none !important;
-    }
-
-    section[data-testid="stMain"] .block-container {
-        max-width: 100% !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
-    }
-
     div[data-testid="stHorizontalBlock"] {
         gap: 0.25rem !important;
-        align-items: flex-start !important;
     }
-
-    div[data-testid="column"] {
-        min-width: 0 !important;
-    }
-
     div[data-testid="stCheckbox"] {
         padding-bottom: 0 !important;
-        margin-bottom: 0.15rem !important;
+        margin-bottom: -8px !important;
     }
-
     div[data-testid="stCheckbox"] label {
-        align-items: flex-start !important;
-        gap: 0.2rem !important;
-    }
-
-    div[data-testid="stCheckbox"] label p,
-    div[data-testid="stCheckbox"] label span {
-        font-size: 0.72rem !important;
+        font-size: 0.78rem !important;
         line-height: 1.15 !important;
-        white-space: normal !important;
-        word-break: normal !important;
-        overflow-wrap: break-word !important;
+    }
+    div[data-testid="stCheckbox"] label span {
+        font-size: 0.78rem !important;
     }
 }
 </style>
