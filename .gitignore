@@ -5,3 +5,4 @@ __pycache__/
 .vscode/
 backups/*.tar
 backups/*.tar
+backups/*.tar
