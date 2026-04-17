@@ -1,0 +1,160 @@
+import streamlit as st
+import requests
+import datetime
+from zoneinfo import ZoneInfo
+
+API_BASE = "http://backend:8000"
+
+st.set_page_config(page_title="Mood Entry", layout="centered")
+
+# Reset handling
+if st.session_state.get("reset_form", False):
+    for k in ["entry_date", "entry_time", "mood_score", "notes"]:
+        st.session_state.pop(k, None)
+    st.session_state["selected_activities"] = set()
+    for key in list(st.session_state.keys()):
+        if key.startswith("act_"):
+            st.session_state.pop(key, None)
+    st.session_state["reset_form"] = False
+
+# Load categories + activities
+def load_categories():
+    try:
+        r = requests.get(f"{API_BASE}/categories/")
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
+
+def load_activities():
+    try:
+        r = requests.get(f"{API_BASE}/activities/")
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
+
+categories = load_categories()
+activities = load_activities()
+
+activities_by_cat = {}
+for a in activities:
+    cid = a.get("category_id")
+    activities_by_cat.setdefault(cid, []).append(a)
+
+# CSS for compact layout
+st.markdown(
+    """
+<style>
+.category-title { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
+
+/* Mobile: tighten checkbox spacing to reduce scrolling */
+@media (max-width: 768px) {
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
+
+    section[data-testid="stMain"] .block-container {
+        max-width: 100% !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.25rem !important;
+        align-items: flex-start !important;
+    }
+
+    div[data-testid="column"] {
+        min-width: 0 !important;
+    }
+
+    div[data-testid="stCheckbox"] {
+        padding-bottom: 0 !important;
+        margin-bottom: 0.15rem !important;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        align-items: flex-start !important;
+        gap: 0.2rem !important;
+    }
+
+    div[data-testid="stCheckbox"] label p,
+    div[data-testid="stCheckbox"] label span {
+        font-size: 0.72rem !important;
+        line-height: 1.15 !important;
+        white-space: normal !important;
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
+    }
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+# Session defaults
+if "selected_activities" not in st.session_state:
+    st.session_state.selected_activities = set()
+
+uk_tz = ZoneInfo("Europe/London")
+now_uk = datetime.datetime.now(uk_tz)
+
+
+st.session_state.setdefault("entry_date", now_uk.date())
+st.session_state.setdefault("entry_time", now_uk.time())
+st.session_state.setdefault("mood_score", 3)
+st.session_state.setdefault("notes", "")
+
+# Date/time
+entry_date = st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
+entry_time = st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
+
+entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
+timestamp_iso = entry_dt.isoformat()
+
+# Mood score (1–5)
+mood_score = st.slider("Mood Score (1 = Great, 5 = Rubbish)", 1, 5, st.session_state.mood_score, key="mood_score")
+
+# Notes
+notes = st.text_area("Notes", st.session_state.notes, key="notes")
+
+# Activities
+st.markdown("### Activities")
+
+def render_chip_row(items, cols=5):
+    col_objs = st.columns(cols)
+    for idx, item in enumerate(items):
+        col = col_objs[idx % cols]
+        with col:
+            aid = item["id"]
+            key = f"act_{aid}"
+            checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
+            if checked:
+                st.session_state.selected_activities.add(aid)
+            else:
+                st.session_state.selected_activities.discard(aid)
+
+for cat in categories:
+    st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
+    render_chip_row(activities_by_cat.get(cat["id"], []), cols=4)
+
+# Save
+if st.button("Save Entry"):
+    payload = {
+        "mood_score": mood_score,
+        "notes": notes,
+        "timestamp": timestamp_iso,
+        "activity_ids": sorted(list(st.session_state.selected_activities)),
+    }
+
+    try:
+        r = requests.post(f"{API_BASE}/mood/", json=payload)
+        if r.status_code in (200, 201):
+            st.success("Mood entry saved!")
+            st.session_state.reset_form = True
+            st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+        else:
+            st.error(f"Error: {r.status_code} {r.text}")
+    except Exception as exc:
+        st.error(f"Error saving entry: {exc}")
