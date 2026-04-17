@@ -42,37 +42,27 @@ for a in activities:
     cid = a.get("category_id")
     activities_by_cat.setdefault(cid, []).append(a)
 
-# CSS for compact chips
+# CSS for compact layout
 st.markdown(
     """
 <style>
-.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.chip-checkbox { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 14px; background-color: #f0f0f0; border: 1px solid #ccc; cursor: pointer; font-size: 13px; }
-.chip-checkbox input[type="checkbox"] { display: none; }
-.chip-checkbox.checked { background-color: #4CAF50 !important; color: white !important; border-color: #4CAF50 !important; }
 .category-title { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
 
-/* Mobile refinement: make activity checkboxes denser to reduce scrolling */
+/* Mobile: tighten checkbox spacing to reduce scrolling */
 @media (max-width: 768px) {
-    div[data-testid="stCheckbox"] {
-        display: inline-block;
-        width: 20%;
-        min-width: 20%;
-        margin: 0 0 6px 0;
-        vertical-align: top;
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.25rem !important;
     }
-
+    div[data-testid="stCheckbox"] {
+        padding-bottom: 0 !important;
+        margin-bottom: -8px !important;
+    }
     div[data-testid="stCheckbox"] label {
-        font-size: 0.74rem;
-        line-height: 1.1;
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
     }
-}
-
-/* Very narrow phones: use 4 columns for readability */
-@media (max-width: 480px) {
-    div[data-testid="stCheckbox"] {
-        width: 25%;
-        min-width: 25%;
+    div[data-testid="stCheckbox"] label span {
+        font-size: 0.78rem !important;
     }
 }
 </style>
