@@ -3,6 +3,13 @@ import requests
 
 st.set_page_config(page_title="Sleep Wellness Tracker", layout="centered")
 
+# Make Mood Entry the first page users see when opening the app root.
+try:
+    st.switch_page("pages/2_mood_entry.py")
+    st.stop()
+except Exception:
+    pass
+
 st.title("Sleep Wellness Tracker")
 
 # Simple backend health check

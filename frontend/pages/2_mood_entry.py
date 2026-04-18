@@ -256,6 +256,14 @@ st.session_state.setdefault("entry_time", now_uk.time())
 st.session_state.setdefault("mood_score", 3)
 st.session_state.setdefault("notes", "")
 
+MOOD_COLOURS = {
+    1: "#2ecc71",  # great
+    2: "#84cc16",  # good
+    3: "#facc15",  # neutral
+    4: "#fb923c",  # low
+    5: "#ef4444",  # rubbish
+}
+
 st.markdown('<div class="section-title">Entry Details</div>', unsafe_allow_html=True)
 date_col, time_col = st.columns(2)
 with date_col:
@@ -267,6 +275,33 @@ entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_sta
 timestamp_iso = entry_dt.isoformat()
 
 mood_score = st.slider("Mood Score (1 = Great, 5 = Rubbish)", 1, 5, st.session_state.mood_score, key="mood_score")
+
+active_mood_colour = MOOD_COLOURS.get(mood_score, "#facc15")
+st.markdown(
+    f"""
+<style>
+div[data-testid="stSlider"] div[data-baseweb="slider"] > div > div:nth-child(2) {{
+    background: {active_mood_colour} !important;
+}}
+
+div[data-testid="stSlider"] div[data-baseweb="slider"] [role="slider"] {{
+    background: {active_mood_colour} !important;
+    border-color: {active_mood_colour} !important;
+    box-shadow: 0 0 0 1px {active_mood_colour} !important;
+}}
+
+.mood-colour-line {{
+    height: 5px;
+    border-radius: 999px;
+    margin-top: -0.25rem;
+    margin-bottom: 0.9rem;
+    background: {active_mood_colour};
+}}
+</style>
+<div class="mood-colour-line"></div>
+""",
+    unsafe_allow_html=True,
+)
 
 st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
 st.markdown(
