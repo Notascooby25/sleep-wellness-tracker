@@ -274,33 +274,161 @@ with time_col:
 entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
-mood_score = st.slider("Mood Score (1 = Great, 5 = Rubbish)", 1, 5, st.session_state.mood_score, key="mood_score")
-
-active_mood_colour = MOOD_COLOURS.get(mood_score, "#facc15")
 st.markdown(
-    f"""
+    """
 <style>
-div[data-testid="stSlider"] div[data-baseweb="slider"] > div > div:nth-child(2) {{
-    background: {active_mood_colour} !important;
-}}
+/* Radio group: basic compact pills */
+div[data-testid="stRadio"] [role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: stretch !important;
+    gap: 0.3rem !important;
+    width: 100% !important;
+    margin-bottom: 0.9rem !important;
+}
 
-div[data-testid="stSlider"] div[data-baseweb="slider"] [role="slider"] {{
-    background: {active_mood_colour} !important;
-    border-color: {active_mood_colour} !important;
-    box-shadow: 0 0 0 1px {active_mood_colour} !important;
-}}
+/* Override Streamlit generated fit-content wrappers so pills can span evenly */
+.st-emotion-cache-zh2fnc {
+    width: 100% !important;
+}
 
-.mood-colour-line {{
-    height: 5px;
-    border-radius: 999px;
-    margin-top: -0.25rem;
-    margin-bottom: 0.9rem;
-    background: {active_mood_colour};
-}}
+div[data-testid="stRadio"] [role="radiogroup"] > * {
+    width: 100% !important;
+}
+
+/* Hide any non-option label that Streamlit may inject for the field title */
+div[data-testid="stRadio"] [role="radiogroup"] label:not(:has(input[type="radio"])) {
+    display: none !important;
+}
+
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]) {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    min-height: 2.25rem !important;
+    border-radius: 999px !important;
+    font-weight: 700 !important;
+    font-size: clamp(0.86rem, 3vw, 1rem) !important;
+    color: #ffffff !important;
+    cursor: pointer !important;
+    background: #2ecc71 !important;
+    border: 1px solid #28b864 !important;
+    transition: all 120ms ease !important;
+    padding: 0.24rem 0.62rem !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Hide the native radio dot */
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]) > div:first-child {
+    display: none !important;
+}
+
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]) > div:last-child {
+    color: #ffffff !important;
+    font-size: clamp(0.86rem, 3vw, 1rem) !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+/* Per-score colours */
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="2"]) {
+    background: #84cc16 !important;
+    border-color: #74b412 !important;
+}
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="3"]) {
+    background: #facc15 !important;
+    border-color: #eab308 !important;
+    color: #213247 !important;
+}
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="3"]) > div:last-child {
+    color: #213247 !important;
+}
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="4"]) {
+    background: #fb923c !important;
+    border-color: #ea7b21 !important;
+}
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="5"]) {
+    background: #ef4444 !important;
+    border-color: #dc2626 !important;
+}
+
+/* Selected state */
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) {
+    box-shadow: 0 0 0 2px rgba(19,34,56,0.22) !important;
+    transform: translateY(-1px) !important;
+}
+
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) > div:last-child {
+    font-weight: 800 !important;
+}
+
+@media (max-width: 520px) {
+    div[data-testid="stRadio"] [role="radiogroup"] {
+        gap: 0.24rem !important;
+    }
+
+    div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]) {
+        min-height: 2.05rem !important;
+        padding: 0.16rem 0.36rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]) > div:last-child {
+        font-size: 0.8rem !important;
+    }
+}
+
+/* Style the info popover button */
+div[data-testid="stPopover"] button {
+    padding: 0 0.55rem !important;
+    min-height: 1.6rem !important;
+    font-size: 0.82rem !important;
+    border-radius: 999px !important;
+    border: 1px solid #ccd9ee !important;
+    background: #f0f5fd !important;
+    color: #3168ad !important;
+    line-height: 1.1 !important;
+}
 </style>
-<div class="mood-colour-line"></div>
 """,
     unsafe_allow_html=True,
+)
+
+# Mood score title with info popover
+mood_title_col, mood_info_col = st.columns([0.88, 0.12])
+with mood_title_col:
+    st.markdown('<div class="section-title">Mood Score</div>', unsafe_allow_html=True)
+with mood_info_col:
+    with st.popover("Info"):
+        st.markdown(
+            """
+**Mood scoring guide**
+
+| Score | Meaning |
+|-------|---------|
+| 🟢 **1** | Great — feeling really good |
+| 🟡 **2** | Good — above average |
+| 🟡 **3** | Neutral — neither good nor bad |
+| 🟠 **4** | Low — below average |
+| 🔴 **5** | Rubbish — really struggling |
+"""
+        )
+
+mood_score = st.radio(
+    "Mood Score",
+    options=[1, 2, 3, 4, 5],
+    format_func=lambda x: f"{x}",
+    horizontal=True,
+    key="mood_score",
+    label_visibility="collapsed",
 )
 
 st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
