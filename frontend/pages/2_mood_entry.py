@@ -5,34 +5,42 @@ from zoneinfo import ZoneInfo
 
 API_BASE = "http://backend:8000"
 
-st.set_page_config(page_title="Mood Entry", layout="centered")
+st.set_page_config(page_title="Mood Entry", layout="wide")
 
-# Reset handling
-if st.session_state.get("reset_form", False):
+
+def reset_entry_form_state():
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         st.session_state.pop(k, None)
     st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
-        if key.startswith("act_"):
+        if key.startswith("act_") or key.startswith("pill_cat_"):
             st.session_state.pop(key, None)
+
+
+if st.session_state.get("reset_form", False):
+    reset_entry_form_state()
     st.session_state["reset_form"] = False
 
-# Load categories + activities
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_categories():
     try:
-        r = requests.get(f"{API_BASE}/categories/")
+        r = requests.get(f"{API_BASE}/categories/", timeout=3)
         r.raise_for_status()
         return r.json()
     except Exception:
         return []
 
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_activities():
     try:
-        r = requests.get(f"{API_BASE}/activities/")
+        r = requests.get(f"{API_BASE}/activities/", timeout=3)
         r.raise_for_status()
         return r.json()
     except Exception:
         return []
+
 
 categories = load_categories()
 activities = load_activities()
@@ -42,50 +50,184 @@ for a in activities:
     cid = a.get("category_id")
     activities_by_cat.setdefault(cid, []).append(a)
 
-# CSS for compact layout
 st.markdown(
     """
 <style>
-.category-title { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
+:root {
+    --bg-soft: #f4f7fb;
+    --card-bg: #ffffff;
+    --card-border: #d9e2ef;
+    --text-main: #132238;
+    --text-sub: #5f6f84;
+    --chip-bg: #ecf2fb;
+    --chip-border: #ccddf4;
+    --chip-text: #1f4066;
+    --chip-active-bg: #3c79c5;
+    --chip-active-border: #3168ad;
+    --chip-active-text: #f7fbff;
+}
 
-/* Mobile: tighten checkbox spacing to reduce scrolling */
-@media (max-width: 768px) {
-    section[data-testid="stSidebar"] {
-        display: none !important;
+[data-testid="stAppViewContainer"] {
+    background:
+      radial-gradient(900px 260px at 8% -12%, #dbeafe 0%, transparent 45%),
+      radial-gradient(900px 280px at 92% -18%, #e5f4ff 0%, transparent 42%),
+      linear-gradient(180deg, #f9fbff 0%, #f2f6fc 100%);
+}
+
+.block-container {
+    max-width: 1120px;
+    padding-top: 1.2rem;
+    padding-bottom: 1.5rem;
+}
+
+.hero {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+    margin-bottom: 12px;
+}
+
+.hero h1 {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 1.8rem;
+    line-height: 1.15;
+}
+
+.hero p {
+    margin: 8px 0 0;
+    color: var(--text-sub);
+    font-size: 0.96rem;
+}
+
+.section-title {
+    color: var(--text-main);
+    font-size: 1.08rem;
+    font-weight: 700;
+    margin: 0.2rem 0 0.35rem;
+}
+
+.activity-topbar {
+    background: #f8fbff;
+    border: 1px solid #d7e6f7;
+    border-radius: 12px;
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.5rem;
+}
+
+.activity-count {
+    color: #2a4e76;
+    font-size: 0.86rem;
+    font-weight: 650;
+}
+
+div[data-testid="stTabs"] {
+    margin-top: 0.2rem;
+}
+
+button[data-baseweb="tab"] {
+    border-radius: 999px;
+    border: 1px solid #d6e5f7;
+    background: #f3f8ff;
+    color: #2d4f76;
+    font-weight: 600;
+    min-height: 32px;
+    padding: 0 0.8rem;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: #d9eafe;
+    border-color: #bfd9fa;
+}
+
+div[data-testid="stCheckbox"] {
+    margin-bottom: 0.32rem;
+}
+
+div[data-testid="stCheckbox"] label {
+    border-radius: 999px;
+    border: 1px solid var(--chip-border);
+    background: var(--chip-bg);
+    padding: 0.26rem 0.66rem;
+    width: 100%;
+    min-height: 2.15rem;
+    display: flex;
+    align-items: center;
+    transition: all 120ms ease-out;
+}
+
+div[data-testid="stCheckbox"] label p {
+    margin: 0;
+    color: var(--chip-text);
+    font-size: 0.83rem;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+div[data-testid="stCheckbox"] label input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+div[data-testid="stCheckbox"] label:has(input:checked) {
+    background: var(--chip-active-bg);
+    border-color: var(--chip-active-border);
+}
+
+div[data-testid="stCheckbox"] label:has(input:checked) p {
+    color: var(--chip-active-text);
+}
+
+div[data-testid="stCheckbox"] svg {
+    display: none;
+}
+
+[data-baseweb="tab-panel"] div[data-testid="stCheckbox"] {
+    display: inline-block;
+    vertical-align: top;
+    width: 32.3%;
+    margin-right: 1%;
+}
+
+[data-baseweb="tab-panel"] div[data-testid="stCheckbox"]:nth-child(3n) {
+    margin-right: 0;
+}
+
+@media (max-width: 860px) {
+    .block-container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-top: 0.95rem;
     }
 
-    section[data-testid="stMain"] .block-container {
-        max-width: 100% !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
+    .hero h1 {
+        font-size: 1.5rem;
     }
 
-    div[data-testid="stHorizontalBlock"] {
-        gap: 0.25rem !important;
-        align-items: flex-start !important;
+    .activity-count {
+        font-size: 0.8rem;
     }
 
-    div[data-testid="column"] {
-        min-width: 0 !important;
+    [data-baseweb="tab-panel"] div[data-testid="stCheckbox"] {
+        width: 48.9%;
+        margin-right: 1.8%;
+        margin-bottom: 0.4rem;
     }
 
-    div[data-testid="stCheckbox"] {
-        padding-bottom: 0 !important;
-        margin-bottom: 0.15rem !important;
+    [data-baseweb="tab-panel"] div[data-testid="stCheckbox"]:nth-child(2n) {
+        margin-right: 0;
     }
 
-    div[data-testid="stCheckbox"] label {
-        align-items: flex-start !important;
-        gap: 0.2rem !important;
-    }
-
-    div[data-testid="stCheckbox"] label p,
-    div[data-testid="stCheckbox"] label span {
-        font-size: 0.72rem !important;
-        line-height: 1.15 !important;
-        white-space: normal !important;
-        word-break: normal !important;
-        overflow-wrap: break-word !important;
+    div[data-testid="stCheckbox"] label p {
+        font-size: 0.78rem;
     }
 }
 </style>
@@ -93,54 +235,98 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Session defaults
+st.markdown(
+    """
+<div class="hero">
+    <h1>Mood Entry</h1>
+    <p>Fast log, tap activities as chips, and save. Times are UK local time (Europe/London).</p>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
-
 st.session_state.setdefault("entry_date", now_uk.date())
 st.session_state.setdefault("entry_time", now_uk.time())
 st.session_state.setdefault("mood_score", 3)
 st.session_state.setdefault("notes", "")
 
-# Date/time
-entry_date = st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
-entry_time = st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
+st.markdown('<div class="section-title">Entry Details</div>', unsafe_allow_html=True)
+date_col, time_col = st.columns(2)
+with date_col:
+    st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
+with time_col:
+    st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
 
 entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
-# Mood score (1–5)
 mood_score = st.slider("Mood Score (1 = Great, 5 = Rubbish)", 1, 5, st.session_state.mood_score, key="mood_score")
 
-# Notes
-notes = st.text_area("Notes", st.session_state.notes, key="notes")
+st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
+st.markdown(
+    f'<div class="activity-topbar"><span class="activity-count">{len(st.session_state.selected_activities)} selected</span></div>',
+    unsafe_allow_html=True,
+)
 
-# Activities
-st.markdown("### Activities")
+count_col, clear_col = st.columns([0.78, 0.22])
+with count_col:
+    st.caption("Tip: tap chips to toggle, then switch categories using tabs.")
+with clear_col:
+    if st.button("Clear", use_container_width=True):
+        reset_entry_form_state()
+        st.rerun()
 
-def render_chip_row(items, cols=5):
-    col_objs = st.columns(cols)
-    for idx, item in enumerate(items):
-        col = col_objs[idx % cols]
-        with col:
-            aid = item["id"]
-            key = f"act_{aid}"
-            checked = st.checkbox(item["name"], value=(aid in st.session_state.selected_activities), key=key)
-            if checked:
-                st.session_state.selected_activities.add(aid)
+if categories:
+    tabs = st.tabs([cat.get("name", "Category") for cat in categories])
+    for cat, tab in zip(categories, tabs):
+        with tab:
+            items = activities_by_cat.get(cat.get("id"), [])
+            if not items:
+                st.caption("No activities in this category.")
+                continue
+
+            option_ids = [item["id"] for item in items]
+            name_lookup = {item["id"]: item["name"] for item in items}
+            default_selected = [aid for aid in option_ids if aid in st.session_state.selected_activities]
+
+            key = f"pill_cat_{cat.get('id')}"
+            if hasattr(st, "pills"):
+                chosen_ids = st.pills(
+                    "Activities",
+                    options=option_ids,
+                    default=default_selected,
+                    selection_mode="multi",
+                    format_func=lambda aid: name_lookup.get(aid, str(aid)),
+                    key=key,
+                    label_visibility="collapsed",
+                )
+                chosen_ids = chosen_ids or []
             else:
-                st.session_state.selected_activities.discard(aid)
+                chosen_ids = st.multiselect(
+                    "Activities",
+                    options=option_ids,
+                    default=default_selected,
+                    format_func=lambda aid: name_lookup.get(aid, str(aid)),
+                    key=key,
+                    label_visibility="collapsed",
+                )
 
-for cat in categories:
-    st.markdown(f"<div class='category-title'>{cat.get('name','Category')}</div>", unsafe_allow_html=True)
-    render_chip_row(activities_by_cat.get(cat["id"], []), cols=4)
+            cat_option_set = set(option_ids)
+            st.session_state.selected_activities.difference_update(cat_option_set)
+            st.session_state.selected_activities.update(set(chosen_ids))
+else:
+    st.warning("No activity categories found.")
 
-# Save
-if st.button("Save Entry"):
+st.markdown('<div class="section-title">Notes</div>', unsafe_allow_html=True)
+notes = st.text_area("Notes", st.session_state.notes, key="notes", height=120, label_visibility="collapsed")
+
+if st.button("Save Entry", type="primary", use_container_width=True):
     payload = {
         "mood_score": mood_score,
         "notes": notes,
@@ -149,11 +335,11 @@ if st.button("Save Entry"):
     }
 
     try:
-        r = requests.post(f"{API_BASE}/mood/", json=payload)
+        r = requests.post(f"{API_BASE}/mood/", json=payload, timeout=4)
         if r.status_code in (200, 201):
-            st.success("Mood entry saved!")
-            st.session_state.reset_form = True
-            st.session_state["_force_rerun_counter"] = st.session_state.get("_force_rerun_counter", 0) + 1
+            st.success("Mood entry saved")
+            st.session_state["reset_form"] = True
+            st.rerun()
         else:
             st.error(f"Error: {r.status_code} {r.text}")
     except Exception as exc:
