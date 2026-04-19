@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from ..garmin_client import GarminClientError, get_garmin_client, is_garmin_configured
 from .. import models
+
+logger = logging.getLogger("app.garmin")
 
 SLEEP_SYNC_KEY = "sleep_daily"
 BODY_SYNC_KEY = "body_battery_daily"
@@ -30,6 +33,7 @@ def _get_sync_state(db: Session, key: str) -> models.GarminSyncState:
     db.add(state)
     db.commit()
     db.refresh(state)
+    logger.info("Created Garmin sync state row; key=%s", key)
     return state
 
 
@@ -112,6 +116,13 @@ def _upsert_sleep_daily(db: Session, sleep_date: dt.date, payload: Dict[str, Any
 
     db.commit()
     db.refresh(row)
+    logger.info(
+        "Upserted Garmin sleep row; date=%s total_sleep_minutes=%s sleep_score=%s payload_keys=%s",
+        sleep_date.isoformat(),
+        row.total_sleep_minutes,
+        row.sleep_score,
+        sorted(payload.keys()),
+    )
     return row
 
 
@@ -130,6 +141,13 @@ def _upsert_body_daily(db: Session, battery_date: dt.date, payload: Dict[str, An
 
     db.commit()
     db.refresh(row)
+    logger.info(
+        "Upserted Garmin body battery row; date=%s morning=%s end_of_day=%s payload_keys=%s",
+        battery_date.isoformat(),
+        row.morning_value,
+        row.end_of_day_value,
+        sorted(payload.keys()),
+    )
     return row
 
 
@@ -137,28 +155,45 @@ def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     now_local = _uk_now()
     state = _get_sync_state(db, SLEEP_SYNC_KEY)
 
+    logger.info(
+        "Sleep sync requested; force=%s now_local=%s last_synced_at=%s",
+        force,
+        now_local.isoformat(),
+        state.last_synced_at.isoformat() if state.last_synced_at else None,
+    )
+
     if not is_garmin_configured():
+        logger.warning("Sleep sync skipped: garmin_not_configured")
         return {"status": "skipped", "reason": "garmin_not_configured"}
     if not force and _recently_synced(state.last_synced_at):
+        logger.info("Sleep sync skipped: throttled_recent_sync")
         return {"status": "skipped", "reason": "throttled_recent_sync"}
     if not force and not _sleep_window_open(now_local):
+        logger.info("Sleep sync skipped: outside_sleep_sync_window")
         return {"status": "skipped", "reason": "outside_sleep_sync_window"}
     if not force and state.last_synced_at and state.last_synced_at.date() >= _today():
+        logger.info("Sleep sync skipped: already_synced_today")
         return {"status": "skipped", "reason": "already_synced_today"}
 
     try:
         client = get_garmin_client()
         date_str = _today().isoformat()
+        logger.info("Requesting Garmin sleep data; date=%s", date_str)
         payload = client.get_sleep_data(date_str) or {}
+        logger.info("Received Garmin sleep payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
         row = _upsert_sleep_daily(db, _today(), payload)
     except GarminClientError as exc:
+        logger.error("Sleep sync failed with Garmin client error: %s", exc)
         return {"status": "error", "reason": str(exc)}
     except Exception as exc:
+        logger.exception("Unexpected sleep sync failure")
         return {"status": "error", "reason": f"sleep_sync_failed: {exc}"}
 
     state.last_synced_at = dt.datetime.now(dt.timezone.utc)
     state.detail = "sleep_sync_ok"
     db.commit()
+
+    logger.info("Sleep sync complete; date=%s row_id=%s", row.sleep_date.isoformat(), row.id)
 
     return {"status": "ok", "sleep_date": row.sleep_date.isoformat(), "id": row.id}
 
@@ -167,35 +202,54 @@ def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]
     now_local = _uk_now()
     state = _get_sync_state(db, BODY_SYNC_KEY)
 
+    logger.info(
+        "Body battery sync requested; force=%s now_local=%s last_synced_at=%s",
+        force,
+        now_local.isoformat(),
+        state.last_synced_at.isoformat() if state.last_synced_at else None,
+    )
+
     if not is_garmin_configured():
+        logger.warning("Body battery sync skipped: garmin_not_configured")
         return {"status": "skipped", "reason": "garmin_not_configured"}
     if not force and _recently_synced(state.last_synced_at):
+        logger.info("Body battery sync skipped: throttled_recent_sync")
         return {"status": "skipped", "reason": "throttled_recent_sync"}
     if not force and not _body_window_open(now_local):
+        logger.info("Body battery sync skipped: outside_body_sync_window")
         return {"status": "skipped", "reason": "outside_body_sync_window"}
     if not force and state.last_synced_at and state.last_synced_at.date() >= _today():
+        logger.info("Body battery sync skipped: already_synced_today")
         return {"status": "skipped", "reason": "already_synced_today"}
 
     try:
         client = get_garmin_client()
         date_str = _today().isoformat()
+        logger.info("Requesting Garmin body battery stats; date=%s", date_str)
         payload = client.get_stats(date_str) or {}
+        logger.info("Received Garmin body battery payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
         row = _upsert_body_daily(db, _today(), payload)
     except GarminClientError as exc:
+        logger.error("Body battery sync failed with Garmin client error: %s", exc)
         return {"status": "error", "reason": str(exc)}
     except Exception as exc:
+        logger.exception("Unexpected body battery sync failure")
         return {"status": "error", "reason": f"body_sync_failed: {exc}"}
 
     state.last_synced_at = dt.datetime.now(dt.timezone.utc)
     state.detail = "body_sync_ok"
     db.commit()
 
+    logger.info("Body battery sync complete; date=%s row_id=%s", row.battery_date.isoformat(), row.id)
+
     return {"status": "ok", "battery_date": row.battery_date.isoformat(), "id": row.id}
 
 
 def sync_smart(db: Session, force: bool = False) -> Dict[str, Any]:
+    logger.info("Smart Garmin sync requested; force=%s", force)
     sleep_result = sync_sleep_if_due(db, force=force)
     body_result = sync_body_battery_if_due(db, force=force)
+    logger.info("Smart Garmin sync finished; sleep=%s body_battery=%s", sleep_result, body_result)
     return {
         "sleep": sleep_result,
         "body_battery": body_result,
