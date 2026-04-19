@@ -87,6 +87,17 @@ st.markdown(
     white-space: nowrap;
 }
 
+.sleep-pill {
+    color: #234766;
+    background: #def3ea;
+    border: 1px solid #b7e2d2;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.24rem 0.58rem;
+    white-space: nowrap;
+}
+
 .entry-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -298,6 +309,7 @@ if "open_entry_menu_id" not in st.session_state:
 def clear_mood_cache():
     load_entries.clear()
     load_activities.clear()
+    load_sleep_range.clear()
 
 
 def parse_timestamp(value):
@@ -401,6 +413,25 @@ def load_activities():
         return r.json()
     except Exception:
         return []
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_sleep_range(start_date: str, end_date: str):
+    try:
+        r = requests.get(
+            f"{API_BASE}/garmin/sleep/range",
+            params={"start_date": start_date, "end_date": end_date},
+            timeout=4,
+        )
+        r.raise_for_status()
+        rows = r.json().get("data") or []
+        return {
+            row.get("date"): row
+            for row in rows
+            if isinstance(row, dict) and row.get("date")
+        }
+    except Exception:
+        return {}
 
 
 if "editing_entry_id" not in st.session_state:
@@ -568,6 +599,12 @@ for e in entries:
 # Sort newest → oldest
 sorted_days = sorted(grouped.keys(), reverse=True)
 
+sleep_by_day = {}
+if sorted_days:
+    min_day = sorted_days[-1].isoformat()
+    max_day = sorted_days[0].isoformat()
+    sleep_by_day = load_sleep_range(min_day, max_day)
+
 if not sorted_days:
     st.markdown('<div class="empty-state">No mood entries yet. Add your first entry from Mood Entry.</div>', unsafe_allow_html=True)
 
@@ -578,12 +615,24 @@ for day in sorted_days:
     # Sort entries newest → oldest
     day_entries = sorted(grouped[day], key=lambda x: x[0], reverse=True)
     entry_count = len(day_entries)
+    sleep_row = sleep_by_day.get(day.isoformat())
+    sleep_text = ""
+    if sleep_row and sleep_row.get("total_sleep_minutes") is not None:
+        total_minutes = int(sleep_row.get("total_sleep_minutes") or 0)
+        sleep_hours = total_minutes // 60
+        sleep_minutes = total_minutes % 60
+        sleep_score = sleep_row.get("sleep_score")
+        score_text = f" · {sleep_score}/100" if sleep_score is not None else ""
+        sleep_text = f"<span class='sleep-pill'>Sleep {sleep_hours}h {sleep_minutes:02d}m{score_text}</span>"
 
     st.markdown(
         f"""
         <div class="day-header">
             <h2 class="day-title">{day_label}</h2>
-            <span class="count-pill">{entry_count} {'entry' if entry_count == 1 else 'entries'}</span>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                {sleep_text}
+                <span class="count-pill">{entry_count} {'entry' if entry_count == 1 else 'entries'}</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,

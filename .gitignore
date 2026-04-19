@@ -10,8 +10,10 @@ build/
 
 # Environment & Secrets (NEVER COMMIT)
 .env
+.env*
 .env.local
 *.env.local
+.envcp*
 docker-compose.yml.local
 backend/garmin_tokens.json
 backend/.env

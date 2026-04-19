@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .routes import mood, categories, activities
+from .routes import mood, categories, activities, garmin
 
 app = FastAPI()
 
@@ -9,6 +9,7 @@ app = FastAPI()
 app.include_router(mood.router)
 app.include_router(categories.router)
 app.include_router(activities.router)
+app.include_router(garmin.router)
 
 @app.get("/health")
 def health_check():
