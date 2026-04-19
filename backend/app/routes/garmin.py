@@ -1,10 +1,13 @@
 import datetime as dt
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
 from ..services.garmin_sync import sync_smart, sync_sleep_if_due, sync_body_battery_if_due
+
+logger = logging.getLogger("app.garmin")
 
 router = APIRouter(prefix="/garmin", tags=["garmin"])
 
@@ -15,6 +18,7 @@ def sync_now(
     force: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
+    logger.info("/garmin/sync-now called; mode=%s force=%s", mode, force)
     if mode == "sleep":
         return {"sleep": sync_sleep_if_due(db, force=force)}
     if mode == "body":
@@ -29,6 +33,7 @@ def sync_now(
 
 @router.get("/sleep/latest")
 def get_latest_sleep(db: Session = Depends(get_db)):
+    logger.info("/garmin/sleep/latest called")
     row = (
         db.query(models.GarminSleepDaily)
         .order_by(models.GarminSleepDaily.sleep_date.desc())
@@ -56,6 +61,7 @@ def get_latest_sleep(db: Session = Depends(get_db)):
 
 @router.get("/sleep/by-date")
 def get_sleep_by_date(date: dt.date = Query(...), db: Session = Depends(get_db)):
+    logger.info("/garmin/sleep/by-date called; date=%s", date.isoformat())
     row = db.query(models.GarminSleepDaily).filter(models.GarminSleepDaily.sleep_date == date).first()
     if not row:
         return {"data": None}
@@ -81,6 +87,7 @@ def get_sleep_range(
     end_date: dt.date = Query(...),
     db: Session = Depends(get_db),
 ):
+    logger.info("/garmin/sleep/range called; start_date=%s end_date=%s", start_date.isoformat(), end_date.isoformat())
     rows = (
         db.query(models.GarminSleepDaily)
         .filter(models.GarminSleepDaily.sleep_date >= start_date)
@@ -110,6 +117,7 @@ def get_sleep_range(
 
 @router.get("/body-battery/latest")
 def get_latest_body_battery(db: Session = Depends(get_db)):
+    logger.info("/garmin/body-battery/latest called")
     row = (
         db.query(models.GarminBodyBatteryDaily)
         .order_by(models.GarminBodyBatteryDaily.battery_date.desc())

@@ -358,10 +358,7 @@ with garmin_sync_col:
         except Exception as exc:
             st.error(f"Garmin sync failed: {exc}")
 
-st.session_state.setdefault("entry_date", now_uk.date())
-st.session_state.setdefault("entry_time", now_uk.time())
 st.session_state.setdefault("mood_score", 3)
-st.session_state.setdefault("notes", "")
 
 MOOD_COLOURS = {
     1: "#2ecc71",  # great
@@ -374,11 +371,11 @@ MOOD_COLOURS = {
 st.markdown('<div class="section-title">Entry Details</div>', unsafe_allow_html=True)
 date_col, time_col = st.columns(2)
 with date_col:
-    st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
+    entry_date = st.date_input("Entry Date", value=now_uk.date(), key="entry_date")
 with time_col:
-    st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
+    entry_time = st.time_input("Entry Time", value=now_uk.time(), key="entry_time")
 
-entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
+entry_dt = datetime.datetime.combine(entry_date, entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
 st.markdown(
@@ -627,7 +624,7 @@ else:
         st.caption(f"Last load error: {st.session_state['mood_entry_last_load_error']}")
 
 st.markdown('<div class="section-title">Notes</div>', unsafe_allow_html=True)
-notes = st.text_area("Notes", st.session_state.notes, key="notes", height=120, label_visibility="collapsed")
+notes = st.text_area("Notes", key="notes", height=120, label_visibility="collapsed")
 
 if st.button("Save Entry", type="primary", use_container_width=True):
     payload = {
