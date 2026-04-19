@@ -24,26 +24,53 @@ if st.session_state.get("reset_form", False):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_categories():
+    endpoints = [f"{API_BASE}/categories/", f"{API_BASE}/categories"]
+    last_exc = None
+    for endpoint in endpoints:
+        try:
+            r = requests.get(endpoint, timeout=3)
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, list):
+                return data
+        except Exception as exc:
+            last_exc = exc
+
+    if last_exc:
+        st.session_state["mood_entry_last_load_error"] = str(last_exc)
     try:
-        r = requests.get(f"{API_BASE}/categories/", timeout=3)
-        r.raise_for_status()
-        return r.json()
+        return []
     except Exception:
         return []
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_activities():
+    endpoints = [f"{API_BASE}/activities/", f"{API_BASE}/activities"]
+    last_exc = None
+    for endpoint in endpoints:
+        try:
+            r = requests.get(endpoint, timeout=3)
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, list):
+                return data
+        except Exception as exc:
+            last_exc = exc
+
+    if last_exc:
+        st.session_state["mood_entry_last_load_error"] = str(last_exc)
     try:
-        r = requests.get(f"{API_BASE}/activities/", timeout=3)
-        r.raise_for_status()
-        return r.json()
+        return []
     except Exception:
         return []
 
 
 categories = load_categories()
 activities = load_activities()
+
+if "mood_entry_last_load_error" not in st.session_state:
+    st.session_state["mood_entry_last_load_error"] = ""
 
 activities_by_cat = {}
 for a in activities:
@@ -248,6 +275,10 @@ st.markdown(
 if "selected_activities" not in st.session_state:
     st.session_state.selected_activities = set()
 
+# Keep selected ids in sync with currently available activities.
+available_activity_ids = {a.get("id") for a in activities if a.get("id") is not None}
+st.session_state.selected_activities.intersection_update(available_activity_ids)
+
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
@@ -432,14 +463,9 @@ mood_score = st.radio(
 )
 
 st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="activity-topbar"><span class="activity-count">{len(st.session_state.selected_activities)} selected</span></div>',
-    unsafe_allow_html=True,
-)
-
 count_col, clear_col = st.columns([0.78, 0.22])
 with count_col:
-    st.caption("Tip: tap chips to toggle, then switch categories using tabs.")
+    st.caption("Tap chips to toggle, then switch categories using tabs.")
 with clear_col:
     if st.button("Clear", use_container_width=True):
         reset_entry_form_state()
@@ -483,8 +509,46 @@ if categories:
             cat_option_set = set(option_ids)
             st.session_state.selected_activities.difference_update(cat_option_set)
             st.session_state.selected_activities.update(set(chosen_ids))
+elif activities:
+    st.info("No categories found, showing all activities in a single group.")
+    option_ids = [item["id"] for item in activities if item.get("id") is not None]
+    name_lookup = {item["id"]: item["name"] for item in activities if item.get("id") is not None}
+    default_selected = [aid for aid in option_ids if aid in st.session_state.selected_activities]
+
+    if hasattr(st, "pills"):
+        chosen_ids = st.pills(
+            "Activities",
+            options=option_ids,
+            default=default_selected,
+            selection_mode="multi",
+            format_func=lambda aid: name_lookup.get(aid, str(aid)),
+            key="pill_uncategorized_all",
+            label_visibility="collapsed",
+        )
+        chosen_ids = chosen_ids or []
+    else:
+        chosen_ids = st.multiselect(
+            "Activities",
+            options=option_ids,
+            default=default_selected,
+            format_func=lambda aid: name_lookup.get(aid, str(aid)),
+            key="pill_uncategorized_all",
+            label_visibility="collapsed",
+        )
+
+    st.session_state.selected_activities = set(chosen_ids)
 else:
-    st.warning("No activity categories found.")
+    st.warning("No categories or activities found. Recreate them from the management pages.")
+    if hasattr(st, "page_link"):
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            st.page_link("pages/4_manage_categories.py", label="Open Manage Categories")
+        with nav_col2:
+            st.page_link("pages/5_manage_activities.py", label="Open Manage Activities")
+    else:
+        st.caption("Use the left sidebar to open Manage Categories and Manage Activities.")
+    if st.session_state.get("mood_entry_last_load_error"):
+        st.caption(f"Last load error: {st.session_state['mood_entry_last_load_error']}")
 
 st.markdown('<div class="section-title">Notes</div>', unsafe_allow_html=True)
 notes = st.text_area("Notes", st.session_state.notes, key="notes", height=120, label_visibility="collapsed")

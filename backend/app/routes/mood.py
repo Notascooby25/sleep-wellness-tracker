@@ -70,3 +70,45 @@ def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
         "created_at": m.created_at,
         "activity_ids": activity_ids,
     }
+
+
+@router.put("/{entry_id}", response_model=schemas.MoodRead)
+def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = Depends(get_db)):
+    m = db.query(models.Mood).filter(models.Mood.id == entry_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mood entry not found")
+
+    m.mood_score = payload.mood_score
+    m.notes = payload.notes
+    m.timestamp = payload.timestamp
+
+    activities = []
+    if payload.activity_ids:
+        activities = db.query(models.Activity).filter(
+            models.Activity.id.in_(payload.activity_ids)
+        ).all()
+    m.activities = activities
+
+    db.commit()
+    db.refresh(m)
+
+    activity_ids = [a.id for a in m.activities]
+    return {
+        "id": m.id,
+        "mood_score": m.mood_score,
+        "notes": m.notes,
+        "timestamp": m.timestamp,
+        "created_at": m.created_at,
+        "activity_ids": activity_ids,
+    }
+
+
+@router.delete("/{entry_id}")
+def delete_mood_entry(entry_id: int, db: Session = Depends(get_db)):
+    m = db.query(models.Mood).filter(models.Mood.id == entry_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mood entry not found")
+
+    db.delete(m)
+    db.commit()
+    return {"ok": True, "id": entry_id}
