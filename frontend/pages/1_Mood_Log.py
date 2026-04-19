@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 import datetime
 import html
+import json
+import io
+import csv
 from zoneinfo import ZoneInfo
 
 API_BASE = "http://backend:8000"
@@ -177,6 +180,89 @@ st.markdown(
         font-size: 1.55rem;
     }
 }
+
+div[data-testid="stPopover"] button:has(div p:only-child) {
+    min-height: 1.6rem !important;
+    padding: 0 0.46rem !important;
+    border-radius: 999px !important;
+    border: 1px solid #d8e3f1 !important;
+    color: #516b89 !important;
+    background: #f4f8fd !important;
+    font-size: 0.95rem !important;
+    line-height: 1 !important;
+}
+
+.entry-row-note {
+    margin-top: 0.5rem;
+    color: var(--text-main);
+    line-height: 1.4;
+    font-size: 0.94rem;
+    min-height: 1.1rem;
+}
+
+.entry-row-chips {
+    margin-top: 0.62rem;
+    margin-bottom: 0.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.36rem;
+}
+
+.entry-row-actions button {
+    min-height: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0 0.5rem !important;
+    border-radius: 999px !important;
+    border: 1px solid #d8e3f1 !important;
+    color: #516b89 !important;
+    background: #f4f8fd !important;
+    font-size: 0.9rem !important;
+    line-height: 1 !important;
+}
+
+/* Streamlit border container — entry cards in main content only */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 2px solid #c2d5ec !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.08) !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin-bottom: 0.72rem !important;
+}
+
+/* Remove Streamlit's internal block padding/gap — we control it */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
+    padding: 10px 12px 10px !important;
+    gap: 2px !important;
+}
+
+/* Remove default paragraph margins that inflate card height */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] p {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.3 !important;
+}
+
+/* Compact column spacing inside card header */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stHorizontalBlock"] {
+    gap: 4px !important;
+    padding-bottom: 0 !important;
+}
+
+@media (max-width: 860px) {
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        border: 2px solid #a7c2e4 !important;
+        border-radius: 14px !important;
+        background: #ffffff !important;
+        box-shadow: 0 4px 14px rgba(30, 58, 138, 0.12) !important;
+        margin-bottom: 0.8rem !important;
+    }
+
+    .entry-row-chips {
+        margin-bottom: 0.32rem;
+    }
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -207,6 +293,96 @@ def mood_meta(score):
     return MOOD_META.get(score, (f"{score}", "#d1d5db"))
 
 
+if "open_entry_menu_id" not in st.session_state:
+    st.session_state["open_entry_menu_id"] = None
+def clear_mood_cache():
+    load_entries.clear()
+    load_activities.clear()
+
+
+def parse_timestamp(value):
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("timestamp is required")
+
+    ts = value.strip()
+    if ts.endswith("Z"):
+        ts = ts[:-1] + "+00:00"
+
+    datetime.datetime.fromisoformat(ts)
+    return ts
+
+
+def parse_activity_ids(value):
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return sorted({int(v) for v in value if str(v).strip()})
+
+    if isinstance(value, str):
+        raw = value.replace(";", ",")
+        return sorted({int(v.strip()) for v in raw.split(",") if v.strip()})
+
+    raise ValueError("activity_ids must be a list or delimited string")
+
+
+def normalize_import_rows(rows):
+    normalized = []
+    for row in rows:
+        score = int(row.get("mood_score"))
+        if score < 1 or score > 5:
+            raise ValueError("mood_score must be between 1 and 5")
+
+        normalized.append(
+            {
+                "mood_score": score,
+                "notes": row.get("notes") or row.get("note") or None,
+                "timestamp": parse_timestamp(row.get("timestamp")),
+                "activity_ids": parse_activity_ids(row.get("activity_ids")),
+            }
+        )
+
+    return normalized
+
+
+def render_entry_actions(entry_id):
+    st.markdown('<div class="entry-row-actions">', unsafe_allow_html=True)
+    with st.popover("⋯"):
+        if st.button("Edit", key=f"menu_edit_{entry_id}", use_container_width=True):
+            st.session_state["editing_entry_id"] = entry_id
+            st.session_state["delete_confirm_id"] = None
+            st.rerun()
+        if st.button("Delete", key=f"menu_delete_{entry_id}", use_container_width=True):
+            st.session_state["delete_confirm_id"] = entry_id
+            st.session_state["editing_entry_id"] = None
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state["delete_confirm_id"] == entry_id:
+        st.warning("Delete this entry? This cannot be undone.")
+        confirm_col, cancel_col = st.columns(2)
+        with confirm_col:
+            if st.button("Confirm Delete", key=f"confirm_delete_{entry_id}", use_container_width=True):
+                try:
+                    resp = requests.delete(f"{API_BASE}/mood/{entry_id}", timeout=4)
+                    if resp.status_code == 200:
+                        clear_mood_cache()
+                        st.session_state["delete_confirm_id"] = None
+                        st.session_state["mood_log_flash"] = f"Entry #{entry_id} deleted."
+                        st.rerun()
+                    else:
+                        st.error(f"Delete failed: {resp.status_code} {resp.text}")
+                except Exception as exc:
+                    st.error(f"Delete failed: {exc}")
+        with cancel_col:
+            if st.button("Cancel", key=f"cancel_delete_{entry_id}", use_container_width=True):
+                st.session_state["delete_confirm_id"] = None
+                st.rerun()
+
+
 @st.cache_data(ttl=45, show_spinner=False)
 def load_entries():
     try:
@@ -227,19 +403,157 @@ def load_activities():
         return []
 
 
+if "editing_entry_id" not in st.session_state:
+    st.session_state["editing_entry_id"] = None
+if "delete_confirm_id" not in st.session_state:
+    st.session_state["delete_confirm_id"] = None
+if "mood_log_flash" not in st.session_state:
+    st.session_state["mood_log_flash"] = None
+
+
 toolbar_col, refresh_col = st.columns([0.8, 0.2])
 with toolbar_col:
     st.caption("Use refresh if entries were added from another device a moment ago.")
 with refresh_col:
     if st.button("Refresh", use_container_width=True):
-        load_entries.clear()
-        load_activities.clear()
+        clear_mood_cache()
         st.rerun()
 
 
 entries = load_entries()
 activities_list = load_activities()
 activity_lookup = {a["id"]: a["name"] for a in activities_list}
+entry_lookup = {e["id"]: e for e in entries}
+
+
+if st.session_state["mood_log_flash"]:
+    st.success(st.session_state["mood_log_flash"])
+    st.session_state["mood_log_flash"] = None
+
+
+with st.sidebar:
+    st.subheader("Mood Log Tools")
+    export_rows = [
+        {
+            "mood_score": e.get("mood_score"),
+            "notes": e.get("notes"),
+            "timestamp": e.get("timestamp"),
+            "activity_ids": e.get("activity_ids", []),
+        }
+        for e in entries
+    ]
+
+    export_json = json.dumps(export_rows, indent=2)
+    st.download_button(
+        "Export JSON",
+        data=export_json,
+        file_name="mood_log_export.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+    csv_buffer = io.StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=["mood_score", "notes", "timestamp", "activity_ids"])
+    writer.writeheader()
+    for row in export_rows:
+        writer.writerow(
+            {
+                "mood_score": row["mood_score"],
+                "notes": row.get("notes") or "",
+                "timestamp": row["timestamp"],
+                "activity_ids": ";".join(str(aid) for aid in row.get("activity_ids", [])),
+            }
+        )
+    st.download_button(
+        "Export CSV",
+        data=csv_buffer.getvalue(),
+        file_name="mood_log_export.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+    st.markdown("---")
+    import_file = st.file_uploader("Import mood log (JSON or CSV)", type=["json", "csv"])
+    if st.button("Import Entries", use_container_width=True, disabled=import_file is None):
+        try:
+            if import_file.name.lower().endswith(".json"):
+                payload_obj = json.loads(import_file.getvalue().decode("utf-8"))
+                rows = payload_obj.get("entries", []) if isinstance(payload_obj, dict) else payload_obj
+                if not isinstance(rows, list):
+                    raise ValueError("JSON import must be a list of rows or an object with an entries list")
+            else:
+                text = import_file.getvalue().decode("utf-8")
+                rows = list(csv.DictReader(io.StringIO(text)))
+
+            rows_to_import = normalize_import_rows(rows)
+
+            imported = 0
+            failed = 0
+            for row in rows_to_import:
+                resp = requests.post(f"{API_BASE}/mood/", json=row, timeout=4)
+                if resp.status_code in (200, 201):
+                    imported += 1
+                else:
+                    failed += 1
+
+            clear_mood_cache()
+            st.session_state["mood_log_flash"] = f"Import complete: {imported} imported, {failed} failed."
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Import failed: {exc}")
+
+    if st.session_state["editing_entry_id"] is not None:
+        edit_id = st.session_state["editing_entry_id"]
+        edit_entry = entry_lookup.get(edit_id)
+        if edit_entry is None:
+            st.session_state["editing_entry_id"] = None
+        else:
+            parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
+            st.markdown("---")
+            st.subheader(f"Edit Entry #{edit_id}")
+            edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
+            edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
+            edit_score = st.radio(
+                "Mood",
+                options=[1, 2, 3, 4, 5],
+                horizontal=True,
+                key=f"edit_score_{edit_id}",
+                index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)),
+            )
+            edit_activities = st.multiselect(
+                "Activities",
+                options=sorted(activity_lookup.keys()),
+                default=edit_entry.get("activity_ids", []),
+                format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
+                key=f"edit_acts_{edit_id}",
+            )
+            edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
+
+            save_col, cancel_col = st.columns(2)
+            with save_col:
+                if st.button("Save Changes", use_container_width=True):
+                    new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
+                    payload = {
+                        "mood_score": int(edit_score),
+                        "notes": edit_notes,
+                        "timestamp": new_ts,
+                        "activity_ids": sorted(edit_activities),
+                    }
+                    try:
+                        resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
+                        if resp.status_code == 200:
+                            clear_mood_cache()
+                            st.session_state["editing_entry_id"] = None
+                            st.session_state["mood_log_flash"] = f"Entry #{edit_id} updated."
+                            st.rerun()
+                        else:
+                            st.error(f"Update failed: {resp.status_code} {resp.text}")
+                    except Exception as exc:
+                        st.error(f"Update failed: {exc}")
+            with cancel_col:
+                if st.button("Cancel", use_container_width=True):
+                    st.session_state["editing_entry_id"] = None
+                    st.rerun()
 
 
 # Group entries by date
@@ -297,20 +611,19 @@ for day in sorted_days:
 
         note_html = notes if notes else "<span class='empty-note'>No notes</span>"
 
-        card_html = f"""
-        <div class="entry-card">
-            <div class="entry-top">
-                <span class="time-tag">{ts.strftime("%H:%M")}</span>
-                <span class="mood-pill" style="background:{mood_bg};">Mood {mood} · {mood_label}</span>
-            </div>
-            <div class="entry-notes">{note_html}</div>
-            <div class="chip-wrap">{chips_html}</div>
-        </div>
-        """
+        target_col = left_col if idx % 2 == 0 else right_col
+        with target_col:
+            with st.container(border=True):
+                header_left, header_mid, header_right = st.columns([0.2, 0.66, 0.14], vertical_alignment="center")
+                with header_left:
+                    st.markdown(f"<span class='time-tag'>{ts.strftime('%H:%M')}</span>", unsafe_allow_html=True)
+                with header_mid:
+                    st.markdown(
+                        f"<div style='text-align:right;'><span class='mood-pill' style='background:{mood_bg};'>Mood {mood} · {mood_label}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+                with header_right:
+                    render_entry_actions(e["id"])
 
-        if idx % 2 == 0:
-            with left_col:
-                st.markdown(card_html, unsafe_allow_html=True)
-        else:
-            with right_col:
-                st.markdown(card_html, unsafe_allow_html=True)
+                st.markdown(f"<div class='entry-row-note'>{note_html}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='entry-row-chips'>{chips_html}</div>", unsafe_allow_html=True)

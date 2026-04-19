@@ -10,7 +10,7 @@ class MoodBase(BaseModel):
     mood_score: int
     notes: Optional[str] = None
     timestamp: datetime
-    activity_ids: Optional[List[int]] = []
+    activity_ids: Optional[List[int]] = Field(default_factory=list)
 
     class Config:
         populate_by_name = True
@@ -20,6 +20,10 @@ class MoodBase(BaseModel):
 
 
 class MoodCreate(MoodBase):
+    pass
+
+
+class MoodUpdate(MoodBase):
     pass
 
 
