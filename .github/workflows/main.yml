@@ -1,0 +1,53 @@
+name: Build ARM64 Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend (ARM64)
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -t sleep_wellness_tracker_backend:latest \
+            -f backend/Dockerfile \
+            backend \
+            --output type=docker,dest=backend-arm64.tar
+
+      - name: Build frontend (ARM64)
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -t sleep_wellness_tracker_frontend:latest \
+            -f frontend/Dockerfile \
+            frontend \
+            --output type=docker,dest=frontend-arm64.tar
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-arm64
+          path: backend-arm64.tar
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-arm64
+          path: frontend-arm64.tar
