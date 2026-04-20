@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from ..garmin_client import GarminClientError, get_garmin_client, is_garmin_configured
+from ..garmin_client import GarminClientError, GarminRateLimitError, get_garmin_client, is_garmin_configured
 from .. import models
 
 logger = logging.getLogger("app.garmin")
@@ -182,6 +182,8 @@ def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
         payload = client.get_sleep_data(date_str) or {}
         logger.info("Received Garmin sleep payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
         row = _upsert_sleep_daily(db, _today(), payload)
+    except GarminRateLimitError:
+        raise
     except GarminClientError as exc:
         logger.error("Sleep sync failed with Garmin client error: %s", exc)
         return {"status": "error", "reason": str(exc)}
@@ -229,6 +231,8 @@ def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]
         payload = client.get_stats(date_str) or {}
         logger.info("Received Garmin body battery payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
         row = _upsert_body_daily(db, _today(), payload)
+    except GarminRateLimitError:
+        raise
     except GarminClientError as exc:
         logger.error("Body battery sync failed with Garmin client error: %s", exc)
         return {"status": "error", "reason": str(exc)}

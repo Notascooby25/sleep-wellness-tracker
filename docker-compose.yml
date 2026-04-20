@@ -33,6 +33,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: sleep-wellness-tracker-frontend:latest
     container_name: sleep_frontend
     env_file: .env
     environment:
