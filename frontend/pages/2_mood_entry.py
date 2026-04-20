@@ -344,7 +344,7 @@ with garmin_sync_col:
     st.markdown("<div style='height: 0.35rem;'></div>", unsafe_allow_html=True)
     if st.button("Sync Garmin", use_container_width=True):
         try:
-            resp = requests.post(f"{API_BASE}/garmin/sync-now?mode=smart", timeout=10)
+            resp = requests.post(f"{API_BASE}/garmin/sync-now?mode=smart", timeout=40)
             if resp.status_code == 200:
                 data = resp.json()
                 sleep_state = (data.get("sleep") or {}).get("status", "unknown")
@@ -353,6 +353,8 @@ with garmin_sync_col:
                 load_garmin_latest_battery.clear()
                 st.session_state["garmin_flash"] = f"Garmin sync result: sleep={sleep_state}, body={body_state}."
                 st.rerun()
+            elif resp.status_code == 429:
+                st.warning("Garmin is rate-limiting this IP — wait a few minutes and try again.")
             else:
                 st.error(f"Garmin sync failed: {resp.status_code} {resp.text}")
         except Exception as exc:

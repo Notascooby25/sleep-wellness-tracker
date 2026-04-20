@@ -16,6 +16,11 @@ class GarminClientError(RuntimeError):
     pass
 
 
+class GarminRateLimitError(GarminClientError):
+    """Raised when Garmin returns HTTP 429 (IP rate limited)."""
+    pass
+
+
 def _garmin_email() -> str:
     return os.getenv("GARMIN_EMAIL", "").strip()
 
@@ -68,7 +73,12 @@ def get_garmin_client() -> Any:
         client.login(token_store)
         logger.info("Garmin login succeeded; token_store=%s", token_store)
     except Exception as exc:
+        exc_str = str(exc)
         logger.exception("Garmin login failed for email=%s", email)
+        if "429" in exc_str:
+            raise GarminRateLimitError(
+                "Garmin is rate-limiting this IP address — wait a few minutes before retrying"
+            ) from exc
         raise GarminClientError(f"Garmin login failed: {exc}") from exc
 
     return client

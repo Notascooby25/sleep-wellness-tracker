@@ -1,0 +1,65 @@
+Registering qemu for cross-arch emulation (may require sudo)...
+Setting /usr/bin/qemu-alpha-static as binfmt interpreter for alpha
+Setting /usr/bin/qemu-arm-static as binfmt interpreter for arm
+Setting /usr/bin/qemu-armeb-static as binfmt interpreter for armeb
+Setting /usr/bin/qemu-sparc-static as binfmt interpreter for sparc
+Setting /usr/bin/qemu-sparc32plus-static as binfmt interpreter for sparc32plus
+Setting /usr/bin/qemu-sparc64-static as binfmt interpreter for sparc64
+Setting /usr/bin/qemu-ppc-static as binfmt interpreter for ppc
+Setting /usr/bin/qemu-ppc64-static as binfmt interpreter for ppc64
+Setting /usr/bin/qemu-ppc64le-static as binfmt interpreter for ppc64le
+Setting /usr/bin/qemu-m68k-static as binfmt interpreter for m68k
+Setting /usr/bin/qemu-mips-static as binfmt interpreter for mips
+Setting /usr/bin/qemu-mipsel-static as binfmt interpreter for mipsel
+Setting /usr/bin/qemu-mipsn32-static as binfmt interpreter for mipsn32
+Setting /usr/bin/qemu-mipsn32el-static as binfmt interpreter for mipsn32el
+Setting /usr/bin/qemu-mips64-static as binfmt interpreter for mips64
+Setting /usr/bin/qemu-mips64el-static as binfmt interpreter for mips64el
+Setting /usr/bin/qemu-sh4-static as binfmt interpreter for sh4
+Setting /usr/bin/qemu-sh4eb-static as binfmt interpreter for sh4eb
+Setting /usr/bin/qemu-s390x-static as binfmt interpreter for s390x
+Setting /usr/bin/qemu-aarch64-static as binfmt interpreter for aarch64
+Setting /usr/bin/qemu-aarch64_be-static as binfmt interpreter for aarch64_be
+Setting /usr/bin/qemu-hppa-static as binfmt interpreter for hppa
+Setting /usr/bin/qemu-riscv32-static as binfmt interpreter for riscv32
+Setting /usr/bin/qemu-riscv64-static as binfmt interpreter for riscv64
+Setting /usr/bin/qemu-xtensa-static as binfmt interpreter for xtensa
+Setting /usr/bin/qemu-xtensaeb-static as binfmt interpreter for xtensaeb
+Setting /usr/bin/qemu-microblaze-static as binfmt interpreter for microblaze
+Setting /usr/bin/qemu-microblazeel-static as binfmt interpreter for microblazeel
+Setting /usr/bin/qemu-or1k-static as binfmt interpreter for or1k
+Setting /usr/bin/qemu-hexagon-static as binfmt interpreter for hexagon
+Building backend image for arm64 -> sleep-wellness-tracker-backend:arm64
+STEP 1/7: FROM python:3.11-slim
+STEP 2/7: WORKDIR /app
+--> Using cache a4ed9622893ba795810cd348f5eb0e8b095f31bb7579625a20c32faa3d0809e1
+--> a4ed9622893b
+STEP 3/7: RUN apt-get update && apt-get install -y     build-essential     libpq-dev     && rm -rf /var/lib/apt/lists/*
+--> Using cache 11ab30d700ff7e8b6e999232fe2d06598e6f454729f1264178703380197fce87
+--> 11ab30d700ff
+STEP 4/7: COPY requirements.txt ./requirements.txt
+--> Using cache 36442a35cdfe1cbaccc5e76d40405f0c41c2e40dbd98f1b171c1debe83cdf5af
+--> 36442a35cdfe
+STEP 5/7: RUN pip install --no-cache-dir -r requirements.txt
+--> Using cache 71851bd6286ba535b42f29930928e084a7f22cc73b4354e4ae8249b0aaf8364f
+--> 71851bd6286b
+STEP 6/7: COPY app ./app
+--> Using cache 723d99f0b93e0cc844a94234b02e02710321eb65bf2401f682f5dc4330fd50d7
+--> 723d99f0b93e
+STEP 7/7: CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+--> Using cache 2a0f44d03526bc2873e2acd58e8790735f559fc5d9c6712b63e10191a7827c7e
+COMMIT sleep-wellness-tracker-backend:arm64
+--> 2a0f44d03526
+Successfully tagged localhost/sleep-wellness-tracker-backend:arm64
+2a0f44d03526bc2873e2acd58e8790735f559fc5d9c6712b63e10191a7827c7e
+Building frontend image for arm64 -> sleep-wellness-tracker-frontend:arm64
+STEP 1/8: FROM python:3.11-slim
+STEP 2/8: WORKDIR /app
+--> Using cache a4ed9622893ba795810cd348f5eb0e8b095f31bb7579625a20c32faa3d0809e1
+--> a4ed9622893b
+STEP 3/8: COPY requirements.txt .
+--> Using cache 4f5bf109cd3c508fd7d978a995ceadd037e9f529844886d7882e7cb8e2e9a93a
+--> 4f5bf109cd3c
+STEP 4/8: RUN pip install --no-cache-dir -r requirements.txt
+container exited on segmentation fault
+Error: building at STEP "RUN pip install --no-cache-dir -r requirements.txt": while running runtime: exit status 1

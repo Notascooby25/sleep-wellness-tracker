@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
+from fastapi import APIRouter, Depends, Query, HTTPException
 from ..services.garmin_sync import sync_smart, sync_sleep_if_due, sync_body_battery_if_due
+from ..garmin_client import GarminRateLimitError
 
 logger = logging.getLogger("app.garmin")
 
@@ -19,16 +21,20 @@ def sync_now(
     db: Session = Depends(get_db),
 ):
     logger.info("/garmin/sync-now called; mode=%s force=%s", mode, force)
-    if mode == "sleep":
-        return {"sleep": sync_sleep_if_due(db, force=force)}
-    if mode == "body":
-        return {"body_battery": sync_body_battery_if_due(db, force=force)}
-    if mode == "all":
-        return {
-            "sleep": sync_sleep_if_due(db, force=True),
-            "body_battery": sync_body_battery_if_due(db, force=True),
-        }
-    return sync_smart(db, force=force)
+    try:
+        if mode == "sleep":
+            return {"sleep": sync_sleep_if_due(db, force=force)}
+        if mode == "body":
+            return {"body_battery": sync_body_battery_if_due(db, force=force)}
+        if mode == "all":
+            return {
+                "sleep": sync_sleep_if_due(db, force=True),
+                "body_battery": sync_body_battery_if_due(db, force=True),
+            }
+        return sync_smart(db, force=force)
+    except GarminRateLimitError as exc:
+        logger.warning("Garmin rate limit hit during sync: %s", exc)
+        raise HTTPException(status_code=429, detail=str(exc))
 
 
 @router.get("/sleep/latest")
@@ -57,6 +63,16 @@ def get_latest_sleep(db: Session = Depends(get_db)):
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
     }
+
+
+@router.get("/sleep/raw-payload")
+def get_sleep_raw_payload(date: dt.date = Query(...), db: Session = Depends(get_db)):
+    """Return the raw Garmin payload stored for a given date — for debugging key names."""
+    logger.info("/garmin/sleep/raw-payload called; date=%s", date.isoformat())
+    row = db.query(models.GarminSleepDaily).filter(models.GarminSleepDaily.sleep_date == date).first()
+    if not row:
+        return {"data": None}
+    return {"date": date.isoformat(), "payload": row.payload}
 
 
 @router.get("/sleep/by-date")
