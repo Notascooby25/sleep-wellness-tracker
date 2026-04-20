@@ -26,7 +26,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/arm64 \
-            -t sleepwell-backend:arm64 \
+            -t sleep-wellness-tracker-backend:latest \
             -f backend/Dockerfile \
             backend \
             --output type=docker,dest=backend-arm64.tar
@@ -35,7 +35,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/arm64 \
-            -t sleepwell-frontend:arm64 \
+            -t sleep-wellness-tracker-frontend:latest \
             -f frontend/Dockerfile \
             frontend \
             --output type=docker,dest=frontend-arm64.tar
