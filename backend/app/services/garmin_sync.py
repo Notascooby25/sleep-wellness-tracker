@@ -1,6 +1,6 @@
 import datetime as dt
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -13,6 +13,8 @@ logger = logging.getLogger("app.garmin")
 SLEEP_SYNC_KEY = "sleep_daily"
 BODY_SYNC_KEY = "body_battery_daily"
 MIN_SYNC_INTERVAL_MINUTES = 45
+SLEEP_BACKFILL_DAYS = 7
+BODY_BACKFILL_DAYS = 7
 UK_TZ = ZoneInfo("Europe/London")
 
 
@@ -23,6 +25,15 @@ def _uk_now() -> dt.datetime:
 
 def _today() -> dt.date:
     return _uk_now().date()
+
+
+def _recent_dates(days: int, end_date: Optional[dt.date] = None) -> List[dt.date]:
+    if days < 1:
+        return []
+
+    target_end = end_date or _today()
+    start_date = target_end - dt.timedelta(days=days - 1)
+    return [start_date + dt.timedelta(days=offset) for offset in range(days)]
 
 
 def _get_sync_state(db: Session, key: str) -> models.GarminSyncState:
@@ -160,6 +171,44 @@ def _upsert_body_daily(db: Session, battery_date: dt.date, payload: Dict[str, An
     return row
 
 
+def _sync_sleep_dates(client: Any, db: Session, dates: List[dt.date]) -> Tuple[List[str], List[Dict[str, str]]]:
+    synced_dates: List[str] = []
+    failed_dates: List[Dict[str, str]] = []
+
+    for sleep_date in dates:
+        date_str = sleep_date.isoformat()
+        try:
+            logger.info("Requesting Garmin sleep data; date=%s", date_str)
+            payload = client.get_sleep_data(date_str) or {}
+            logger.info("Received Garmin sleep payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
+            _upsert_sleep_daily(db, sleep_date, payload)
+            synced_dates.append(date_str)
+        except Exception as exc:
+            logger.exception("Failed syncing Garmin sleep data; date=%s", date_str)
+            failed_dates.append({"date": date_str, "error": str(exc)})
+
+    return synced_dates, failed_dates
+
+
+def _sync_body_dates(client: Any, db: Session, dates: List[dt.date]) -> Tuple[List[str], List[Dict[str, str]]]:
+    synced_dates: List[str] = []
+    failed_dates: List[Dict[str, str]] = []
+
+    for battery_date in dates:
+        date_str = battery_date.isoformat()
+        try:
+            logger.info("Requesting Garmin body battery stats; date=%s", date_str)
+            payload = client.get_stats(date_str) or {}
+            logger.info("Received Garmin body battery payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
+            _upsert_body_daily(db, battery_date, payload)
+            synced_dates.append(date_str)
+        except Exception as exc:
+            logger.exception("Failed syncing Garmin body battery stats; date=%s", date_str)
+            failed_dates.append({"date": date_str, "error": str(exc)})
+
+    return synced_dates, failed_dates
+
+
 def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     now_local = _uk_now()
     state = _get_sync_state(db, SLEEP_SYNC_KEY)
@@ -186,11 +235,14 @@ def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
 
     try:
         client = get_garmin_client()
-        date_str = _today().isoformat()
-        logger.info("Requesting Garmin sleep data; date=%s", date_str)
-        payload = client.get_sleep_data(date_str) or {}
-        logger.info("Received Garmin sleep payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
-        row = _upsert_sleep_daily(db, _today(), payload)
+        target_dates = _recent_dates(SLEEP_BACKFILL_DAYS)
+        logger.info(
+            "Running Garmin sleep backfill; days=%s start_date=%s end_date=%s",
+            SLEEP_BACKFILL_DAYS,
+            target_dates[0].isoformat(),
+            target_dates[-1].isoformat(),
+        )
+        synced_dates, failed_dates = _sync_sleep_dates(client, db, target_dates)
     except GarminRateLimitError:
         raise
     except GarminClientError as exc:
@@ -200,13 +252,31 @@ def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
         logger.exception("Unexpected sleep sync failure")
         return {"status": "error", "reason": f"sleep_sync_failed: {exc}"}
 
+    if not synced_dates:
+        logger.error("Sleep sync failed for all requested dates")
+        return {
+            "status": "error",
+            "reason": "sleep_backfill_failed",
+            "failed_dates": failed_dates,
+        }
+
     state.last_synced_at = dt.datetime.now(dt.timezone.utc)
-    state.detail = "sleep_sync_ok"
+    state.detail = "sleep_sync_partial" if failed_dates else "sleep_sync_ok"
     db.commit()
 
-    logger.info("Sleep sync complete; date=%s row_id=%s", row.sleep_date.isoformat(), row.id)
+    logger.info(
+        "Sleep sync complete; synced_dates=%s failed_count=%s",
+        synced_dates,
+        len(failed_dates),
+    )
 
-    return {"status": "ok", "sleep_date": row.sleep_date.isoformat(), "id": row.id}
+    return {
+        "status": "partial" if failed_dates else "ok",
+        "sleep_date": synced_dates[-1],
+        "synced_dates": synced_dates,
+        "failed_dates": failed_dates,
+        "backfill_days": SLEEP_BACKFILL_DAYS,
+    }
 
 
 def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
@@ -235,11 +305,14 @@ def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]
 
     try:
         client = get_garmin_client()
-        date_str = _today().isoformat()
-        logger.info("Requesting Garmin body battery stats; date=%s", date_str)
-        payload = client.get_stats(date_str) or {}
-        logger.info("Received Garmin body battery payload; date=%s payload_keys=%s", date_str, sorted(payload.keys()))
-        row = _upsert_body_daily(db, _today(), payload)
+        target_dates = _recent_dates(BODY_BACKFILL_DAYS)
+        logger.info(
+            "Running Garmin body battery backfill; days=%s start_date=%s end_date=%s",
+            BODY_BACKFILL_DAYS,
+            target_dates[0].isoformat(),
+            target_dates[-1].isoformat(),
+        )
+        synced_dates, failed_dates = _sync_body_dates(client, db, target_dates)
     except GarminRateLimitError:
         raise
     except GarminClientError as exc:
@@ -249,13 +322,31 @@ def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]
         logger.exception("Unexpected body battery sync failure")
         return {"status": "error", "reason": f"body_sync_failed: {exc}"}
 
+    if not synced_dates:
+        logger.error("Body battery sync failed for all requested dates")
+        return {
+            "status": "error",
+            "reason": "body_backfill_failed",
+            "failed_dates": failed_dates,
+        }
+
     state.last_synced_at = dt.datetime.now(dt.timezone.utc)
-    state.detail = "body_sync_ok"
+    state.detail = "body_sync_partial" if failed_dates else "body_sync_ok"
     db.commit()
 
-    logger.info("Body battery sync complete; date=%s row_id=%s", row.battery_date.isoformat(), row.id)
+    logger.info(
+        "Body battery sync complete; synced_dates=%s failed_count=%s",
+        synced_dates,
+        len(failed_dates),
+    )
 
-    return {"status": "ok", "battery_date": row.battery_date.isoformat(), "id": row.id}
+    return {
+        "status": "partial" if failed_dates else "ok",
+        "battery_date": synced_dates[-1],
+        "synced_dates": synced_dates,
+        "failed_dates": failed_dates,
+        "backfill_days": BODY_BACKFILL_DAYS,
+    }
 
 
 def sync_smart(db: Session, force: bool = False) -> Dict[str, Any]:
