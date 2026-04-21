@@ -33,6 +33,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: sleep-wellness-tracker-frontend:latest
     container_name: sleep_frontend
     env_file: .env
     environment:
@@ -41,9 +42,9 @@ services:
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=watchdog
     depends_on:
       - backend
-    command: streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.runOnSave=true --server.fileWatcherType=watchdog
+    command: streamlit run main.py --server.address=0.0.0.0 --server.port=8505 --server.runOnSave=true --server.fileWatcherType=watchdog
     ports:
-      - "8501:8501"
+      - "8505:8505"
     volumes:
       - ./frontend/main.py:/app/main.py:Z
       - ./frontend/pages:/app/pages:Z

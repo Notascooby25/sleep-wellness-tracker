@@ -1,14 +1,54 @@
-.history/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment & Secrets (NEVER COMMIT)
 .env
+.env*
+.env.local
+*.env.local
+.envcp*
+docker-compose.yml.local
+backend/garmin_tokens.json
+backend/.env
+frontend/.env
+
+# IDE & Editor
 .vscode/
+.idea/
+*.swp
+*.swo
+.history/
+
+# Database & Backups
+*.db
+*.db.bak
+*.sql.bak
+*.bak
 backups/*.tar
-backups/*.tar
-backups/*.tar
-backups/*.tar
+backups/*.tar.gz
+*.dump
+*.sql
+
+# Compressed archives
 backend.tar
 frontend.tar
-backups/*.tar
-backend.tar
-frontend.tar
+*.tar.gz
+
+# Logs
+logs/*.err
+logs/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
