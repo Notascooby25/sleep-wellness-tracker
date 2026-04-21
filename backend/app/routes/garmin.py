@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
