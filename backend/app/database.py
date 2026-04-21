@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from .models import Base
 
-logger = logging.getLogger("app.database")
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -21,6 +21,8 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # wait for DB to be available with retries
 def wait_for_db(max_retries: int = 20, delay_seconds: int = 2):
+    if max_retries < 1:
+        raise ValueError("max_retries must be at least 1")
     last_exc = None
     for attempt in range(1, max_retries + 1):
         try:
