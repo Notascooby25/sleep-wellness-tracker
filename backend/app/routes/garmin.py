@@ -1,11 +1,10 @@
 import datetime as dt
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
-from fastapi import APIRouter, Depends, Query, HTTPException
 from ..services.garmin_sync import sync_smart, sync_sleep_if_due, sync_body_battery_if_due
 from ..garmin_client import GarminRateLimitError
 
