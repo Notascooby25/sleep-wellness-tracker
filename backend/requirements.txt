@@ -5,5 +5,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 alembic
+garminconnect
+curl_cffi
 
 
