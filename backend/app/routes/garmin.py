@@ -64,16 +64,6 @@ def get_latest_sleep(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/sleep/raw-payload")
-def get_sleep_raw_payload(date: dt.date = Query(...), db: Session = Depends(get_db)):
-    """Return the raw Garmin payload stored for a given date — for debugging key names."""
-    logger.info("/garmin/sleep/raw-payload called; date=%s", date.isoformat())
-    row = db.query(models.GarminSleepDaily).filter(models.GarminSleepDaily.sleep_date == date).first()
-    if not row:
-        return {"data": None}
-    return {"date": date.isoformat(), "payload": row.payload}
-
-
 @router.get("/sleep/by-date")
 def get_sleep_by_date(date: dt.date = Query(...), db: Session = Depends(get_db)):
     logger.info("/garmin/sleep/by-date called; date=%s", date.isoformat())
