@@ -87,6 +87,25 @@ st.markdown(
     white-space: nowrap;
 }
 
+.sleep-pill {
+    color: #234766;
+    background: #def3ea;
+    border: 1px solid #b7e2d2;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.24rem 0.58rem;
+    white-space: nowrap;
+}
+
+.day-header-right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
 .entry-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -298,6 +317,7 @@ if "open_entry_menu_id" not in st.session_state:
 def clear_mood_cache():
     load_entries.clear()
     load_activities.clear()
+    load_sleep_range.clear()
 
 
 def parse_timestamp(value):
@@ -346,6 +366,38 @@ def normalize_import_rows(rows):
         )
 
     return normalized
+
+
+def entry_signature(row):
+    raw_notes = row.get("notes")
+    normalized_notes = (raw_notes or "").strip()
+    timestamp_value = row.get("timestamp")
+    if isinstance(timestamp_value, datetime.datetime):
+        normalized_ts = timestamp_value.isoformat()
+    else:
+        normalized_ts = parse_timestamp(timestamp_value)
+
+    return (
+        int(row.get("mood_score")),
+        normalized_notes,
+        normalized_ts,
+        tuple(sorted(int(aid) for aid in row.get("activity_ids", []))),
+    )
+
+
+def delete_entries(entry_ids):
+    deleted = 0
+    failed = 0
+    for entry_id in entry_ids:
+        try:
+            resp = requests.delete(f"{API_BASE}/mood/{entry_id}", timeout=4)
+            if resp.status_code == 200:
+                deleted += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    return deleted, failed
 
 
 def render_entry_actions(entry_id):
@@ -403,12 +455,33 @@ def load_activities():
         return []
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def load_sleep_range(start_date: str, end_date: str):
+    try:
+        r = requests.get(
+            f"{API_BASE}/garmin/sleep/range",
+            params={"start_date": start_date, "end_date": end_date},
+            timeout=4,
+        )
+        r.raise_for_status()
+        rows = r.json().get("data") or []
+        return {
+            row.get("date"): row
+            for row in rows
+            if isinstance(row, dict) and row.get("date")
+        }
+    except Exception:
+        return {}
+
+
 if "editing_entry_id" not in st.session_state:
     st.session_state["editing_entry_id"] = None
 if "delete_confirm_id" not in st.session_state:
     st.session_state["delete_confirm_id"] = None
 if "mood_log_flash" not in st.session_state:
     st.session_state["mood_log_flash"] = None
+if "bulk_delete_confirm" not in st.session_state:
+    st.session_state["bulk_delete_confirm"] = None
 
 
 toolbar_col, refresh_col = st.columns([0.8, 0.2])
@@ -486,21 +559,72 @@ with st.sidebar:
                 rows = list(csv.DictReader(io.StringIO(text)))
 
             rows_to_import = normalize_import_rows(rows)
+            existing_signatures = {entry_signature(entry) for entry in entries}
+            seen_import_signatures = set()
 
             imported = 0
             failed = 0
+            skipped_duplicates = 0
             for row in rows_to_import:
+                signature = entry_signature(row)
+                if signature in existing_signatures or signature in seen_import_signatures:
+                    skipped_duplicates += 1
+                    continue
+
                 resp = requests.post(f"{API_BASE}/mood/", json=row, timeout=4)
                 if resp.status_code in (200, 201):
                     imported += 1
+                    existing_signatures.add(signature)
+                    seen_import_signatures.add(signature)
                 else:
                     failed += 1
 
             clear_mood_cache()
-            st.session_state["mood_log_flash"] = f"Import complete: {imported} imported, {failed} failed."
+            st.session_state["mood_log_flash"] = (
+                f"Import complete: {imported} imported, {skipped_duplicates} duplicates skipped, {failed} failed."
+            )
             st.rerun()
         except Exception as exc:
             st.error(f"Import failed: {exc}")
+
+    st.markdown("---")
+    st.subheader("Bulk Delete")
+    delete_target_date = st.date_input("Delete entries for date", value=datetime.datetime.now(uk_tz).date())
+
+    if st.button("Delete Selected Day", use_container_width=True):
+        st.session_state["bulk_delete_confirm"] = f"day:{delete_target_date.isoformat()}"
+        st.rerun()
+
+    if st.button("Delete All Entries", use_container_width=True):
+        st.session_state["bulk_delete_confirm"] = "all"
+        st.rerun()
+
+    confirm_value = st.session_state.get("bulk_delete_confirm")
+    if confirm_value:
+        if confirm_value == "all":
+            st.warning("Delete all mood log entries? This cannot be undone.")
+            target_entry_ids = [entry["id"] for entry in entries]
+        else:
+            target_date = datetime.date.fromisoformat(confirm_value.split(":", 1)[1])
+            st.warning(f"Delete all entries on {target_date.isoformat()}? This cannot be undone.")
+            target_entry_ids = [
+                entry["id"]
+                for entry in entries
+                if datetime.datetime.fromisoformat(entry["timestamp"]).astimezone(uk_tz).date() == target_date
+            ]
+
+        confirm_col, cancel_col = st.columns(2)
+        with confirm_col:
+            if st.button("Confirm Bulk Delete", use_container_width=True):
+                deleted, failed = delete_entries(target_entry_ids)
+                clear_mood_cache()
+                st.session_state["bulk_delete_confirm"] = None
+                st.session_state["mood_log_flash"] = f"Bulk delete complete: {deleted} deleted, {failed} failed."
+                st.rerun()
+        with cancel_col:
+            if st.button("Cancel Bulk Delete", use_container_width=True):
+                st.session_state["bulk_delete_confirm"] = None
+                st.rerun()
 
     if st.session_state["editing_entry_id"] is not None:
         edit_id = st.session_state["editing_entry_id"]
@@ -568,6 +692,12 @@ for e in entries:
 # Sort newest → oldest
 sorted_days = sorted(grouped.keys(), reverse=True)
 
+sleep_by_day = {}
+if sorted_days:
+    min_day = sorted_days[-1].isoformat()
+    max_day = sorted_days[0].isoformat()
+    sleep_by_day = load_sleep_range(min_day, max_day)
+
 if not sorted_days:
     st.markdown('<div class="empty-state">No mood entries yet. Add your first entry from Mood Entry.</div>', unsafe_allow_html=True)
 
@@ -578,16 +708,29 @@ for day in sorted_days:
     # Sort entries newest → oldest
     day_entries = sorted(grouped[day], key=lambda x: x[0], reverse=True)
     entry_count = len(day_entries)
+    sleep_row = sleep_by_day.get(day.isoformat())
+    sleep_text = ""
+    if sleep_row and sleep_row.get("total_sleep_minutes") is not None:
+        total_minutes = int(sleep_row.get("total_sleep_minutes") or 0)
+        sleep_hours = total_minutes // 60
+        sleep_minutes = total_minutes % 60
+        sleep_score = sleep_row.get("sleep_score")
+        score_text = f" · {sleep_score}/100" if sleep_score is not None else ""
+        sleep_text = f"<span class='sleep-pill'>Sleep {sleep_hours}h {sleep_minutes:02d}m{score_text}</span>"
 
-    st.markdown(
-        f"""
-        <div class="day-header">
-            <h2 class="day-title">{day_label}</h2>
-            <span class="count-pill">{entry_count} {'entry' if entry_count == 1 else 'entries'}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    header_left, header_right = st.columns([0.62, 0.38], vertical_alignment="center")
+    with header_left:
+        st.markdown(f"<div class='day-header'><h2 class='day-title'>{day_label}</h2></div>", unsafe_allow_html=True)
+    with header_right:
+        st.markdown(
+            f"""
+            <div class="day-header-right">
+                {sleep_text}
+                <span class="count-pill">{entry_count} {'entry' if entry_count == 1 else 'entries'}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # Two columns use desktop width better while preserving single-column flow on mobile.
     left_col, right_col = st.columns(2, gap="medium")

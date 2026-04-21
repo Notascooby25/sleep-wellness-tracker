@@ -8,6 +8,13 @@ API_BASE = "http://backend:8000"
 st.set_page_config(page_title="Mood Entry", layout="wide")
 
 
+def fmt_minutes(total_minutes):
+    if total_minutes is None:
+        return "-"
+    mins = max(0, int(total_minutes))
+    return f"{mins // 60}h {mins % 60:02d}m"
+
+
 def reset_entry_form_state():
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         st.session_state.pop(k, None)
@@ -64,6 +71,26 @@ def load_activities():
         return []
     except Exception:
         return []
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_garmin_latest_sleep():
+    try:
+        r = requests.get(f"{API_BASE}/garmin/sleep/latest", timeout=4)
+        r.raise_for_status()
+        return r.json().get("data")
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_garmin_latest_battery():
+    try:
+        r = requests.get(f"{API_BASE}/garmin/body-battery/latest", timeout=4)
+        r.raise_for_status()
+        return r.json().get("data")
+    except Exception:
+        return None
 
 
 categories = load_categories()
@@ -262,6 +289,13 @@ div[data-testid="stCheckbox"] svg {
     unsafe_allow_html=True,
 )
 
+if "garmin_flash" not in st.session_state:
+    st.session_state["garmin_flash"] = None
+
+if st.session_state["garmin_flash"]:
+    st.info(st.session_state["garmin_flash"])
+    st.session_state["garmin_flash"] = None
+
 st.markdown(
     """
 <div class="hero">
@@ -282,10 +316,51 @@ st.session_state.selected_activities.intersection_update(available_activity_ids)
 uk_tz = ZoneInfo("Europe/London")
 now_uk = datetime.datetime.now(uk_tz)
 
-st.session_state.setdefault("entry_date", now_uk.date())
-st.session_state.setdefault("entry_time", now_uk.time())
+garmin_col, garmin_sync_col = st.columns([0.82, 0.18])
+with garmin_col:
+    if now_uk.hour < 12:
+        sleep_data = load_garmin_latest_sleep()
+        battery_data = load_garmin_latest_battery()
+        with st.container(border=True):
+            st.markdown("**Last Night Garmin Sleep**")
+            if sleep_data:
+                st.caption(
+                    f"Duration {fmt_minutes(sleep_data.get('total_sleep_minutes'))} | "
+                    f"Deep {fmt_minutes(sleep_data.get('deep_sleep_minutes'))} | "
+                    f"Light {fmt_minutes(sleep_data.get('light_sleep_minutes'))} | "
+                    f"REM {fmt_minutes(sleep_data.get('rem_sleep_minutes'))}"
+                )
+                if sleep_data.get("sleep_score") is not None:
+                    st.caption(f"Sleep score: {sleep_data.get('sleep_score')}/100")
+            else:
+                st.caption("No Garmin sleep data yet. First sync starts from 08:00 UK.")
+
+            if battery_data and battery_data.get("end_of_day_value") is not None:
+                st.caption(f"Yesterday end-of-day body battery: {battery_data.get('end_of_day_value')}")
+    else:
+        st.caption("Garmin sleep summary appears in the morning; use Mood Log for historical sleep details.")
+
+with garmin_sync_col:
+    st.markdown("<div style='height: 0.35rem;'></div>", unsafe_allow_html=True)
+    if st.button("Sync Garmin", use_container_width=True):
+        try:
+            resp = requests.post(f"{API_BASE}/garmin/sync-now?mode=smart", timeout=40)
+            if resp.status_code == 200:
+                data = resp.json()
+                sleep_state = (data.get("sleep") or {}).get("status", "unknown")
+                body_state = (data.get("body_battery") or {}).get("status", "unknown")
+                load_garmin_latest_sleep.clear()
+                load_garmin_latest_battery.clear()
+                st.session_state["garmin_flash"] = f"Garmin sync result: sleep={sleep_state}, body={body_state}."
+                st.rerun()
+            elif resp.status_code == 429:
+                st.warning("Garmin is rate-limiting this IP — wait a few minutes and try again.")
+            else:
+                st.error(f"Garmin sync failed: {resp.status_code} {resp.text}")
+        except Exception as exc:
+            st.error(f"Garmin sync failed: {exc}")
+
 st.session_state.setdefault("mood_score", 3)
-st.session_state.setdefault("notes", "")
 
 MOOD_COLOURS = {
     1: "#2ecc71",  # great
@@ -298,11 +373,11 @@ MOOD_COLOURS = {
 st.markdown('<div class="section-title">Entry Details</div>', unsafe_allow_html=True)
 date_col, time_col = st.columns(2)
 with date_col:
-    st.date_input("Entry Date", value=st.session_state.entry_date, key="entry_date")
+    entry_date = st.date_input("Entry Date", value=now_uk.date(), key="entry_date")
 with time_col:
-    st.time_input("Entry Time", value=st.session_state.entry_time, key="entry_time")
+    entry_time = st.time_input("Entry Time", value=now_uk.time(), key="entry_time")
 
-entry_dt = datetime.datetime.combine(st.session_state.entry_date, st.session_state.entry_time, tzinfo=uk_tz)
+entry_dt = datetime.datetime.combine(entry_date, entry_time, tzinfo=uk_tz)
 timestamp_iso = entry_dt.isoformat()
 
 st.markdown(
@@ -551,7 +626,7 @@ else:
         st.caption(f"Last load error: {st.session_state['mood_entry_last_load_error']}")
 
 st.markdown('<div class="section-title">Notes</div>', unsafe_allow_html=True)
-notes = st.text_area("Notes", st.session_state.notes, key="notes", height=120, label_visibility="collapsed")
+notes = st.text_area("Notes", key="notes", height=120, label_visibility="collapsed")
 
 if st.button("Save Entry", type="primary", use_container_width=True):
     payload = {
