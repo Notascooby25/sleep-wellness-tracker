@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 import datetime
@@ -7,7 +8,7 @@ import io
 import csv
 from zoneinfo import ZoneInfo
 
-API_BASE = "http://backend:8000"
+API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 st.set_page_config(page_title="Mood Log", layout="wide")
 
