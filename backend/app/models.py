@@ -4,7 +4,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Date,
     DateTime,
+    JSON,
     ForeignKey,
     Table,
     func,
@@ -49,3 +51,45 @@ class Mood(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     activities = relationship("Activity", secondary=mood_activities, back_populates="moods")
+
+
+class GarminSleepDaily(Base):
+    __tablename__ = "garmin_sleep_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sleep_date = Column(Date, unique=True, nullable=False, index=True)
+    sleep_start = Column(DateTime(timezone=True), nullable=True)
+    sleep_end = Column(DateTime(timezone=True), nullable=True)
+    total_sleep_minutes = Column(Integer, nullable=True)
+    deep_sleep_minutes = Column(Integer, nullable=True)
+    light_sleep_minutes = Column(Integer, nullable=True)
+    rem_sleep_minutes = Column(Integer, nullable=True)
+    awake_minutes = Column(Integer, nullable=True)
+    sleep_score = Column(Integer, nullable=True)
+    body_battery_wakeup = Column(Integer, nullable=True)
+    body_battery_bedtime = Column(Integer, nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class GarminBodyBatteryDaily(Base):
+    __tablename__ = "garmin_body_battery_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    battery_date = Column(Date, unique=True, nullable=False, index=True)
+    morning_value = Column(Integer, nullable=True)
+    end_of_day_value = Column(Integer, nullable=True)
+    peak_value = Column(Integer, nullable=True)
+    low_value = Column(Integer, nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class GarminSyncState(Base):
+    __tablename__ = "garmin_sync_state"
+
+    key = Column(String(80), primary_key=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    detail = Column(Text, nullable=True)
