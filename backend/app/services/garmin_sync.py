@@ -89,39 +89,48 @@ def _upsert_sleep_daily(db: Session, sleep_date: dt.date, payload: Dict[str, Any
         row = models.GarminSleepDaily(sleep_date=sleep_date)
         db.add(row)
 
-    row.sleep_start = _to_datetime(_get_int(payload, "sleepStartTimestampGMT", "sleepStartTimestampLocal"))
-    row.sleep_end = _to_datetime(_get_int(payload, "sleepEndTimestampGMT", "sleepEndTimestampLocal"))
-    row.total_sleep_minutes = _get_int(payload, "sleepTimeSeconds", "totalSleepSeconds")
-    if row.total_sleep_minutes is not None:
-        row.total_sleep_minutes = row.total_sleep_minutes // 60
+    # Garmin wraps all metrics inside dailySleepDTO; fall back to top-level for safety
+    dto = payload.get("dailySleepDTO") or payload
 
-    row.deep_sleep_minutes = _get_int(payload, "deepSleepSeconds")
-    row.light_sleep_minutes = _get_int(payload, "lightSleepSeconds")
-    row.rem_sleep_minutes = _get_int(payload, "remSleepSeconds")
-    row.awake_minutes = _get_int(payload, "awakeSleepSeconds")
+    row.sleep_start = _to_datetime(_get_int(dto, "sleepStartTimestampGMT", "sleepStartTimestampLocal"))
+    row.sleep_end = _to_datetime(_get_int(dto, "sleepEndTimestampGMT", "sleepEndTimestampLocal"))
 
-    if row.deep_sleep_minutes is not None:
-        row.deep_sleep_minutes = row.deep_sleep_minutes // 60
-    if row.light_sleep_minutes is not None:
-        row.light_sleep_minutes = row.light_sleep_minutes // 60
-    if row.rem_sleep_minutes is not None:
-        row.rem_sleep_minutes = row.rem_sleep_minutes // 60
-    if row.awake_minutes is not None:
-        row.awake_minutes = row.awake_minutes // 60
+    raw_total = _get_int(dto, "sleepTimeSeconds", "totalSleepSeconds")
+    row.total_sleep_minutes = raw_total // 60 if raw_total is not None else None
 
-    row.sleep_score = _get_int(payload, "overallSleepScore", "sleepScores.overallScore", "sleepScores.overall")
-    row.body_battery_wakeup = _get_int(payload, "bodyBatteryWakeup")
-    row.body_battery_bedtime = _get_int(payload, "bodyBatteryBedtime")
+    raw_deep = _get_int(dto, "deepSleepSeconds")
+    row.deep_sleep_minutes = raw_deep // 60 if raw_deep is not None else None
+
+    raw_light = _get_int(dto, "lightSleepSeconds")
+    row.light_sleep_minutes = raw_light // 60 if raw_light is not None else None
+
+    raw_rem = _get_int(dto, "remSleepSeconds")
+    row.rem_sleep_minutes = raw_rem // 60 if raw_rem is not None else None
+
+    raw_awake = _get_int(dto, "awakeSleepSeconds")
+    row.awake_minutes = raw_awake // 60 if raw_awake is not None else None
+
+    # sleepScores.overall is a dict {"value": int, ...} in the current Garmin API
+    sleep_scores = dto.get("sleepScores") or {}
+    overall = sleep_scores.get("overall")
+    if isinstance(overall, dict):
+        row.sleep_score = overall.get("value")
+    else:
+        score = _get_int(dto, "overallSleepScore")
+        row.sleep_score = score if score is not None else (int(overall) if overall is not None else None)
+
+    row.body_battery_wakeup = _get_int(dto, "bodyBatteryWakeup")
+    row.body_battery_bedtime = _get_int(dto, "bodyBatteryBedtime")
     row.payload = payload
 
     db.commit()
     db.refresh(row)
     logger.info(
-        "Upserted Garmin sleep row; date=%s total_sleep_minutes=%s sleep_score=%s payload_keys=%s",
+        "Upserted Garmin sleep row; date=%s total_sleep_minutes=%s sleep_score=%s dto_keys=%s",
         sleep_date.isoformat(),
         row.total_sleep_minutes,
         row.sleep_score,
-        sorted(payload.keys()),
+        sorted(dto.keys()),
     )
     return row
 
