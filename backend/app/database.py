@@ -1,4 +1,4 @@
-# File: backend/app/database.py
+import logging
 import os
 import time
 from sqlalchemy import create_engine
@@ -6,35 +6,46 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from .models import Base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/postgres")
+logger = logging.getLogger("app.database")
 
-# create engine with pool_pre_ping to help with dropped connections
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Copy .env.example to .env and configure your database connection."
+    )
+
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-# wait for DB to be available with retries
-def wait_for_db(max_retries: int = 20, delay_seconds: int = 2):
-    retries = 0
-    while retries < max_retries:
-        try:
-            # attempt a real connection
-            with engine.connect() as conn:
-                return True
-        except OperationalError:
-            retries += 1
-            time.sleep(delay_seconds)
-    # final attempt to raise the last error if DB never became available
-    with engine.connect() as conn:
-        return True
 
-# ensure DB is ready before creating sessions / tables
+def wait_for_db(max_retries: int = 20, delay_seconds: int = 2):
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            with engine.connect():
+                logger.info("Database connection established on attempt %d", attempt)
+                return True
+        except OperationalError as exc:
+            last_exc = exc
+            logger.warning(
+                "Database not ready (attempt %d/%d), retrying in %ds...",
+                attempt, max_retries, delay_seconds,
+            )
+            time.sleep(delay_seconds)
+    raise RuntimeError(
+        f"Database not available after {max_retries} attempts. Last error: {last_exc}"
+    ) from last_exc
+
+
 wait_for_db()
 
-# create tables if they don't exist
+logger.info("Running create_all to ensure all tables exist...")
 Base.metadata.create_all(bind=engine)
+logger.info("Database tables verified.")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# FastAPI dependency
+
 def get_db():
     db = SessionLocal()
     try:
