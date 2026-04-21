@@ -6,7 +6,16 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 : "${DS223_HOST:?Set DS223_HOST, e.g. DS223_HOST=192.168.68.107}"
 DS223_USER="${DS223_USER:-admin}"
+DS223_PORT="${DS223_PORT:-8022}"
 DS223_SSH_TARGET="${DS223_USER}@${DS223_HOST}"
+SSH_CONTROL_PATH="${SSH_CONTROL_PATH:-$HOME/.ssh/cm-%r@%h:%p}"
+
+SSH_BASE_ARGS=(
+  -p "$DS223_PORT"
+  -o ControlMaster=auto
+  -o ControlPersist=5m
+  -o "ControlPath=$SSH_CONTROL_PATH"
+)
 
 BACKEND_IMAGE="${BACKEND_IMAGE:-sleep-wellness-tracker-backend:arm64}"
 FRONTEND_IMAGE="${FRONTEND_IMAGE:-sleep-wellness-tracker-frontend:arm64}"
@@ -30,13 +39,13 @@ if [[ ! -f "$BACKEND_TAR" || ! -f "$FRONTEND_TAR" ]]; then
 fi
 
 echo "Creating remote temp dir: $REMOTE_DIR"
-ssh "$DS223_SSH_TARGET" "mkdir -p '$REMOTE_DIR'"
+ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "mkdir -p '$REMOTE_DIR'"
 
 echo "Copying ARM64 image tar files to DS223"
-scp "$BACKEND_TAR" "$FRONTEND_TAR" "$DS223_SSH_TARGET:$REMOTE_DIR/"
+scp -P "$DS223_PORT" -o ControlMaster=auto -o ControlPersist=5m -o "ControlPath=$SSH_CONTROL_PATH" "$BACKEND_TAR" "$FRONTEND_TAR" "$DS223_SSH_TARGET:$REMOTE_DIR/"
 
 echo "Loading images on DS223 and tagging as :latest"
-ssh "$DS223_SSH_TARGET" "
+ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "
 set -euo pipefail
 podman load -i '$REMOTE_DIR/$(basename "$BACKEND_TAR")'
 podman load -i '$REMOTE_DIR/$(basename "$FRONTEND_TAR")'
