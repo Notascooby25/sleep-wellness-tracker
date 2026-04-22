@@ -11,6 +11,7 @@ DS223_SSH_TARGET="${DS223_USER}@${DS223_HOST}"
 REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR:-/volume1/docker/sleepwell/project/sleep-wellness-tracker-main}"
 DRY_RUN="${DRY_RUN:-0}"
 SYNC_METHOD="${SYNC_METHOD:-tar}"
+SHOW_PROGRESS="${SHOW_PROGRESS:-1}"
 SSH_CONTROL_PATH="${SSH_CONTROL_PATH:-$HOME/.ssh/cm-%r@%h:%p}"
 
 EXCLUDE_PATTERNS=(
@@ -20,6 +21,11 @@ EXCLUDE_PATTERNS=(
   .vscode/
   .idea/
   __pycache__/
+  */__pycache__/
+  */__pycache__/*
+  *.pyc
+  *.pyo
+  *.pyd
   dist/
   build/
   backups/
@@ -89,8 +95,21 @@ else
     exit 0
   fi
 
-  tar "${TAR_EXCLUDE_ARGS[@]}" -C "$ROOT_DIR" -cf - . \
-    | ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "tar -xf - -C '$REMOTE_PROJECT_DIR'"
+  if [[ "$SHOW_PROGRESS" == "1" ]]; then
+    if command -v pv >/dev/null 2>&1; then
+      echo "Progress mode: byte stream (pv)"
+      tar "${TAR_EXCLUDE_ARGS[@]}" -C "$ROOT_DIR" -cf - . \
+        | pv -bterp \
+        | ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "tar --no-overwrite-dir -xf - -C '$REMOTE_PROJECT_DIR'"
+    else
+      echo "Progress mode: file list (install 'pv' for byte progress)"
+      tar "${TAR_EXCLUDE_ARGS[@]}" -C "$ROOT_DIR" -cvf - . \
+        | ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "tar --no-overwrite-dir -xf - -C '$REMOTE_PROJECT_DIR'"
+    fi
+  else
+    tar "${TAR_EXCLUDE_ARGS[@]}" -C "$ROOT_DIR" -cf - . \
+      | ssh "${SSH_BASE_ARGS[@]}" "$DS223_SSH_TARGET" "tar --no-overwrite-dir -xf - -C '$REMOTE_PROJECT_DIR'"
+  fi
 fi
 
 echo "Source sync complete."
