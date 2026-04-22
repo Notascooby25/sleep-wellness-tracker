@@ -1,89 +1,168 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# BEFORE SLEEP (category_id = 7)
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Reading","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Caffeine after 4pm","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Supplement","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Relaxation","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Out Late","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Working Late","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Screen Time","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Meditation","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Stressed","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Anxious","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Shower or Bath","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Alcohol","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Food","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Journaling","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Nap during day","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Illness","category_id":7}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Pain / Discomfort","category_id":7}'
+set -u
 
+API_BASE="${API_BASE:-http://localhost:8000}"
 
-# MORNING CHECK IN (category_id = 8)
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Bathroom","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Interrupted Sleep","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Fell Asleep Quickly","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Restful Sleep","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Restless Mind","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Insomnia","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Not Tired","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Sleep Music","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Sleep Stories","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Woke up Refreshed","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Woke up Early","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Woke up Late","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Dreaming","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Noise","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Nightmare","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Cool Room","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Warm Room","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Health Condition","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Pain","category_id":8}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Tossing & Turning","category_id":8}'
+if ! command -v jq >/dev/null 2>&1; then
+	echo "Error: jq is required for this script. Install jq and run again."
+	exit 1
+fi
 
+declare -A CAT_ID
 
-# HEADACHES (category_id = 9)
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Migraine","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Headache","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Front Left","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Front Right","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Centre","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Back Left","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Back Right","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Jaw Left Side","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Jaw Right Side","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Dizzy","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Blurred Vision","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Brain Fog","category_id":9}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Pressure in Head","category_id":9}'
+resolve_category_id() {
+	local category_name="$1"
+	local category_id
+	category_id="$(curl -sS "${API_BASE}/categories/" | jq -r --arg n "$category_name" '.[] | select(.name == $n) | .id' | head -n 1)"
 
+	if [[ -z "$category_id" || "$category_id" == "null" ]]; then
+		echo "Error: category not found: $category_name"
+		return 1
+	fi
 
-# HEALTH (category_id = 10)
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Anxious / Anxiety / Shaking","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Legs Aching","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Fatigue / Ache","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"No Energy","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Skin Peeling on Hands","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Left Shoulder / Arm / Neck Pain","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Right Shoulder / Arm / Neck Pain","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Back Pain – Lower","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Peak Flow test Logged","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Wheezy / Short of breath","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Cold / Flu","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Ear Ache / Humming Left","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Ear Ache / Humming Right","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Acid Reflux Feeling","category_id":10}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Allergy / Hayfever","category_id":10}'
+	CAT_ID["$category_name"]="$category_id"
+	return 0
+}
 
+resolve_with_fallback() {
+	local primary_name="$1"
+	local fallback_name="$2"
+	if resolve_category_id "$primary_name"; then
+		return 0
+	fi
+	if [[ -n "$fallback_name" ]]; then
+		resolve_category_id "$fallback_name" || true
+		if [[ -n "${CAT_ID[$fallback_name]:-}" ]]; then
+			CAT_ID["$primary_name"]="${CAT_ID[$fallback_name]}"
+			echo "Using fallback category '$fallback_name' for '$primary_name'"
+		fi
+	fi
+}
 
-# LIFESTYLE (category_id = 11)
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"DIY Gardening","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Workout","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Cycling","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Walk","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Exercise","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Run","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Gardening","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Acupuncture","category_id":11}'
-curl -X POST http://localhost:8000/activities/ -H "Content-Type: application/json" -d '{"name":"Physio","category_id":11}'
+create_activity() {
+	local category_name="$1"
+	local activity_name="$2"
+	local category_id="${CAT_ID[$category_name]:-}"
+
+	if [[ -z "$category_id" ]]; then
+		echo "Skip: unresolved category for activity '$activity_name'"
+		return 1
+	fi
+
+	local http_code
+	http_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST "${API_BASE}/activities/" -H "Content-Type: application/json" -d "{\"name\":\"${activity_name}\",\"category_id\":${category_id}}")"
+
+	if [[ "$http_code" =~ ^2 ]]; then
+		echo "OK   [$category_name] $activity_name"
+	else
+		echo "FAIL [$category_name] $activity_name (HTTP $http_code)"
+	fi
+}
+
+resolve_with_fallback "Lifestyle" ""
+resolve_with_fallback "Headache Issues" "Headaches"
+resolve_with_fallback "Health" ""
+resolve_with_fallback "Before Sleep" ""
+resolve_with_fallback "During Sleep" "Morning Check In"
+
+# LIFESTYLE
+create_activity "Lifestyle" "Reading"
+create_activity "Lifestyle" "Relax"
+create_activity "Lifestyle" "DIY Gardening"
+create_activity "Lifestyle" "Workout"
+create_activity "Lifestyle" "Cycling"
+create_activity "Lifestyle" "Walk"
+create_activity "Lifestyle" "Exercise"
+create_activity "Lifestyle" "Run"
+create_activity "Lifestyle" "Gardening"
+create_activity "Lifestyle" "Acupuncture"
+create_activity "Lifestyle" "Physio"
+
+# HEADACHE ISSUES
+create_activity "Headache Issues" "Headache"
+create_activity "Headache Issues" "Migraine"
+create_activity "Headache Issues" "Pain in Left Side of Head"
+create_activity "Headache Issues" "Pain Front of Head"
+create_activity "Headache Issues" "Pain Right Side of Head"
+create_activity "Headache Issues" "Jaw / Teeth Pain Left Side"
+create_activity "Headache Issues" "Jaw / Teeth Pain Right Side"
+create_activity "Headache Issues" "Pressure in Head"
+create_activity "Headache Issues" "Brain Fog"
+create_activity "Headache Issues" "Blurred Vision"
+create_activity "Headache Issues" "Back Right"
+create_activity "Headache Issues" "Pain Back Left of Head"
+create_activity "Headache Issues" "Strain Lower Right Throat"
+create_activity "Headache Issues" "Strain Lower Left Throat"
+
+# HEALTH
+create_activity "Health" "Anxious / Anxiety Shaking"
+create_activity "Health" "Legs Hurting / Aching"
+create_activity "Health" "Fatigue / Ache"
+create_activity "Health" "No Energy"
+create_activity "Health" "Ear Humming Left"
+create_activity "Health" "Ear Humming Right"
+create_activity "Health" "Skin Peeling on Hands"
+create_activity "Health" "Left Shoulder / Arm / Neck"
+create_activity "Health" "Right Side Shoulder / Neck"
+create_activity "Health" "Back Pain - Lower"
+create_activity "Health" "Eat Healthy"
+create_activity "Health" "Ill / Injured"
+create_activity "Health" "Foot - Heel"
+create_activity "Health" "PeakFlow Test"
+create_activity "Health" "Wheezy / Short of Breath"
+create_activity "Health" "Cold"
+create_activity "Health" "Right Ear Ache / Pain"
+create_activity "Health" "Left Ear Ache"
+create_activity "Health" "Acid Reflux"
+create_activity "Health" "Bloated"
+create_activity "Health" "Allergy / Hayfever"
+
+# BEFORE SLEEP
+create_activity "Before Sleep" "Stress"
+create_activity "Before Sleep" "Exercise"
+create_activity "Before Sleep" "Shower or Bath"
+create_activity "Before Sleep" "Self-Care"
+create_activity "Before Sleep" "Anxiety"
+create_activity "Before Sleep" "Breathing Exercises"
+create_activity "Before Sleep" "Meditation"
+create_activity "Before Sleep" "Screen Time"
+create_activity "Before Sleep" "Alcohol"
+create_activity "Before Sleep" "Food"
+create_activity "Before Sleep" "Caffeine"
+create_activity "Before Sleep" "Work"
+create_activity "Before Sleep" "Busy Schedule"
+create_activity "Before Sleep" "Relaxation"
+create_activity "Before Sleep" "Reading"
+create_activity "Before Sleep" "Nap"
+create_activity "Before Sleep" "Journaling"
+create_activity "Before Sleep" "Travel"
+create_activity "Before Sleep" "Supplement"
+create_activity "Before Sleep" "Pain"
+create_activity "Before Sleep" "Medication"
+create_activity "Before Sleep" "Illness"
+
+# DURING SLEEP
+create_activity "During Sleep" "Bathroom"
+create_activity "During Sleep" "Tossing and Turning"
+create_activity "During Sleep" "Fell Asleep Quickly"
+create_activity "During Sleep" "Interrupted Sleep"
+create_activity "During Sleep" "Restless Mind"
+create_activity "During Sleep" "Restful Sleep"
+create_activity "During Sleep" "Not Tired"
+create_activity "During Sleep" "Insomnia"
+create_activity "During Sleep" "Sleep Music"
+create_activity "During Sleep" "Woke Up Refreshed"
+create_activity "During Sleep" "Soundscapes"
+create_activity "During Sleep" "Sleep Stories"
+create_activity "During Sleep" "Shared Bed"
+create_activity "During Sleep" "Nightmare"
+create_activity "During Sleep" "Dream"
+create_activity "During Sleep" "Light"
+create_activity "During Sleep" "Noise"
+create_activity "During Sleep" "Warm Room Temperature"
+create_activity "During Sleep" "Cool Room Temperature"
+create_activity "During Sleep" "Children"
+create_activity "During Sleep" "Pain"
+create_activity "During Sleep" "Pets"
+create_activity "During Sleep" "Health Condition"
