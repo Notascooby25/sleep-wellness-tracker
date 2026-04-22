@@ -317,6 +317,7 @@ if "open_entry_menu_id" not in st.session_state:
     st.session_state["open_entry_menu_id"] = None
 def clear_mood_cache():
     load_entries.clear()
+    load_categories.clear()
     load_activities.clear()
     load_sleep_range.clear()
 
@@ -447,6 +448,16 @@ def load_entries():
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def load_categories():
+    try:
+        r = requests.get(f"{API_BASE}/categories/", timeout=3)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_activities():
     try:
         r = requests.get(f"{API_BASE}/activities/", timeout=3)
@@ -495,6 +506,7 @@ with refresh_col:
 
 
 entries = load_entries()
+categories_list = load_categories()
 activities_list = load_activities()
 activity_lookup = {a["id"]: a["name"] for a in activities_list}
 entry_lookup = {e["id"]: e for e in entries}
@@ -543,6 +555,22 @@ with st.sidebar:
         data=csv_buffer.getvalue(),
         file_name="mood_log_export.csv",
         mime="text/csv",
+        use_container_width=True,
+    )
+
+    backup_snapshot = {
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "mood_log_tools",
+        "entries": export_rows,
+        "categories": categories_list,
+        "activities": activities_list,
+    }
+    backup_name = f"mood_log_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+    st.download_button(
+        "Download Full Backup (JSON)",
+        data=json.dumps(backup_snapshot, indent=2),
+        file_name=backup_name,
+        mime="application/json",
         use_container_width=True,
     )
 
