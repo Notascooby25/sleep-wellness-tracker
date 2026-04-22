@@ -12,6 +12,8 @@ REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR:-/volume1/docker/sleepwell/project/slee
 DRY_RUN="${DRY_RUN:-0}"
 SYNC_METHOD="${SYNC_METHOD:-tar}"
 SHOW_PROGRESS="${SHOW_PROGRESS:-1}"
+INCLUDE_ENV="${INCLUDE_ENV:-0}"
+INCLUDE_LOCAL_OVERRIDE="${INCLUDE_LOCAL_OVERRIDE:-0}"
 SSH_CONTROL_PATH="${SSH_CONTROL_PATH:-$HOME/.ssh/cm-%r@%h:%p}"
 
 EXCLUDE_PATTERNS=(
@@ -46,6 +48,24 @@ EXCLUDE_PATTERNS=(
   *.crdownload
   backend/garmin_tokens.json
 )
+
+if [[ "$INCLUDE_ENV" == "1" ]]; then
+  EXCLUDE_PATTERNS=("${EXCLUDE_PATTERNS[@]/.env}" )
+  EXCLUDE_PATTERNS=("${EXCLUDE_PATTERNS[@]/.env.local}" )
+  EXCLUDE_PATTERNS=("${EXCLUDE_PATTERNS[@]/.env.*}" )
+fi
+
+if [[ "$INCLUDE_LOCAL_OVERRIDE" == "1" ]]; then
+  EXCLUDE_PATTERNS=("${EXCLUDE_PATTERNS[@]/docker-compose.yml.local}" )
+fi
+
+FILTERED_EXCLUDE_PATTERNS=()
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+  if [[ -n "$pattern" ]]; then
+    FILTERED_EXCLUDE_PATTERNS+=("$pattern")
+  fi
+done
+EXCLUDE_PATTERNS=("${FILTERED_EXCLUDE_PATTERNS[@]}")
 
 SSH_BASE_ARGS=(
   -p "$DS223_PORT"
