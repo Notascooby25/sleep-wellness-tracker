@@ -19,6 +19,7 @@ def fmt_minutes(total_minutes):
 def reset_entry_form_state():
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         st.session_state.pop(k, None)
+    st.session_state["notes"] = ""
     st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
         if key.startswith("act_") or key.startswith("pill_cat_"):
@@ -28,6 +29,9 @@ def reset_entry_form_state():
 if st.session_state.get("reset_form", False):
     reset_entry_form_state()
     st.session_state["reset_form"] = False
+
+if "entry_flash" not in st.session_state:
+    st.session_state["entry_flash"] = None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -296,6 +300,12 @@ if "garmin_flash" not in st.session_state:
 if st.session_state["garmin_flash"]:
     st.info(st.session_state["garmin_flash"])
     st.session_state["garmin_flash"] = None
+
+if st.session_state["entry_flash"]:
+    st.success(st.session_state["entry_flash"])
+    if hasattr(st, "toast"):
+        st.toast(st.session_state["entry_flash"], icon="✅")
+    st.session_state["entry_flash"] = None
 
 st.markdown(
     """
@@ -640,8 +650,9 @@ if st.button("Save Entry", type="primary", use_container_width=True):
     try:
         r = requests.post(f"{API_BASE}/mood/", json=payload, timeout=4)
         if r.status_code in (200, 201):
-            st.success("Mood entry saved")
+            # Reset on next run before widgets render; this is the most reliable Streamlit pattern.
             st.session_state["reset_form"] = True
+            st.session_state["entry_flash"] = "Mood entry saved successfully."
             st.rerun()
         else:
             st.error(f"Error: {r.status_code} {r.text}")
