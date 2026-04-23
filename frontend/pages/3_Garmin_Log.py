@@ -170,6 +170,19 @@ def fmt_ml(value):
     return f"{int(value)} ml"
 
 
+def fmt_duration_minutes(value):
+    if value is None:
+        return "n/a"
+    total = int(value)
+    if total < 60:
+        return f"{total}m"
+    hours = total // 60
+    minutes = total % 60
+    if minutes == 0:
+        return f"{hours}h"
+    return f"{hours}h {minutes}m"
+
+
 def metric_count(rows_by_date: dict) -> int:
     return sum(1 for row in rows_by_date.values() if isinstance(row, dict))
 
@@ -394,7 +407,7 @@ for idx, date_str in enumerate(all_dates):
                         unsafe_allow_html=True,
                     )
                     st.caption(
-                        f"Rest {stress_row.get('rest_stress_duration') or 'n/a'} | Low {stress_row.get('low_stress_duration') or 'n/a'} | Medium {stress_row.get('medium_stress_duration') or 'n/a'} | High {stress_row.get('high_stress_duration') or 'n/a'}"
+                        f"Rest {fmt_duration_minutes(stress_row.get('rest_stress_duration'))} | Low {fmt_duration_minutes(stress_row.get('low_stress_duration'))} | Medium {fmt_duration_minutes(stress_row.get('medium_stress_duration'))} | High {fmt_duration_minutes(stress_row.get('high_stress_duration'))}"
                     )
                 else:
                     st.markdown("<div class='metric-empty'>No stress data</div>", unsafe_allow_html=True)

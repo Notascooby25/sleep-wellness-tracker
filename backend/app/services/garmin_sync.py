@@ -1,6 +1,7 @@
 import datetime as dt
 import logging
 import os
+import statistics
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -275,10 +276,52 @@ def _upsert_stress_daily(db: Session, stress_date: dt.date, payload: Dict[str, A
         db.add(row)
 
     row.overall_stress_level = _get_int(payload, "overallStressLevel", "averageStressLevel", "avgStressLevel", "stressLevel")
-    row.rest_stress_duration = _get_int(payload, "restStressDuration", "restDuration")
-    row.low_stress_duration = _get_int(payload, "lowStressDuration", "lowDuration")
-    row.medium_stress_duration = _get_int(payload, "mediumStressDuration", "mediumDuration")
-    row.high_stress_duration = _get_int(payload, "highStressDuration", "highDuration")
+
+    # Garmin payload variants expose duration fields under different names and units.
+    rest_minutes = _get_int(
+        payload,
+        "restStressDuration",
+        "restDuration",
+        "restStressDurationInMinutes",
+    )
+    low_minutes = _get_int(
+        payload,
+        "lowStressDuration",
+        "lowDuration",
+        "lowStressDurationInMinutes",
+    )
+    medium_minutes = _get_int(
+        payload,
+        "mediumStressDuration",
+        "mediumDuration",
+        "mediumStressDurationInMinutes",
+    )
+    high_minutes = _get_int(
+        payload,
+        "highStressDuration",
+        "highDuration",
+        "highStressDurationInMinutes",
+    )
+
+    # Some Garmin payloads provide seconds instead of minutes.
+    rest_seconds = _get_int(payload, "restStressDurationInSeconds", "restDurationInSeconds")
+    low_seconds = _get_int(payload, "lowStressDurationInSeconds", "lowDurationInSeconds")
+    medium_seconds = _get_int(payload, "mediumStressDurationInSeconds", "mediumDurationInSeconds")
+    high_seconds = _get_int(payload, "highStressDurationInSeconds", "highDurationInSeconds")
+
+    if rest_minutes is None and rest_seconds is not None:
+        rest_minutes = rest_seconds // 60
+    if low_minutes is None and low_seconds is not None:
+        low_minutes = low_seconds // 60
+    if medium_minutes is None and medium_seconds is not None:
+        medium_minutes = medium_seconds // 60
+    if high_minutes is None and high_seconds is not None:
+        high_minutes = high_seconds // 60
+
+    row.rest_stress_duration = rest_minutes
+    row.low_stress_duration = low_minutes
+    row.medium_stress_duration = medium_minutes
+    row.high_stress_duration = high_minutes
 
     # Garmin stress payloads commonly return stressValuesArray + avg/max levels instead of explicit duration fields.
     # When durations are missing, derive rough buckets from stress values so the UI does not show n/a everywhere.
@@ -287,42 +330,16 @@ def _upsert_stress_daily(db: Session, stress_date: dt.date, payload: Dict[str, A
         value is None
         for value in [row.rest_stress_duration, row.low_stress_duration, row.medium_stress_duration, row.high_stress_duration]
     ):
-        rest_count = 0
-        low_count = 0
-        medium_count = 0
-        high_count = 0
-
-        for item in stress_values:
-            level: Optional[int] = None
-            if isinstance(item, (int, float)):
-                level = int(item)
-            elif isinstance(item, dict):
-                level = _get_int(item, "stressLevel", "value")
-            elif isinstance(item, (list, tuple)) and item:
-                # Some payload versions encode entries as [timestamp, value] or [value].
-                maybe_level = item[-1]
-                if isinstance(maybe_level, (int, float)):
-                    level = int(maybe_level)
-
-            if level is None or level < 0:
-                continue
-            if level == 0:
-                rest_count += 1
-            elif level <= 25:
-                low_count += 1
-            elif level <= 50:
-                medium_count += 1
-            else:
-                high_count += 1
+        rest_minutes_derived, low_minutes_derived, medium_minutes_derived, high_minutes_derived = _derive_stress_minutes(stress_values)
 
         if row.rest_stress_duration is None:
-            row.rest_stress_duration = rest_count if rest_count > 0 else None
+            row.rest_stress_duration = rest_minutes_derived
         if row.low_stress_duration is None:
-            row.low_stress_duration = low_count if low_count > 0 else None
+            row.low_stress_duration = low_minutes_derived
         if row.medium_stress_duration is None:
-            row.medium_stress_duration = medium_count if medium_count > 0 else None
+            row.medium_stress_duration = medium_minutes_derived
         if row.high_stress_duration is None:
-            row.high_stress_duration = high_count if high_count > 0 else None
+            row.high_stress_duration = high_minutes_derived
 
     if row.overall_stress_level is None:
         row.overall_stress_level = _get_int(payload, "maxStressLevel")
@@ -338,6 +355,97 @@ def _upsert_stress_daily(db: Session, stress_date: dt.date, payload: Dict[str, A
         sorted(payload.keys()),
     )
     return row
+
+
+def _derive_stress_minutes(stress_values: List[Any]) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
+    timestamps_ms: List[int] = []
+    levels: List[int] = []
+
+    for item in stress_values:
+        level: Optional[int] = None
+        timestamp: Optional[int] = None
+
+        if isinstance(item, (int, float)):
+            level = int(item)
+        elif isinstance(item, dict):
+            level = _get_int(item, "stressLevel", "value", "level")
+            timestamp = _get_int(
+                item,
+                "timestamp",
+                "timeInMillis",
+                "measurementTimeInMillis",
+                "startTimeInMillis",
+                "startGMT",
+                "startTimestampGMT",
+            )
+        elif isinstance(item, (list, tuple)) and item:
+            if len(item) >= 2:
+                first = item[0]
+                second = item[1]
+                if isinstance(first, (int, float)) and isinstance(second, (int, float)):
+                    if first > 10_000_000_000:
+                        timestamp = int(first)
+                        level = int(second)
+                    else:
+                        level = int(first)
+                        timestamp = int(second) if second > 10_000_000_000 else None
+            elif len(item) == 1 and isinstance(item[0], (int, float)):
+                level = int(item[0])
+
+        if level is None or level < 0:
+            continue
+
+        levels.append(level)
+        if timestamp is not None and timestamp > 0:
+            timestamps_ms.append(timestamp)
+
+    if not levels:
+        return None, None, None, None
+
+    sample_minutes = 1.0
+    if len(timestamps_ms) >= 3:
+        sorted_ts = sorted(set(timestamps_ms))
+        deltas = [
+            (sorted_ts[idx] - sorted_ts[idx - 1]) / 60000.0
+            for idx in range(1, len(sorted_ts))
+            if sorted_ts[idx] > sorted_ts[idx - 1]
+        ]
+        if deltas:
+            sample_minutes = max(1.0, min(15.0, statistics.median(deltas)))
+
+    rest_count = 0
+    low_count = 0
+    medium_count = 0
+    high_count = 0
+
+    for level in levels:
+        # Some Garmin payloads use categorical values 0/1/2/3, others use a 0..100 scale.
+        if level in (0, 1, 2, 3):
+            if level == 0:
+                rest_count += 1
+            elif level == 1:
+                low_count += 1
+            elif level == 2:
+                medium_count += 1
+            else:
+                high_count += 1
+            continue
+
+        if level == 0:
+            rest_count += 1
+        elif level <= 25:
+            low_count += 1
+        elif level <= 50:
+            medium_count += 1
+        else:
+            high_count += 1
+
+    def _to_minutes(count: int) -> Optional[int]:
+        if count <= 0:
+            return None
+        return int(round(count * sample_minutes))
+
+    return _to_minutes(rest_count), _to_minutes(low_count), _to_minutes(medium_count), _to_minutes(high_count)
 
 
 def _upsert_hydration_daily(db: Session, hydration_date: dt.date, payload: Dict[str, Any]) -> models.GarminHydrationDaily:
