@@ -80,22 +80,22 @@ st.markdown(
 .count-pill {
     color: #25466f;
     background: #e4eefb;
-    border: 1px solid #c9dbf4;
+    border: 1px solid #c8d9ef;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    padding: 0.24rem 0.6rem;
+    padding: 0.42rem 0.9rem;
     white-space: nowrap;
 }
 
 .sleep-pill {
     color: #234766;
-    background: #def3ea;
-    border: 1px solid #b7e2d2;
+    background: #d8efe4;
+    border: 1px solid #b8ddcb;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    padding: 0.24rem 0.58rem;
+    padding: 0.42rem 0.9rem;
     white-space: nowrap;
 }
 
@@ -126,20 +126,21 @@ st.markdown(
 .time-tag {
     font-weight: 700;
     color: #355271;
-    background: #eef4fb;
-    border: 1px solid #d8e6f6;
-    border-radius: 8px;
-    padding: 0.2rem 0.48rem;
-    font-size: 0.74rem;
+    background: #e6eef7;
+    border: 1px solid #c8d7ea;
+    border-radius: 12px;
+    padding: 0.28rem 0.62rem;
+    font-size: 0.83rem;
 }
 
 .mood-pill {
     border-radius: 999px;
-    padding: 0.22rem 0.68rem;
-    font-size: 0.76rem;
+    padding: 0.42rem 0.98rem;
+    font-size: 0.94rem;
     font-weight: 700;
-    color: #0f172a;
+    color: #20394f;
     white-space: nowrap;
+    border: 1px solid rgba(33, 71, 101, 0.16);
 }
 
 .entry-notes {
@@ -160,14 +161,14 @@ st.markdown(
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.34rem;
+    gap: 0.38rem;
     background: var(--chip-bg);
     color: var(--chip-text);
-    border: 1px solid #ccddf4;
+    border: 1px solid #b8cde7;
     border-radius: 999px;
-    padding: 0.14rem 0.55rem;
-    font-size: 0.74rem;
-    font-weight: 600;
+    padding: 0.28rem 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 650;
 }
 
 .chip-dot {
@@ -199,6 +200,20 @@ st.markdown(
     .hero h1 {
         font-size: 1.55rem;
     }
+
+    .day-header-right {
+        justify-content: flex-start;
+    }
+
+    /* Force stacked layout only for entry-row columns on small screens. */
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) {
+        flex-wrap: wrap !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) > div[data-testid="column"] {
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
 }
 
 div[data-testid="stPopover"] button:has(div p:only-child) {
@@ -213,19 +228,19 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 }
 
 .entry-row-note {
-    margin-top: 0.5rem;
+    margin-top: 0.85rem;
     color: var(--text-main);
     line-height: 1.4;
-    font-size: 0.94rem;
+    font-size: 1.06rem;
     min-height: 1.1rem;
 }
 
 .entry-row-chips {
-    margin-top: 0.62rem;
-    margin-bottom: 0.2rem;
+    margin-top: 0.88rem;
+    margin-bottom: 0.28rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.36rem;
+    gap: 0.42rem;
 }
 
 .entry-row-actions button {
@@ -242,19 +257,45 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 
 /* Streamlit border container — entry cards in main content only */
 section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 2px solid #c2d5ec !important;
-    border-radius: 14px !important;
-    background: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.08) !important;
+    border: 1px solid #cbdcee !important;
+    border-radius: 18px !important;
+    background: #eef5fb !important;
+    box-shadow: none !important;
     overflow: hidden !important;
     padding: 0 !important;
-    margin-bottom: 0.72rem !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Remove Streamlit's internal block padding/gap — we control it */
 section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
-    padding: 10px 12px 10px !important;
+    padding: 16px 18px 14px !important;
     gap: 2px !important;
+}
+
+/* Mood-tinted card backgrounds to match the soft reference look. */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#b8f0cf"]) {
+    background: #dcefe5 !important;
+    border-color: #bdddcf !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#d9efb3"]) {
+    background: #ebe8d6 !important;
+    border-color: #ddd7bb !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#fde58a"]) {
+    background: #ead9d0 !important;
+    border-color: #dcc4b7 !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#f7c597"]) {
+    background: #ecd6cb !important;
+    border-color: #dbbfaf !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#f5a6a6"]) {
+    background: #efd1d1 !important;
+    border-color: #deb6b6 !important;
 }
 
 /* Remove default paragraph margins that inflate card height */
@@ -272,11 +313,9 @@ section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] di
 
 @media (max-width: 860px) {
     section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        border: 2px solid #a7c2e4 !important;
-        border-radius: 14px !important;
-        background: #ffffff !important;
-        box-shadow: 0 4px 14px rgba(30, 58, 138, 0.12) !important;
-        margin-bottom: 0.8rem !important;
+        border-radius: 16px !important;
+        box-shadow: none !important;
+        margin-bottom: 0.88rem !important;
     }
 
     .entry-row-chips {
