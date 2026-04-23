@@ -400,6 +400,7 @@ def _run_metric_sync(
     state_key: str,
     metric_name: str,
     backfill_days: int,
+    backfill_days_override: Optional[int],
     sync_dates_fn: Callable[[Any, Session, List[dt.date]], Tuple[List[str], List[Dict[str, str]]]],
     latest_field: str,
     window_open: Callable[[dt.datetime], bool],
@@ -429,13 +430,15 @@ def _run_metric_sync(
         logger.info("%s sync skipped: already_synced_today", metric_name)
         return {"status": "skipped", "reason": "already_synced_today"}
 
+    effective_backfill_days = max(1, int(backfill_days_override)) if backfill_days_override else backfill_days
+
     try:
         client = get_garmin_client()
-        target_dates = _recent_dates(backfill_days)
+        target_dates = _recent_dates(effective_backfill_days)
         logger.info(
             "Running Garmin %s backfill; days=%s start_date=%s end_date=%s",
             metric_name,
-            backfill_days,
+            effective_backfill_days,
             target_dates[0].isoformat(),
             target_dates[-1].isoformat(),
         )
@@ -468,17 +471,18 @@ def _run_metric_sync(
         latest_field: synced_dates[-1],
         "synced_dates": synced_dates,
         "failed_dates": failed_dates,
-        "backfill_days": backfill_days,
+        "backfill_days": effective_backfill_days,
     }
 
 
-def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_sleep_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=SLEEP_SYNC_KEY,
         metric_name="sleep",
         backfill_days=SLEEP_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_sleep_dates,
         latest_field="sleep_date",
         window_open=_recovery_window_open,
@@ -486,13 +490,14 @@ def sync_sleep_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     )
 
 
-def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_body_battery_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=BODY_SYNC_KEY,
         metric_name="body battery",
         backfill_days=BODY_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_body_dates,
         latest_field="battery_date",
         window_open=_day_close_window_open,
@@ -500,13 +505,14 @@ def sync_body_battery_if_due(db: Session, force: bool = False) -> Dict[str, Any]
     )
 
 
-def sync_hrv_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_hrv_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=HRV_SYNC_KEY,
         metric_name="hrv",
         backfill_days=HRV_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_hrv_dates,
         latest_field="hrv_date",
         window_open=_recovery_window_open,
@@ -514,13 +520,14 @@ def sync_hrv_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     )
 
 
-def sync_resting_heart_rate_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_resting_heart_rate_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=RHR_SYNC_KEY,
         metric_name="resting heart rate",
         backfill_days=RHR_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_rhr_dates,
         latest_field="heart_rate_date",
         window_open=_recovery_window_open,
@@ -528,13 +535,14 @@ def sync_resting_heart_rate_if_due(db: Session, force: bool = False) -> Dict[str
     )
 
 
-def sync_stress_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_stress_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=STRESS_SYNC_KEY,
         metric_name="stress",
         backfill_days=STRESS_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_stress_dates,
         latest_field="stress_date",
         window_open=_day_close_window_open,
@@ -542,13 +550,14 @@ def sync_stress_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     )
 
 
-def sync_hydration_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
+def sync_hydration_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     return _run_metric_sync(
         db,
         force=force,
         state_key=HYDRATION_SYNC_KEY,
         metric_name="hydration",
         backfill_days=HYDRATION_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
         sync_dates_fn=_sync_hydration_dates,
         latest_field="hydration_date",
         window_open=_day_close_window_open,
@@ -556,15 +565,15 @@ def sync_hydration_if_due(db: Session, force: bool = False) -> Dict[str, Any]:
     )
 
 
-def sync_smart(db: Session, force: bool = False) -> Dict[str, Any]:
-    logger.info("Smart Garmin sync requested; force=%s", force)
+def sync_smart(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
+    logger.info("Smart Garmin sync requested; force=%s backfill_days=%s", force, backfill_days)
     results = {
-        "sleep": sync_sleep_if_due(db, force=force),
-        "body_battery": sync_body_battery_if_due(db, force=force),
-        "hrv": sync_hrv_if_due(db, force=force),
-        "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force),
-        "stress": sync_stress_if_due(db, force=force),
-        "hydration": sync_hydration_if_due(db, force=force),
+        "sleep": sync_sleep_if_due(db, force=force, backfill_days=backfill_days),
+        "body_battery": sync_body_battery_if_due(db, force=force, backfill_days=backfill_days),
+        "hrv": sync_hrv_if_due(db, force=force, backfill_days=backfill_days),
+        "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force, backfill_days=backfill_days),
+        "stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days),
+        "hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days),
     }
     logger.info("Smart Garmin sync finished; results=%s", results)
     return results

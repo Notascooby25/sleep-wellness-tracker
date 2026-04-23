@@ -134,6 +134,10 @@ st.markdown(
     .hero h1 {
         font-size: 1.52rem;
     }
+
+    .summary-value {
+        font-size: 1.02rem;
+    }
 }
 </style>
 """,
@@ -201,67 +205,80 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-control_cols = st.columns([0.2, 0.2, 0.22, 0.12, 0.12, 0.14])
+control_cols = st.columns([0.3, 0.3, 0.2, 0.2])
 with control_cols[0]:
     start_date = st.date_input("Start date", value=default_start, max_value=today)
 with control_cols[1]:
     end_date = st.date_input("End date", value=today, min_value=start_date, max_value=today)
 with control_cols[2]:
-    sync_scope = st.selectbox(
-        "Sync scope",
-        options=[
-            ("smart", "Smart (windowed)"),
-            ("all", "All metrics"),
-            ("sleep", "Sleep only"),
-            ("body", "Body Battery only"),
-            ("hrv", "HRV only"),
-            ("rhr", "Resting HR only"),
-            ("stress", "Stress only"),
-            ("hydration", "Hydration only"),
-        ],
-        format_func=lambda item: item[1],
-        index=0,
-        help="Use a single metric scope for more reliable large backfills.",
-    )
-with control_cols[3]:
-    show_empty_days = st.checkbox("Show empty days", value=False)
-with control_cols[4]:
-    force_sync = st.checkbox("Force sync", value=False)
-with control_cols[5]:
     if st.button("Refresh", use_container_width=True):
         clear_garmin_cache()
         st.rerun()
+with control_cols[3]:
+    sync_now_clicked = st.button("Sync Garmin", use_container_width=True, type="primary")
 
-sync_col = st.columns([0.18, 0.82])[0]
-with sync_col:
-    if st.button("Sync Garmin", use_container_width=True, type="primary"):
-        try:
-            selected_mode = sync_scope[0]
-            params = {
-                "mode": selected_mode,
-                "force": "true" if force_sync else "false",
-            }
-            response = requests.post(f"{API_BASE}/garmin/sync-now", params=params, timeout=240)
-            if response.status_code == 200:
-                data = response.json()
-                clear_garmin_cache()
-                status_parts = []
-                for key, value in data.items():
-                    if isinstance(value, dict):
-                        status = value.get("status", "unknown")
-                        reason = value.get("reason")
-                        suffix = f" ({reason})" if reason else ""
-                        status_parts.append(f"{key}={status}{suffix}")
-                    else:
-                        status_parts.append(f"{key}=unknown")
-                st.session_state["garmin_log_flash"] = "Garmin sync result: " + ", ".join(status_parts)
-                st.rerun()
-            elif response.status_code == 429:
-                st.warning("Garmin is rate-limiting this IP. Wait a few minutes and try again.")
-            else:
-                st.error(f"Garmin sync failed: {response.status_code} {response.text}")
-        except Exception as exc:
-            st.error(f"Garmin sync failed: {exc}")
+with st.expander("Sync settings", expanded=False):
+    settings_cols = st.columns([0.45, 0.2, 0.18, 0.17])
+    with settings_cols[0]:
+        sync_scope = st.selectbox(
+            "Sync scope",
+            options=[
+                ("smart", "Smart (windowed)"),
+                ("all", "All metrics"),
+                ("sleep", "Sleep only"),
+                ("body", "Body Battery only"),
+                ("hrv", "HRV only"),
+                ("rhr", "Resting HR only"),
+                ("stress", "Stress only"),
+                ("hydration", "Hydration only"),
+            ],
+            format_func=lambda item: item[1],
+            index=0,
+            help="Single-metric sync is usually more reliable for larger backfills.",
+        )
+    with settings_cols[1]:
+        sync_days = st.number_input(
+            "Backfill days",
+            min_value=1,
+            max_value=365,
+            value=30,
+            step=1,
+            help="Overrides env backfill days for this sync request only.",
+        )
+    with settings_cols[2]:
+        force_sync = st.checkbox("Force sync", value=False)
+    with settings_cols[3]:
+        show_empty_days = st.checkbox("Show empty days", value=False)
+
+if sync_now_clicked:
+    try:
+        selected_mode = sync_scope[0]
+        params = {
+            "mode": selected_mode,
+            "force": "true" if force_sync else "false",
+            "backfill_days": int(sync_days),
+        }
+        response = requests.post(f"{API_BASE}/garmin/sync-now", params=params, timeout=240)
+        if response.status_code == 200:
+            data = response.json()
+            clear_garmin_cache()
+            status_parts = []
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    status = value.get("status", "unknown")
+                    reason = value.get("reason")
+                    suffix = f" ({reason})" if reason else ""
+                    status_parts.append(f"{key}={status}{suffix}")
+                else:
+                    status_parts.append(f"{key}=unknown")
+            st.session_state["garmin_log_flash"] = "Garmin sync result: " + ", ".join(status_parts)
+            st.rerun()
+        elif response.status_code == 429:
+            st.warning("Garmin is rate-limiting this IP. Wait a few minutes and try again.")
+        else:
+            st.error(f"Garmin sync failed: {response.status_code} {response.text}")
+    except Exception as exc:
+        st.error(f"Garmin sync failed: {exc}")
 
 start_iso = start_date.isoformat()
 end_iso = end_date.isoformat()
@@ -273,7 +290,6 @@ rhr_rows = load_metric_range("resting-heart-rate", start_iso, end_iso)
 stress_rows = load_metric_range("stress", start_iso, end_iso)
 hydration_rows = load_metric_range("hydration", start_iso, end_iso)
 
-summary_cols = st.columns(6)
 summary_data = [
     ("Sleep days", metric_count(sleep_rows)),
     ("Body battery days", metric_count(body_rows)),
@@ -282,8 +298,10 @@ summary_data = [
     ("Stress days", metric_count(stress_rows)),
     ("Hydration days", metric_count(hydration_rows)),
 ]
-for col, (label, value) in zip(summary_cols, summary_data):
-    with col:
+for idx, (label, value) in enumerate(summary_data):
+    if idx % 3 == 0:
+        summary_cols = st.columns(3)
+    with summary_cols[idx % 3]:
         st.markdown(
             f"<div class='summary-card'><div class='summary-label'>{label}</div><div class='summary-value'>{value}</div></div>",
             unsafe_allow_html=True,
@@ -304,7 +322,7 @@ all_dates = sorted(
 if not all_dates:
     st.markdown("<div class='summary-card' style='margin-top: 1rem;'>No Garmin data found for this date range yet.</div>", unsafe_allow_html=True)
 
-for date_str in all_dates:
+for idx, date_str in enumerate(all_dates):
     sleep_row = sleep_rows.get(date_str)
     body_row = body_rows.get(date_str)
     hrv_row = hrv_rows.get(date_str)
@@ -326,83 +344,83 @@ for date_str in all_dates:
     if rhr_row and rhr_row.get("resting_heart_rate") is not None:
         pill_parts.append(f"<span class='metric-pill'>Resting HR {rhr_row.get('resting_heart_rate')}</span>")
 
-    st.markdown(f"### <span class='day-title'>{day.strftime('%A, %d %B %Y')}</span>", unsafe_allow_html=True)
-    if pill_parts:
-        st.markdown("".join(pill_parts), unsafe_allow_html=True)
+    is_latest_day = idx == 0
+    with st.expander(day.strftime("%A, %d %B %Y"), expanded=is_latest_day):
+        if pill_parts:
+            st.markdown("".join(pill_parts), unsafe_allow_html=True)
 
-    metric_cols = st.columns(3)
-    with metric_cols[0]:
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>Sleep</div>", unsafe_allow_html=True)
-            if sleep_row:
-                st.markdown(
-                    f"<div class='metric-value'>{fmt_minutes(sleep_row.get('total_sleep_minutes'))}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(
-                    f"Deep {fmt_minutes(sleep_row.get('deep_sleep_minutes'))} | Light {fmt_minutes(sleep_row.get('light_sleep_minutes'))} | REM {fmt_minutes(sleep_row.get('rem_sleep_minutes'))}"
-                )
-            else:
-                st.markdown("<div class='metric-empty'>No sleep data</div>", unsafe_allow_html=True)
+        left_col, right_col = st.columns(2)
+        with left_col:
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Sleep</div>", unsafe_allow_html=True)
+                if sleep_row:
+                    st.markdown(
+                        f"<div class='metric-value'>{fmt_minutes(sleep_row.get('total_sleep_minutes'))}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"Deep {fmt_minutes(sleep_row.get('deep_sleep_minutes'))} | Light {fmt_minutes(sleep_row.get('light_sleep_minutes'))} | REM {fmt_minutes(sleep_row.get('rem_sleep_minutes'))}"
+                    )
+                else:
+                    st.markdown("<div class='metric-empty'>No sleep data</div>", unsafe_allow_html=True)
 
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>HRV</div>", unsafe_allow_html=True)
-            if hrv_row:
-                status = hrv_row.get("status") or "No status"
-                st.markdown(
-                    f"<div class='metric-value'>{hrv_row.get('weekly_avg') or 'No data'}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(f"Baseline {hrv_row.get('baseline_low') or 'n/a'} to {hrv_row.get('baseline_high') or 'n/a'} | {status}")
-            else:
-                st.markdown("<div class='metric-empty'>No HRV data</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>HRV</div>", unsafe_allow_html=True)
+                if hrv_row:
+                    status = hrv_row.get("status") or "No status"
+                    st.markdown(
+                        f"<div class='metric-value'>{hrv_row.get('weekly_avg') or 'No data'}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(f"Baseline {hrv_row.get('baseline_low') or 'n/a'} to {hrv_row.get('baseline_high') or 'n/a'} | {status}")
+                else:
+                    st.markdown("<div class='metric-empty'>No HRV data</div>", unsafe_allow_html=True)
 
-    with metric_cols[1]:
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>Body Battery</div>", unsafe_allow_html=True)
-            if body_row:
-                st.markdown(
-                    f"<div class='metric-value'>{body_row.get('end_of_day_value') or 'No data'}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(
-                    f"Morning {body_row.get('morning_value') or 'n/a'} | Peak {body_row.get('peak_value') or 'n/a'} | Low {body_row.get('low_value') or 'n/a'}"
-                )
-            else:
-                st.markdown("<div class='metric-empty'>No body battery data</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Stress</div>", unsafe_allow_html=True)
+                if stress_row:
+                    st.markdown(
+                        f"<div class='metric-value'>{stress_row.get('overall_stress_level') or 'No data'}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"Rest {stress_row.get('rest_stress_duration') or 'n/a'} | Low {stress_row.get('low_stress_duration') or 'n/a'} | Medium {stress_row.get('medium_stress_duration') or 'n/a'} | High {stress_row.get('high_stress_duration') or 'n/a'}"
+                    )
+                else:
+                    st.markdown("<div class='metric-empty'>No stress data</div>", unsafe_allow_html=True)
 
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>Resting Heart Rate</div>", unsafe_allow_html=True)
-            if rhr_row:
-                st.markdown(
-                    f"<div class='metric-value'>{rhr_row.get('resting_heart_rate') or 'No data'} bpm</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(f"Min {rhr_row.get('min_heart_rate') or 'n/a'} | Max {rhr_row.get('max_heart_rate') or 'n/a'}")
-            else:
-                st.markdown("<div class='metric-empty'>No resting heart rate data</div>", unsafe_allow_html=True)
+        with right_col:
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Body Battery</div>", unsafe_allow_html=True)
+                if body_row:
+                    st.markdown(
+                        f"<div class='metric-value'>{body_row.get('end_of_day_value') or 'No data'}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"Morning {body_row.get('morning_value') or 'n/a'} | Peak {body_row.get('peak_value') or 'n/a'} | Low {body_row.get('low_value') or 'n/a'}"
+                    )
+                else:
+                    st.markdown("<div class='metric-empty'>No body battery data</div>", unsafe_allow_html=True)
 
-    with metric_cols[2]:
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>Stress</div>", unsafe_allow_html=True)
-            if stress_row:
-                st.markdown(
-                    f"<div class='metric-value'>{stress_row.get('overall_stress_level') or 'No data'}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(
-                    f"Rest {stress_row.get('rest_stress_duration') or 'n/a'} | Low {stress_row.get('low_stress_duration') or 'n/a'} | Medium {stress_row.get('medium_stress_duration') or 'n/a'} | High {stress_row.get('high_stress_duration') or 'n/a'}"
-                )
-            else:
-                st.markdown("<div class='metric-empty'>No stress data</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Resting Heart Rate</div>", unsafe_allow_html=True)
+                if rhr_row:
+                    st.markdown(
+                        f"<div class='metric-value'>{rhr_row.get('resting_heart_rate') or 'No data'} bpm</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(f"Min {rhr_row.get('min_heart_rate') or 'n/a'} | Max {rhr_row.get('max_heart_rate') or 'n/a'}")
+                else:
+                    st.markdown("<div class='metric-empty'>No resting heart rate data</div>", unsafe_allow_html=True)
 
-        with st.container(border=True):
-            st.markdown("<div class='metric-name'>Hydration</div>", unsafe_allow_html=True)
-            if hydration_row:
-                st.markdown(
-                    f"<div class='metric-value'>{fmt_ml(hydration_row.get('consumed_ml'))}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(f"Goal {fmt_ml(hydration_row.get('goal_ml'))}")
-            else:
-                st.markdown("<div class='metric-empty'>No hydration data</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Hydration</div>", unsafe_allow_html=True)
+                if hydration_row:
+                    st.markdown(
+                        f"<div class='metric-value'>{fmt_ml(hydration_row.get('consumed_ml'))}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(f"Goal {fmt_ml(hydration_row.get('goal_ml'))}")
+                else:
+                    st.markdown("<div class='metric-empty'>No hydration data</div>", unsafe_allow_html=True)
