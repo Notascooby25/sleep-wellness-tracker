@@ -274,11 +274,59 @@ def _upsert_stress_daily(db: Session, stress_date: dt.date, payload: Dict[str, A
         row = models.GarminStressDaily(stress_date=stress_date)
         db.add(row)
 
-    row.overall_stress_level = _get_int(payload, "overallStressLevel", "averageStressLevel", "stressLevel")
+    row.overall_stress_level = _get_int(payload, "overallStressLevel", "averageStressLevel", "avgStressLevel", "stressLevel")
     row.rest_stress_duration = _get_int(payload, "restStressDuration", "restDuration")
     row.low_stress_duration = _get_int(payload, "lowStressDuration", "lowDuration")
     row.medium_stress_duration = _get_int(payload, "mediumStressDuration", "mediumDuration")
     row.high_stress_duration = _get_int(payload, "highStressDuration", "highDuration")
+
+    # Garmin stress payloads commonly return stressValuesArray + avg/max levels instead of explicit duration fields.
+    # When durations are missing, derive rough buckets from stress values so the UI does not show n/a everywhere.
+    stress_values = payload.get("stressValuesArray")
+    if isinstance(stress_values, list) and any(
+        value is None
+        for value in [row.rest_stress_duration, row.low_stress_duration, row.medium_stress_duration, row.high_stress_duration]
+    ):
+        rest_count = 0
+        low_count = 0
+        medium_count = 0
+        high_count = 0
+
+        for item in stress_values:
+            level: Optional[int] = None
+            if isinstance(item, (int, float)):
+                level = int(item)
+            elif isinstance(item, dict):
+                level = _get_int(item, "stressLevel", "value")
+            elif isinstance(item, (list, tuple)) and item:
+                # Some payload versions encode entries as [timestamp, value] or [value].
+                maybe_level = item[-1]
+                if isinstance(maybe_level, (int, float)):
+                    level = int(maybe_level)
+
+            if level is None or level < 0:
+                continue
+            if level == 0:
+                rest_count += 1
+            elif level <= 25:
+                low_count += 1
+            elif level <= 50:
+                medium_count += 1
+            else:
+                high_count += 1
+
+        if row.rest_stress_duration is None:
+            row.rest_stress_duration = rest_count if rest_count > 0 else None
+        if row.low_stress_duration is None:
+            row.low_stress_duration = low_count if low_count > 0 else None
+        if row.medium_stress_duration is None:
+            row.medium_stress_duration = medium_count if medium_count > 0 else None
+        if row.high_stress_duration is None:
+            row.high_stress_duration = high_count if high_count > 0 else None
+
+    if row.overall_stress_level is None:
+        row.overall_stress_level = _get_int(payload, "maxStressLevel")
+
     row.payload = payload
 
     db.commit()
@@ -331,7 +379,7 @@ def _fetch_rhr_payload(client: Any, date_str: str) -> Dict[str, Any]:
 
 
 def _fetch_stress_payload(client: Any, date_str: str) -> Dict[str, Any]:
-    return _call_client_method(client, ["get_stress_data", "get_stress", "get_stress_stats"], date_str)
+    return _call_client_method(client, ["get_stress_data", "get_all_day_stress", "get_stress", "get_stress_stats"], date_str)
 
 
 def _fetch_hydration_payload(client: Any, date_str: str) -> Dict[str, Any]:
