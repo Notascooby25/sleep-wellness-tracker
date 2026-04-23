@@ -70,6 +70,13 @@ st.markdown(
     box-shadow: 0 6px 14px rgba(30, 58, 138, 0.05);
 }
 
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0.25rem 0 0.9rem;
+}
+
 .summary-label {
     color: var(--text-sub);
     font-size: 0.76rem;
@@ -137,6 +144,11 @@ st.markdown(
 
     .summary-value {
         font-size: 1.02rem;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem;
     }
 }
 </style>
@@ -298,14 +310,12 @@ summary_data = [
     ("Stress days", metric_count(stress_rows)),
     ("Hydration days", metric_count(hydration_rows)),
 ]
-for idx, (label, value) in enumerate(summary_data):
-    if idx % 3 == 0:
-        summary_cols = st.columns(3)
-    with summary_cols[idx % 3]:
-        st.markdown(
-            f"<div class='summary-card'><div class='summary-label'>{label}</div><div class='summary-value'>{value}</div></div>",
-            unsafe_allow_html=True,
-        )
+
+summary_cards_html = "".join(
+    f"<div class='summary-card'><div class='summary-label'>{label}</div><div class='summary-value'>{value}</div></div>"
+    for label, value in summary_data
+)
+st.markdown(f"<div class='summary-grid'>{summary_cards_html}</div>", unsafe_allow_html=True)
 
 all_dates = sorted(
     {
