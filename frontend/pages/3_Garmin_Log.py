@@ -201,34 +201,59 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-control_cols = st.columns([0.22, 0.22, 0.14, 0.14, 0.14, 0.14])
+control_cols = st.columns([0.2, 0.2, 0.22, 0.12, 0.12, 0.14])
 with control_cols[0]:
     start_date = st.date_input("Start date", value=default_start, max_value=today)
 with control_cols[1]:
     end_date = st.date_input("End date", value=today, min_value=start_date, max_value=today)
 with control_cols[2]:
-    show_empty_days = st.checkbox("Show empty days", value=False)
+    sync_scope = st.selectbox(
+        "Sync scope",
+        options=[
+            ("smart", "Smart (windowed)"),
+            ("all", "All metrics"),
+            ("sleep", "Sleep only"),
+            ("body", "Body Battery only"),
+            ("hrv", "HRV only"),
+            ("rhr", "Resting HR only"),
+            ("stress", "Stress only"),
+            ("hydration", "Hydration only"),
+        ],
+        format_func=lambda item: item[1],
+        index=0,
+        help="Use a single metric scope for more reliable large backfills.",
+    )
 with control_cols[3]:
-    force_sync = st.checkbox("Force sync", value=False)
+    show_empty_days = st.checkbox("Show empty days", value=False)
 with control_cols[4]:
+    force_sync = st.checkbox("Force sync", value=False)
+with control_cols[5]:
     if st.button("Refresh", use_container_width=True):
         clear_garmin_cache()
         st.rerun()
-with control_cols[5]:
-    if st.button("Sync Garmin", use_container_width=True):
+
+sync_col = st.columns([0.18, 0.82])[0]
+with sync_col:
+    if st.button("Sync Garmin", use_container_width=True, type="primary"):
         try:
+            selected_mode = sync_scope[0]
             params = {
-                "mode": "all" if force_sync else "smart",
+                "mode": selected_mode,
                 "force": "true" if force_sync else "false",
             }
-            response = requests.post(f"{API_BASE}/garmin/sync-now", params=params, timeout=90)
+            response = requests.post(f"{API_BASE}/garmin/sync-now", params=params, timeout=240)
             if response.status_code == 200:
                 data = response.json()
                 clear_garmin_cache()
                 status_parts = []
-                for key in ["sleep", "body_battery", "hrv", "resting_heart_rate", "stress", "hydration"]:
-                    status = (data.get(key) or {}).get("status", "unknown")
-                    status_parts.append(f"{key}={status}")
+                for key, value in data.items():
+                    if isinstance(value, dict):
+                        status = value.get("status", "unknown")
+                        reason = value.get("reason")
+                        suffix = f" ({reason})" if reason else ""
+                        status_parts.append(f"{key}={status}{suffix}")
+                    else:
+                        status_parts.append(f"{key}=unknown")
                 st.session_state["garmin_log_flash"] = "Garmin sync result: " + ", ".join(status_parts)
                 st.rerun()
             elif response.status_code == 429:

@@ -199,7 +199,7 @@ def _upsert_body_daily(db: Session, battery_date: dt.date, payload: Dict[str, An
         row = models.GarminBodyBatteryDaily(battery_date=battery_date)
         db.add(row)
 
-    row.morning_value = _get_int(payload, "morningValue", "bodyBatteryMorning", "bodyBatteryLowestValue")
+    row.morning_value = _get_int(payload, "morningValue", "bodyBatteryMorning")
     row.end_of_day_value = _get_int(payload, "endOfDayValue", "bodyBatteryEvening", "bodyBatteryMostRecentValue")
     row.peak_value = _get_int(payload, "peakValue", "maxValue", "bodyBatteryHighestValue")
     row.low_value = _get_int(payload, "lowValue", "minValue", "bodyBatteryLowestValue")
