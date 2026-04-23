@@ -95,32 +95,33 @@ def _serialize_hydration(row: models.GarminHydrationDaily) -> dict:
 def sync_now(
     mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|all)$"),
     force: bool = Query(default=False),
+    backfill_days: int | None = Query(default=None, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    logger.info("/garmin/sync-now called; mode=%s force=%s", mode, force)
+    logger.info("/garmin/sync-now called; mode=%s force=%s backfill_days=%s", mode, force, backfill_days)
     try:
         if mode == "sleep":
-            return {"sleep": sync_sleep_if_due(db, force=force)}
+            return {"sleep": sync_sleep_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "body":
-            return {"body_battery": sync_body_battery_if_due(db, force=force)}
+            return {"body_battery": sync_body_battery_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "hrv":
-            return {"hrv": sync_hrv_if_due(db, force=force)}
+            return {"hrv": sync_hrv_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "rhr":
-            return {"resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force)}
+            return {"resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "stress":
-            return {"stress": sync_stress_if_due(db, force=force)}
+            return {"stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "hydration":
-            return {"hydration": sync_hydration_if_due(db, force=force)}
+            return {"hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "all":
             return {
-                "sleep": sync_sleep_if_due(db, force=True),
-                "body_battery": sync_body_battery_if_due(db, force=True),
-                "hrv": sync_hrv_if_due(db, force=True),
-                "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=True),
-                "stress": sync_stress_if_due(db, force=True),
-                "hydration": sync_hydration_if_due(db, force=True),
+                "sleep": sync_sleep_if_due(db, force=True, backfill_days=backfill_days),
+                "body_battery": sync_body_battery_if_due(db, force=True, backfill_days=backfill_days),
+                "hrv": sync_hrv_if_due(db, force=True, backfill_days=backfill_days),
+                "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=True, backfill_days=backfill_days),
+                "stress": sync_stress_if_due(db, force=True, backfill_days=backfill_days),
+                "hydration": sync_hydration_if_due(db, force=True, backfill_days=backfill_days),
             }
-        return sync_smart(db, force=force)
+        return sync_smart(db, force=force, backfill_days=backfill_days)
     except GarminRateLimitError as exc:
         logger.warning("Garmin rate limit hit during sync: %s", exc)
         raise HTTPException(status_code=429, detail=str(exc))
