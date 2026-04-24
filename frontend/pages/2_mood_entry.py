@@ -479,12 +479,20 @@ div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="5"]) {
 
 /* Selected state */
 div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) {
-    box-shadow: 0 0 0 2px rgba(19,34,56,0.22) !important;
-    transform: translateY(-1px) !important;
+    box-shadow: 0 0 0 3px rgba(19,34,56,0.38), 0 8px 16px rgba(19, 34, 56, 0.18) !important;
+    transform: translateY(-1px) scale(1.02) !important;
 }
 
 div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) > div:last-child {
     font-weight: 800 !important;
+}
+
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked)::after {
+    content: "✓";
+    margin-left: 0.35rem;
+    font-weight: 900;
+    font-size: 0.9rem;
+    line-height: 1;
 }
 
 @media (max-width: 520px) {
@@ -547,6 +555,8 @@ mood_score = st.radio(
     key="mood_score",
     label_visibility="collapsed",
 )
+
+st.caption(f"Selected mood score: {mood_score}")
 
 st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
 count_col, clear_col = st.columns([0.78, 0.22])
