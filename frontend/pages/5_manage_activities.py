@@ -70,6 +70,7 @@ st.subheader("Filter by Category")
 
 category_map = {c["name"]: c["id"] for c in categories} if categories else {}
 category_names = list(category_map.keys())
+category_name_by_id = {c["id"]: c["name"] for c in categories} if categories else {}
 
 selected_category = st.selectbox("Category", ["(all)"] + category_names)
 
@@ -85,13 +86,14 @@ else:
 st.subheader("Add Activity")
 
 new_name = st.text_input("Activity name")
-new_cat = st.selectbox("Category for new activity", category_names)
+new_cat = st.selectbox("Category for new activity", ["(uncategorized)"] + category_names)
 
 if st.button("Add Activity"):
     if new_name.strip():
+        selected_new_category_id = None if new_cat == "(uncategorized)" else category_map[new_cat]
         resp = post_json("/activities/", {
             "name": new_name,
-            "category_id": category_map[new_cat]
+            "category_id": selected_new_category_id
         })
         if resp and resp.ok:
             st.success("Activity added.")
@@ -110,21 +112,49 @@ if not filtered:
     st.info("No activities found.")
 else:
     for a in filtered:
+        current_category_name = category_name_by_id.get(a.get("category_id"), "(uncategorized)")
         st.markdown(f"### {a['name']} (ID {a['id']})")
+        st.caption(f"Current category: {current_category_name}")
 
         col1, col2 = st.columns(2)
 
         # Rename
         with col1:
-            new_name = st.text_input(f"Rename {a['name']}", key=f"rename_{a['id']}")
+            edited_name = st.text_input(
+                f"Name for activity {a['id']}",
+                value=a["name"],
+                key=f"rename_{a['id']}"
+            )
+
+            current_category_id = a.get("category_id")
+            category_options = ["(uncategorized)"] + category_names
+            if current_category_id is None:
+                default_category_index = 0
+            else:
+                current_category = category_name_by_id.get(current_category_id)
+                default_category_index = category_options.index(current_category) if current_category in category_options else 0
+
+            edited_category_name = st.selectbox(
+                f"Category for activity {a['id']}",
+                category_options,
+                index=default_category_index,
+                key=f"category_{a['id']}"
+            )
+
             if st.button(f"Save {a['id']}", key=f"save_{a['id']}"):
-                if new_name.strip():
-                    resp = put_json(f"/activities/{a['id']}", {"name": new_name})
+                if edited_name.strip():
+                    edited_category_id = None if edited_category_name == "(uncategorized)" else category_map[edited_category_name]
+                    resp = put_json(
+                        f"/activities/{a['id']}",
+                        {"name": edited_name.strip(), "category_id": edited_category_id}
+                    )
                     if resp and resp.ok:
                         st.success("Updated.")
                         st.rerun()
                     else:
                         st.error("Failed to update.")
+                else:
+                    st.warning("Name cannot be empty.")
 
         # Delete
         with col2:

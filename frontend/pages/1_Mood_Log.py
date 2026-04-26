@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 import datetime
@@ -7,7 +8,7 @@ import io
 import csv
 from zoneinfo import ZoneInfo
 
-API_BASE = "http://backend:8000"
+API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 st.set_page_config(page_title="Mood Log", layout="wide")
 
@@ -79,22 +80,22 @@ st.markdown(
 .count-pill {
     color: #25466f;
     background: #e4eefb;
-    border: 1px solid #c9dbf4;
+    border: 1px solid #c8d9ef;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    padding: 0.24rem 0.6rem;
+    padding: 0.42rem 0.9rem;
     white-space: nowrap;
 }
 
 .sleep-pill {
     color: #234766;
-    background: #def3ea;
-    border: 1px solid #b7e2d2;
+    background: #d8efe4;
+    border: 1px solid #b8ddcb;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    padding: 0.24rem 0.58rem;
+    padding: 0.42rem 0.9rem;
     white-space: nowrap;
 }
 
@@ -125,20 +126,32 @@ st.markdown(
 .time-tag {
     font-weight: 700;
     color: #355271;
-    background: #eef4fb;
-    border: 1px solid #d8e6f6;
-    border-radius: 8px;
-    padding: 0.2rem 0.48rem;
-    font-size: 0.74rem;
+    background: #e6eef7;
+    border: 1px solid #c8d7ea;
+    border-radius: 12px;
+    padding: 0.28rem 0.62rem;
+    font-size: 0.83rem;
 }
 
 .mood-pill {
     border-radius: 999px;
-    padding: 0.22rem 0.68rem;
-    font-size: 0.76rem;
+    padding: 0.34rem 0.82rem;
+    font-size: 0.88rem;
     font-weight: 700;
-    color: #0f172a;
+    color: #20394f;
     white-space: nowrap;
+    border: 1px solid rgba(33, 71, 101, 0.16);
+}
+
+.mood-pill-1 { background: #b8f0cf; }
+.mood-pill-2 { background: #d9efb3; }
+.mood-pill-3 { background: #fde58a; }
+.mood-pill-4 { background: #f7c597; }
+.mood-pill-5 { background: #f5a6a6; }
+.mood-pill-none { background: #dfe7f2; }
+
+.mood-marker {
+    display: none;
 }
 
 .entry-notes {
@@ -159,18 +172,18 @@ st.markdown(
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.34rem;
+    gap: 0.28rem;
     background: var(--chip-bg);
     color: var(--chip-text);
-    border: 1px solid #ccddf4;
+    border: 1px solid #b8cde7;
     border-radius: 999px;
-    padding: 0.14rem 0.55rem;
-    font-size: 0.74rem;
+    padding: 0.2rem 0.58rem;
+    font-size: 0.82rem;
     font-weight: 600;
 }
 
 .chip-dot {
-    font-size: 0.86rem;
+    font-size: 0.74rem;
     line-height: 1;
     opacity: 0.9;
 }
@@ -198,6 +211,20 @@ st.markdown(
     .hero h1 {
         font-size: 1.55rem;
     }
+
+    .day-header-right {
+        justify-content: flex-start;
+    }
+
+    /* Force stacked layout only for entry-row columns on small screens. */
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) {
+        flex-wrap: wrap !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) > div[data-testid="column"] {
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
 }
 
 div[data-testid="stPopover"] button:has(div p:only-child) {
@@ -212,19 +239,19 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 }
 
 .entry-row-note {
-    margin-top: 0.5rem;
+    margin-top: 0.85rem;
     color: var(--text-main);
     line-height: 1.4;
-    font-size: 0.94rem;
+    font-size: 1.06rem;
     min-height: 1.1rem;
 }
 
 .entry-row-chips {
     margin-top: 0.62rem;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.16rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.36rem;
+    gap: 0.3rem;
 }
 
 .entry-row-actions button {
@@ -241,19 +268,45 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 
 /* Streamlit border container — entry cards in main content only */
 section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 2px solid #c2d5ec !important;
-    border-radius: 14px !important;
-    background: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.08) !important;
+    border: 1px solid #cbdcee !important;
+    border-radius: 18px !important;
+    background: #eef5fb !important;
+    box-shadow: none !important;
     overflow: hidden !important;
     padding: 0 !important;
-    margin-bottom: 0.72rem !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Remove Streamlit's internal block padding/gap — we control it */
 section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
-    padding: 10px 12px 10px !important;
+    padding: 16px 18px 14px !important;
     gap: 2px !important;
+}
+
+/* Mood-tinted card backgrounds to match the soft reference look. */
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-1) {
+    background: #dcefe5 !important;
+    border-color: #bdddcf !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-2) {
+    background: #ebe8d6 !important;
+    border-color: #ddd7bb !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-3) {
+    background: #ead9d0 !important;
+    border-color: #dcc4b7 !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-4) {
+    background: #ecd6cb !important;
+    border-color: #dbbfaf !important;
+}
+
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-5) {
+    background: #efd1d1 !important;
+    border-color: #deb6b6 !important;
 }
 
 /* Remove default paragraph margins that inflate card height */
@@ -271,15 +324,24 @@ section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] di
 
 @media (max-width: 860px) {
     section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        border: 2px solid #a7c2e4 !important;
-        border-radius: 14px !important;
-        background: #ffffff !important;
-        box-shadow: 0 4px 14px rgba(30, 58, 138, 0.12) !important;
-        margin-bottom: 0.8rem !important;
+        border-radius: 16px !important;
+        box-shadow: none !important;
+        margin-bottom: 0.88rem !important;
     }
 
     .entry-row-chips {
-        margin-bottom: 0.32rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.16rem;
+        gap: 0.24rem;
+    }
+
+    .chip {
+        padding: 0.12rem 0.48rem;
+        font-size: 0.74rem;
+    }
+
+    .chip-dot {
+        font-size: 0.68rem;
     }
 }
 </style>
@@ -309,13 +371,22 @@ MOOD_META = {
 
 
 def mood_meta(score):
+    if score is None:
+        return ("No rating", "#dfe7f2")
     return MOOD_META.get(score, (f"{score}", "#d1d5db"))
+
+
+def mood_css_class(score):
+    if score in {1, 2, 3, 4, 5}:
+        return str(score)
+    return "none"
 
 
 if "open_entry_menu_id" not in st.session_state:
     st.session_state["open_entry_menu_id"] = None
 def clear_mood_cache():
     load_entries.clear()
+    load_categories.clear()
     load_activities.clear()
     load_sleep_range.clear()
 
@@ -352,9 +423,13 @@ def parse_activity_ids(value):
 def normalize_import_rows(rows):
     normalized = []
     for row in rows:
-        score = int(row.get("mood_score"))
-        if score < 1 or score > 5:
-            raise ValueError("mood_score must be between 1 and 5")
+        raw_score = row.get("mood_score")
+        if raw_score in (None, "", "null"):
+            score = None
+        else:
+            score = int(raw_score)
+            if score < 1 or score > 5:
+                raise ValueError("mood_score must be between 1 and 5, or empty")
 
         normalized.append(
             {
@@ -378,7 +453,7 @@ def entry_signature(row):
         normalized_ts = parse_timestamp(timestamp_value)
 
     return (
-        int(row.get("mood_score")),
+        None if row.get("mood_score") is None else int(row.get("mood_score")),
         normalized_notes,
         normalized_ts,
         tuple(sorted(int(aid) for aid in row.get("activity_ids", []))),
@@ -446,6 +521,16 @@ def load_entries():
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def load_categories():
+    try:
+        r = requests.get(f"{API_BASE}/categories/", timeout=3)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_activities():
     try:
         r = requests.get(f"{API_BASE}/activities/", timeout=3)
@@ -482,6 +567,8 @@ if "mood_log_flash" not in st.session_state:
     st.session_state["mood_log_flash"] = None
 if "bulk_delete_confirm" not in st.session_state:
     st.session_state["bulk_delete_confirm"] = None
+if "bulk_clear_rating_confirm" not in st.session_state:
+    st.session_state["bulk_clear_rating_confirm"] = False
 
 
 toolbar_col, refresh_col = st.columns([0.8, 0.2])
@@ -494,9 +581,67 @@ with refresh_col:
 
 
 entries = load_entries()
+categories_list = load_categories()
 activities_list = load_activities()
 activity_lookup = {a["id"]: a["name"] for a in activities_list}
+activity_full_lookup = {a["id"]: a for a in activities_list}  # Full activity objects with category_id
+category_name_by_id = {c["id"]: c["name"] for c in categories_list}
+category_id_by_name = {c["name"]: c["id"] for c in categories_list}
 entry_lookup = {e["id"]: e for e in entries}
+
+
+def matching_entries_for_rating_clear(target_category_ids, include_mixed=False):
+    matches = []
+    if not target_category_ids:
+        return matches
+
+    for entry in entries:
+        if entry.get("mood_score") is None:
+            continue
+
+        activity_ids = entry.get("activity_ids") or []
+        if not activity_ids:
+            continue
+
+        entry_category_ids = {
+            activity_full_lookup.get(aid, {}).get("category_id")
+            for aid in activity_ids
+            if activity_full_lookup.get(aid, {}).get("category_id") is not None
+        }
+
+        if not entry_category_ids:
+            continue
+
+        if include_mixed:
+            is_match = bool(entry_category_ids.intersection(target_category_ids))
+        else:
+            is_match = entry_category_ids.issubset(target_category_ids)
+
+        if is_match:
+            matches.append(entry)
+
+    return matches
+
+
+def clear_ratings(entry_rows):
+    updated = 0
+    failed = 0
+    for row in entry_rows:
+        payload = {
+            "mood_score": None,
+            "notes": row.get("notes"),
+            "timestamp": row.get("timestamp"),
+            "activity_ids": row.get("activity_ids", []),
+        }
+        try:
+            resp = requests.put(f"{API_BASE}/mood/{row['id']}", json=payload, timeout=4)
+            if resp.status_code == 200:
+                updated += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    return updated, failed
 
 
 if st.session_state["mood_log_flash"]:
@@ -542,6 +687,22 @@ with st.sidebar:
         data=csv_buffer.getvalue(),
         file_name="mood_log_export.csv",
         mime="text/csv",
+        use_container_width=True,
+    )
+
+    backup_snapshot = {
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "mood_log_tools",
+        "entries": export_rows,
+        "categories": categories_list,
+        "activities": activities_list,
+    }
+    backup_name = f"mood_log_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+    st.download_button(
+        "Download Full Backup (JSON)",
+        data=json.dumps(backup_snapshot, indent=2),
+        file_name=backup_name,
+        mime="application/json",
         use_container_width=True,
     )
 
@@ -626,59 +787,63 @@ with st.sidebar:
                 st.session_state["bulk_delete_confirm"] = None
                 st.rerun()
 
-    if st.session_state["editing_entry_id"] is not None:
-        edit_id = st.session_state["editing_entry_id"]
-        edit_entry = entry_lookup.get(edit_id)
-        if edit_entry is None:
-            st.session_state["editing_entry_id"] = None
-        else:
-            parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
-            st.markdown("---")
-            st.subheader(f"Edit Entry #{edit_id}")
-            edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
-            edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
-            edit_score = st.radio(
-                "Mood",
-                options=[1, 2, 3, 4, 5],
-                horizontal=True,
-                key=f"edit_score_{edit_id}",
-                index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)),
-            )
-            edit_activities = st.multiselect(
-                "Activities",
-                options=sorted(activity_lookup.keys()),
-                default=edit_entry.get("activity_ids", []),
-                format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
-                key=f"edit_acts_{edit_id}",
-            )
-            edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
+    st.markdown("---")
+    st.subheader("Bulk Rating Cleanup")
+    cleanup_default_names = [
+        name for name in ["Lifestyle", "Before Sleep", "During Sleep"] if name in category_id_by_name
+    ]
+    cleanup_target_names = st.multiselect(
+        "Categories to disassociate rating from",
+        options=sorted(category_id_by_name.keys()),
+        default=cleanup_default_names,
+    )
+    cleanup_include_mixed = st.checkbox(
+        "Include entries that also contain other categories",
+        value=False,
+        help="Off = only clear entries where all selected activities are in the chosen categories.",
+    )
 
-            save_col, cancel_col = st.columns(2)
-            with save_col:
-                if st.button("Save Changes", use_container_width=True):
-                    new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
-                    payload = {
-                        "mood_score": int(edit_score),
-                        "notes": edit_notes,
-                        "timestamp": new_ts,
-                        "activity_ids": sorted(edit_activities),
+    cleanup_target_ids = {category_id_by_name[name] for name in cleanup_target_names}
+    cleanup_matches = matching_entries_for_rating_clear(cleanup_target_ids, include_mixed=cleanup_include_mixed)
+    st.caption(f"Matches with rating to clear: {len(cleanup_matches)}")
+
+    with st.expander("Preview matching entries", expanded=False):
+        if cleanup_matches:
+            for row in cleanup_matches[:50]:
+                ts_local = datetime.datetime.fromisoformat(row["timestamp"]).astimezone(uk_tz)
+                row_cat_names = sorted(
+                    {
+                        category_name_by_id.get(activity_full_lookup.get(aid, {}).get("category_id"), "(uncategorized)")
+                        for aid in (row.get("activity_ids") or [])
                     }
-                    try:
-                        resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
-                        if resp.status_code == 200:
-                            clear_mood_cache()
-                            st.session_state["editing_entry_id"] = None
-                            st.session_state["mood_log_flash"] = f"Entry #{edit_id} updated."
-                            st.rerun()
-                        else:
-                            st.error(f"Update failed: {resp.status_code} {resp.text}")
-                    except Exception as exc:
-                        st.error(f"Update failed: {exc}")
-            with cancel_col:
-                if st.button("Cancel", use_container_width=True):
-                    st.session_state["editing_entry_id"] = None
-                    st.rerun()
+                )
+                st.write(
+                    f"#{row['id']} · {ts_local.strftime('%Y-%m-%d %H:%M')} · Mood {row.get('mood_score')} · "
+                    f"Categories: {', '.join(row_cat_names)}"
+                )
+            if len(cleanup_matches) > 50:
+                st.caption(f"Showing first 50 of {len(cleanup_matches)} matches.")
+        else:
+            st.caption("No matching rated entries found.")
 
+    if st.button("Clear Ratings for Matches", use_container_width=True, disabled=not cleanup_matches):
+        st.session_state["bulk_clear_rating_confirm"] = True
+        st.rerun()
+
+    if st.session_state.get("bulk_clear_rating_confirm"):
+        st.warning(f"Clear rating on {len(cleanup_matches)} matching entries?")
+        confirm_col, cancel_col = st.columns(2)
+        with confirm_col:
+            if st.button("Confirm Clear Ratings", use_container_width=True):
+                updated, failed = clear_ratings(cleanup_matches)
+                clear_mood_cache()
+                st.session_state["bulk_clear_rating_confirm"] = False
+                st.session_state["mood_log_flash"] = f"Rating cleanup complete: {updated} updated, {failed} failed."
+                st.rerun()
+        with cancel_col:
+            if st.button("Cancel Clear Ratings", use_container_width=True):
+                st.session_state["bulk_clear_rating_confirm"] = False
+                st.rerun()
 
 # Group entries by date
 grouped = {}
@@ -700,6 +865,83 @@ if sorted_days:
 
 if not sorted_days:
     st.markdown('<div class="empty-state">No mood entries yet. Add your first entry from Mood Entry.</div>', unsafe_allow_html=True)
+
+if st.session_state["editing_entry_id"] is not None:
+    edit_id = st.session_state["editing_entry_id"]
+    edit_entry = entry_lookup.get(edit_id)
+    if edit_entry is None:
+        st.session_state["editing_entry_id"] = None
+    else:
+        parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
+        st.markdown("---")
+        st.subheader(f"Edit Entry #{edit_id}")
+        edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
+        edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
+        
+        edit_activities = st.multiselect(
+            "Activities",
+            options=sorted(activity_lookup.keys()),
+            default=edit_entry.get("activity_ids", []),
+            format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
+            key=f"edit_acts_{edit_id}",
+        )
+        
+        # Determine if rating is required for edited activities
+        categories_lookup = {cat["id"]: cat for cat in categories_list}
+        any_require_rating = False
+        rating_labels = set()
+        
+        for activity_id in edit_activities:
+            activity = activity_full_lookup.get(activity_id)
+            if activity:
+                cat_id = activity.get("category_id")
+                cat = categories_lookup.get(cat_id)
+                if cat and cat.get("require_rating", 1):
+                    any_require_rating = True
+                    if cat.get("rating_label"):
+                        rating_labels.add(cat.get("rating_label"))
+        
+        rating_context = "Mood Score" if not rating_labels else list(rating_labels)[0]
+        
+        if any_require_rating or not edit_activities:
+            edit_score = st.radio(
+                rating_context,
+                options=[1, 2, 3, 4, 5],
+                horizontal=True,
+                key=f"edit_score_{edit_id}",
+                index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)) if edit_entry.get("mood_score") else 2,
+            )
+        else:
+            st.caption("Rating not required for selected activities.")
+            edit_score = None
+        
+        edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
+
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            if st.button("Save Changes", key=f"save_edit_{edit_id}", use_container_width=True):
+                new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
+                payload = {
+                    "mood_score": int(edit_score) if edit_score is not None else None,
+                    "notes": edit_notes,
+                    "timestamp": new_ts,
+                    "activity_ids": sorted(edit_activities),
+                }
+                try:
+                    resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
+                    if resp.status_code == 200:
+                        clear_mood_cache()
+                        st.session_state["editing_entry_id"] = None
+                        st.session_state["mood_log_flash"] = f"Entry #{edit_id} updated."
+                        st.rerun()
+                    else:
+                        st.error(f"Update failed: {resp.status_code} {resp.text}")
+                except Exception as exc:
+                    st.error(f"Update failed: {exc}")
+        with cancel_col:
+            if st.button("Cancel", key=f"cancel_edit_{edit_id}", use_container_width=True):
+                st.session_state["editing_entry_id"] = None
+                st.rerun()
 
 
 for day in sorted_days:
@@ -738,6 +980,7 @@ for day in sorted_days:
     for idx, (ts, e) in enumerate(day_entries):
         mood = e["mood_score"]
         mood_label, mood_bg = mood_meta(mood)
+        mood_class = mood_css_class(mood)
         notes = html.escape(e.get("notes") or "")
         activity_ids = e.get("activity_ids", [])
 
@@ -757,12 +1000,13 @@ for day in sorted_days:
         target_col = left_col if idx % 2 == 0 else right_col
         with target_col:
             with st.container(border=True):
+                st.markdown(f"<div class='mood-marker mood-marker-{mood_class}'></div>", unsafe_allow_html=True)
                 header_left, header_mid, header_right = st.columns([0.2, 0.66, 0.14], vertical_alignment="center")
                 with header_left:
                     st.markdown(f"<span class='time-tag'>{ts.strftime('%H:%M')}</span>", unsafe_allow_html=True)
                 with header_mid:
                     st.markdown(
-                        f"<div style='text-align:right;'><span class='mood-pill' style='background:{mood_bg};'>Mood {mood} · {mood_label}</span></div>",
+                        f"<div style='text-align:right;'><span class='mood-pill mood-pill-{mood_class}'>{mood_label if mood is None else f'Mood {mood} · {mood_label}'}</span></div>",
                         unsafe_allow_html=True,
                     )
                 with header_right:

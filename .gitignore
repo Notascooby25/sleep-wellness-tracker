@@ -39,7 +39,10 @@ backups/*.tar.gz
 # Compressed archives
 backend.tar
 frontend.tar
+*.tar
 *.tar.gz
+*.zip
+*.crdownload
 
 # Logs
 logs/*.err
