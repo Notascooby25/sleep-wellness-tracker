@@ -135,12 +135,22 @@ st.markdown(
 
 .mood-pill {
     border-radius: 999px;
-    padding: 0.42rem 0.98rem;
-    font-size: 0.94rem;
+    padding: 0.34rem 0.82rem;
+    font-size: 0.88rem;
     font-weight: 700;
     color: #20394f;
     white-space: nowrap;
     border: 1px solid rgba(33, 71, 101, 0.16);
+}
+
+.mood-pill-1 { background: #b8f0cf; }
+.mood-pill-2 { background: #d9efb3; }
+.mood-pill-3 { background: #fde58a; }
+.mood-pill-4 { background: #f7c597; }
+.mood-pill-5 { background: #f5a6a6; }
+
+.mood-marker {
+    display: none;
 }
 
 .entry-notes {
@@ -161,18 +171,18 @@ st.markdown(
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.38rem;
+    gap: 0.28rem;
     background: var(--chip-bg);
     color: var(--chip-text);
     border: 1px solid #b8cde7;
     border-radius: 999px;
-    padding: 0.28rem 0.8rem;
-    font-size: 0.9rem;
-    font-weight: 650;
+    padding: 0.2rem 0.58rem;
+    font-size: 0.82rem;
+    font-weight: 600;
 }
 
 .chip-dot {
-    font-size: 0.86rem;
+    font-size: 0.74rem;
     line-height: 1;
     opacity: 0.9;
 }
@@ -236,11 +246,11 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 }
 
 .entry-row-chips {
-    margin-top: 0.88rem;
-    margin-bottom: 0.28rem;
+    margin-top: 0.62rem;
+    margin-bottom: 0.16rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.42rem;
+    gap: 0.3rem;
 }
 
 .entry-row-actions button {
@@ -273,27 +283,27 @@ section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > 
 }
 
 /* Mood-tinted card backgrounds to match the soft reference look. */
-section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#b8f0cf"]) {
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-1) {
     background: #dcefe5 !important;
     border-color: #bdddcf !important;
 }
 
-section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#d9efb3"]) {
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-2) {
     background: #ebe8d6 !important;
     border-color: #ddd7bb !important;
 }
 
-section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#fde58a"]) {
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-3) {
     background: #ead9d0 !important;
     border-color: #dcc4b7 !important;
 }
 
-section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#f7c597"]) {
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-4) {
     background: #ecd6cb !important;
     border-color: #dbbfaf !important;
 }
 
-section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.entry-row-note):has(span[style*="background:#f5a6a6"]) {
+section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-5) {
     background: #efd1d1 !important;
     border-color: #deb6b6 !important;
 }
@@ -319,7 +329,18 @@ section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] di
     }
 
     .entry-row-chips {
-        margin-bottom: 0.32rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.16rem;
+        gap: 0.24rem;
+    }
+
+    .chip {
+        padding: 0.12rem 0.48rem;
+        font-size: 0.74rem;
+    }
+
+    .chip-dot {
+        font-size: 0.68rem;
     }
 }
 </style>
@@ -694,60 +715,6 @@ with st.sidebar:
                 st.session_state["bulk_delete_confirm"] = None
                 st.rerun()
 
-    if st.session_state["editing_entry_id"] is not None:
-        edit_id = st.session_state["editing_entry_id"]
-        edit_entry = entry_lookup.get(edit_id)
-        if edit_entry is None:
-            st.session_state["editing_entry_id"] = None
-        else:
-            parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
-            st.markdown("---")
-            st.subheader(f"Edit Entry #{edit_id}")
-            edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
-            edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
-            edit_score = st.radio(
-                "Mood",
-                options=[1, 2, 3, 4, 5],
-                horizontal=True,
-                key=f"edit_score_{edit_id}",
-                index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)),
-            )
-            edit_activities = st.multiselect(
-                "Activities",
-                options=sorted(activity_lookup.keys()),
-                default=edit_entry.get("activity_ids", []),
-                format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
-                key=f"edit_acts_{edit_id}",
-            )
-            edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
-
-            save_col, cancel_col = st.columns(2)
-            with save_col:
-                if st.button("Save Changes", use_container_width=True):
-                    new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
-                    payload = {
-                        "mood_score": int(edit_score),
-                        "notes": edit_notes,
-                        "timestamp": new_ts,
-                        "activity_ids": sorted(edit_activities),
-                    }
-                    try:
-                        resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
-                        if resp.status_code == 200:
-                            clear_mood_cache()
-                            st.session_state["editing_entry_id"] = None
-                            st.session_state["mood_log_flash"] = f"Entry #{edit_id} updated."
-                            st.rerun()
-                        else:
-                            st.error(f"Update failed: {resp.status_code} {resp.text}")
-                    except Exception as exc:
-                        st.error(f"Update failed: {exc}")
-            with cancel_col:
-                if st.button("Cancel", use_container_width=True):
-                    st.session_state["editing_entry_id"] = None
-                    st.rerun()
-
-
 # Group entries by date
 grouped = {}
 for e in entries:
@@ -768,6 +735,83 @@ if sorted_days:
 
 if not sorted_days:
     st.markdown('<div class="empty-state">No mood entries yet. Add your first entry from Mood Entry.</div>', unsafe_allow_html=True)
+
+if st.session_state["editing_entry_id"] is not None:
+    edit_id = st.session_state["editing_entry_id"]
+    edit_entry = entry_lookup.get(edit_id)
+    if edit_entry is None:
+        st.session_state["editing_entry_id"] = None
+    else:
+        parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
+        st.markdown("---")
+        st.subheader(f"Edit Entry #{edit_id}")
+        edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
+        edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
+        
+        edit_activities = st.multiselect(
+            "Activities",
+            options=sorted(activity_lookup.keys()),
+            default=edit_entry.get("activity_ids", []),
+            format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
+            key=f"edit_acts_{edit_id}",
+        )
+        
+        # Determine if rating is required for edited activities
+        categories_lookup = {cat["id"]: cat for cat in categories_list}
+        any_require_rating = False
+        rating_labels = set()
+        
+        for activity_id in edit_activities:
+            activity = activity_lookup.get(activity_id)
+            if activity:
+                cat_id = activity.get("category_id")
+                cat = categories_lookup.get(cat_id)
+                if cat and cat.get("require_rating", 1):
+                    any_require_rating = True
+                    if cat.get("rating_label"):
+                        rating_labels.add(cat.get("rating_label"))
+        
+        rating_context = "Mood Score" if not rating_labels else list(rating_labels)[0]
+        
+        if any_require_rating or not edit_activities:
+            edit_score = st.radio(
+                rating_context,
+                options=[1, 2, 3, 4, 5],
+                horizontal=True,
+                key=f"edit_score_{edit_id}",
+                index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)) if edit_entry.get("mood_score") else 2,
+            )
+        else:
+            st.caption("Rating not required for selected activities.")
+            edit_score = None
+        
+        edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
+
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            if st.button("Save Changes", key=f"save_edit_{edit_id}", use_container_width=True):
+                new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
+                payload = {
+                    "mood_score": int(edit_score) if edit_score is not None else None,
+                    "notes": edit_notes,
+                    "timestamp": new_ts,
+                    "activity_ids": sorted(edit_activities),
+                }
+                try:
+                    resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
+                    if resp.status_code == 200:
+                        clear_mood_cache()
+                        st.session_state["editing_entry_id"] = None
+                        st.session_state["mood_log_flash"] = f"Entry #{edit_id} updated."
+                        st.rerun()
+                    else:
+                        st.error(f"Update failed: {resp.status_code} {resp.text}")
+                except Exception as exc:
+                    st.error(f"Update failed: {exc}")
+        with cancel_col:
+            if st.button("Cancel", key=f"cancel_edit_{edit_id}", use_container_width=True):
+                st.session_state["editing_entry_id"] = None
+                st.rerun()
 
 
 for day in sorted_days:
@@ -825,12 +869,13 @@ for day in sorted_days:
         target_col = left_col if idx % 2 == 0 else right_col
         with target_col:
             with st.container(border=True):
+                st.markdown(f"<div class='mood-marker mood-marker-{mood}'></div>", unsafe_allow_html=True)
                 header_left, header_mid, header_right = st.columns([0.2, 0.66, 0.14], vertical_alignment="center")
                 with header_left:
                     st.markdown(f"<span class='time-tag'>{ts.strftime('%H:%M')}</span>", unsafe_allow_html=True)
                 with header_mid:
                     st.markdown(
-                        f"<div style='text-align:right;'><span class='mood-pill' style='background:{mood_bg};'>Mood {mood} · {mood_label}</span></div>",
+                        f"<div style='text-align:right;'><span class='mood-pill mood-pill-{mood}'>Mood {mood} · {mood_label}</span></div>",
                         unsafe_allow_html=True,
                     )
                 with header_right:
