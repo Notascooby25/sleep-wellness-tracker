@@ -1,9 +1,10 @@
+import os
 import streamlit as st
 import requests
 import datetime
 from zoneinfo import ZoneInfo
 
-API_BASE = "http://backend:8000"
+API_BASE = os.getenv("API_BASE", "http://backend:8000")
 
 st.set_page_config(page_title="Mood Entry", layout="wide")
 
@@ -18,6 +19,7 @@ def fmt_minutes(total_minutes):
 def reset_entry_form_state():
     for k in ["entry_date", "entry_time", "mood_score", "notes"]:
         st.session_state.pop(k, None)
+    st.session_state["notes"] = ""
     st.session_state["selected_activities"] = set()
     for key in list(st.session_state.keys()):
         if key.startswith("act_") or key.startswith("pill_cat_"):
@@ -27,6 +29,9 @@ def reset_entry_form_state():
 if st.session_state.get("reset_form", False):
     reset_entry_form_state()
     st.session_state["reset_form"] = False
+
+if "entry_flash" not in st.session_state:
+    st.session_state["entry_flash"] = None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -99,10 +104,32 @@ activities = load_activities()
 if "mood_entry_last_load_error" not in st.session_state:
     st.session_state["mood_entry_last_load_error"] = ""
 
+activity_lookup = {a["id"]: a for a in activities}
 activities_by_cat = {}
 for a in activities:
     cid = a.get("category_id")
     activities_by_cat.setdefault(cid, []).append(a)
+
+categories_lookup = {cat["id"]: cat for cat in categories}
+
+def get_selected_category_info():
+    """Determine if rating is required based on selected activities."""
+    any_require_rating = False
+    rating_labels = set()
+    
+    for activity_id in st.session_state.selected_activities:
+        activity = activity_lookup.get(activity_id)
+        if not activity:
+            continue
+        cat_id = activity.get("category_id")
+        cat = categories_lookup.get(cat_id)
+        if cat and cat.get("require_rating", 1):
+            any_require_rating = True
+            if cat.get("rating_label"):
+                rating_labels.add(cat.get("rating_label"))
+    
+    context_label = "Mood Score" if not rating_labels else list(rating_labels)[0]
+    return any_require_rating, context_label
 
 st.markdown(
     """
@@ -296,6 +323,12 @@ if st.session_state["garmin_flash"]:
     st.info(st.session_state["garmin_flash"])
     st.session_state["garmin_flash"] = None
 
+if st.session_state["entry_flash"]:
+    st.success(st.session_state["entry_flash"])
+    if hasattr(st, "toast"):
+        st.toast(st.session_state["entry_flash"], icon="✅")
+    st.session_state["entry_flash"] = None
+
 st.markdown(
     """
 <div class="hero">
@@ -361,6 +394,7 @@ with garmin_sync_col:
             st.error(f"Garmin sync failed: {exc}")
 
 st.session_state.setdefault("mood_score", 3)
+st.session_state.setdefault("rating_required", True)
 
 MOOD_COLOURS = {
     1: "#2ecc71",  # great
@@ -468,12 +502,20 @@ div[data-testid="stRadio"] [role="radiogroup"] label:has(input[value="5"]) {
 
 /* Selected state */
 div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) {
-    box-shadow: 0 0 0 2px rgba(19,34,56,0.22) !important;
-    transform: translateY(-1px) !important;
+    box-shadow: 0 0 0 3px rgba(19,34,56,0.38), 0 8px 16px rgba(19, 34, 56, 0.18) !important;
+    transform: translateY(-1px) scale(1.02) !important;
 }
 
 div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked) > div:last-child {
     font-weight: 800 !important;
+}
+
+div[data-testid="stRadio"] [role="radiogroup"] label:has(input[type="radio"]:checked)::after {
+    content: "✓";
+    margin-left: 0.35rem;
+    font-weight: 900;
+    font-size: 0.9rem;
+    line-height: 1;
 }
 
 @media (max-width: 520px) {
@@ -508,14 +550,19 @@ div[data-testid="stPopover"] button {
     unsafe_allow_html=True,
 )
 
-# Mood score title with info popover
-mood_title_col, mood_info_col = st.columns([0.88, 0.12])
-with mood_title_col:
-    st.markdown('<div class="section-title">Mood Score</div>', unsafe_allow_html=True)
-with mood_info_col:
-    with st.popover("Info"):
-        st.markdown(
-            """
+# Determine if rating is required based on selected activities
+rating_required, rating_context = get_selected_category_info()
+st.session_state["rating_required"] = rating_required
+
+if rating_required or not st.session_state.selected_activities:
+    mood_title_col, mood_info_col = st.columns([0.88, 0.12])
+    with mood_title_col:
+        st.markdown(f'<div class="section-title">{rating_context}</div>', unsafe_allow_html=True)
+    with mood_info_col:
+        if rating_context == "Mood Score":
+            with st.popover("Info"):
+                st.markdown(
+                    """
 **Mood scoring guide**
 
 | Score | Meaning |
@@ -526,16 +573,38 @@ with mood_info_col:
 | 🟠 **4** | Low — below average |
 | 🔴 **5** | Rubbish — really struggling |
 """
-        )
+                )
+        elif rating_context == "Pain/Discomfort Level":
+            with st.popover("Info"):
+                st.markdown(
+                    """
+**Pain/Discomfort scoring guide**
 
-mood_score = st.radio(
-    "Mood Score",
-    options=[1, 2, 3, 4, 5],
-    format_func=lambda x: f"{x}",
-    horizontal=True,
-    key="mood_score",
-    label_visibility="collapsed",
-)
+| Score | Level |
+|-------|-------|
+| 🟢 **1** | None — no pain or discomfort |
+| 🟡 **2** | Mild — barely noticeable |
+| 🟡 **3** | Moderate — noticeable but manageable |
+| 🟠 **4** | Significant — affecting activities |
+| 🔴 **5** | Severe — limiting or overwhelming |
+"""
+                )
+
+    mood_score = st.radio(
+        rating_context,
+        options=[1, 2, 3, 4, 5],
+        format_func=lambda x: f"{x}",
+        horizontal=True,
+        key="mood_score",
+        label_visibility="collapsed",
+    )
+    st.caption(f"Selected {rating_context.lower()}: {mood_score}")
+else:
+    st.markdown(
+        '<div class="section-title" style="color: #7d8ea4; font-weight: 500; font-size: 0.95rem;">Rating not required for selected activities.</div>',
+        unsafe_allow_html=True,
+    )
+    mood_score = None
 
 st.markdown('<div class="section-title">Activities</div>', unsafe_allow_html=True)
 count_col, clear_col = st.columns([0.78, 0.22])
@@ -639,8 +708,8 @@ if st.button("Save Entry", type="primary", use_container_width=True):
     try:
         r = requests.post(f"{API_BASE}/mood/", json=payload, timeout=4)
         if r.status_code in (200, 201):
-            st.success("Mood entry saved")
             st.session_state["reset_form"] = True
+            st.session_state["entry_flash"] = "Mood entry saved successfully."
             st.rerun()
         else:
             st.error(f"Error: {r.status_code} {r.text}")
