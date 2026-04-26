@@ -27,12 +27,19 @@ def create_activity(payload: schemas.ActivityCreate, db: Session = Depends(get_d
     return new_act
 
 @router.put("/{activity_id}", response_model=schemas.ActivityResponse)
-def update_activity(activity_id: int, payload: schemas.ActivityCreate, db: Session = Depends(get_db)):
+def update_activity(activity_id: int, payload: schemas.ActivityUpdate, db: Session = Depends(get_db)):
     act = db.query(models.Activity).filter(models.Activity.id == activity_id).first()
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found")
-    act.name = payload.name
-    act.category_id = payload.category_id
+
+    if "name" in payload.model_fields_set:
+        if payload.name is None or not payload.name.strip():
+            raise HTTPException(status_code=400, detail="Activity name cannot be empty")
+        act.name = payload.name.strip()
+
+    if "category_id" in payload.model_fields_set:
+        act.category_id = payload.category_id
+
     db.commit()
     db.refresh(act)
     return act

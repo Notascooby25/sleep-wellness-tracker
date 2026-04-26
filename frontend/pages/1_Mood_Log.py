@@ -148,6 +148,7 @@ st.markdown(
 .mood-pill-3 { background: #fde58a; }
 .mood-pill-4 { background: #f7c597; }
 .mood-pill-5 { background: #f5a6a6; }
+.mood-pill-none { background: #dfe7f2; }
 
 .mood-marker {
     display: none;
@@ -370,7 +371,15 @@ MOOD_META = {
 
 
 def mood_meta(score):
+    if score is None:
+        return ("No rating", "#dfe7f2")
     return MOOD_META.get(score, (f"{score}", "#d1d5db"))
+
+
+def mood_css_class(score):
+    if score in {1, 2, 3, 4, 5}:
+        return str(score)
+    return "none"
 
 
 if "open_entry_menu_id" not in st.session_state:
@@ -414,9 +423,13 @@ def parse_activity_ids(value):
 def normalize_import_rows(rows):
     normalized = []
     for row in rows:
-        score = int(row.get("mood_score"))
-        if score < 1 or score > 5:
-            raise ValueError("mood_score must be between 1 and 5")
+        raw_score = row.get("mood_score")
+        if raw_score in (None, "", "null"):
+            score = None
+        else:
+            score = int(raw_score)
+            if score < 1 or score > 5:
+                raise ValueError("mood_score must be between 1 and 5, or empty")
 
         normalized.append(
             {
@@ -440,7 +453,7 @@ def entry_signature(row):
         normalized_ts = parse_timestamp(timestamp_value)
 
     return (
-        int(row.get("mood_score")),
+        None if row.get("mood_score") is None else int(row.get("mood_score")),
         normalized_notes,
         normalized_ts,
         tuple(sorted(int(aid) for aid in row.get("activity_ids", []))),
@@ -554,6 +567,8 @@ if "mood_log_flash" not in st.session_state:
     st.session_state["mood_log_flash"] = None
 if "bulk_delete_confirm" not in st.session_state:
     st.session_state["bulk_delete_confirm"] = None
+if "bulk_clear_rating_confirm" not in st.session_state:
+    st.session_state["bulk_clear_rating_confirm"] = False
 
 
 toolbar_col, refresh_col = st.columns([0.8, 0.2])
@@ -570,7 +585,63 @@ categories_list = load_categories()
 activities_list = load_activities()
 activity_lookup = {a["id"]: a["name"] for a in activities_list}
 activity_full_lookup = {a["id"]: a for a in activities_list}  # Full activity objects with category_id
+category_name_by_id = {c["id"]: c["name"] for c in categories_list}
+category_id_by_name = {c["name"]: c["id"] for c in categories_list}
 entry_lookup = {e["id"]: e for e in entries}
+
+
+def matching_entries_for_rating_clear(target_category_ids, include_mixed=False):
+    matches = []
+    if not target_category_ids:
+        return matches
+
+    for entry in entries:
+        if entry.get("mood_score") is None:
+            continue
+
+        activity_ids = entry.get("activity_ids") or []
+        if not activity_ids:
+            continue
+
+        entry_category_ids = {
+            activity_full_lookup.get(aid, {}).get("category_id")
+            for aid in activity_ids
+            if activity_full_lookup.get(aid, {}).get("category_id") is not None
+        }
+
+        if not entry_category_ids:
+            continue
+
+        if include_mixed:
+            is_match = bool(entry_category_ids.intersection(target_category_ids))
+        else:
+            is_match = entry_category_ids.issubset(target_category_ids)
+
+        if is_match:
+            matches.append(entry)
+
+    return matches
+
+
+def clear_ratings(entry_rows):
+    updated = 0
+    failed = 0
+    for row in entry_rows:
+        payload = {
+            "mood_score": None,
+            "notes": row.get("notes"),
+            "timestamp": row.get("timestamp"),
+            "activity_ids": row.get("activity_ids", []),
+        }
+        try:
+            resp = requests.put(f"{API_BASE}/mood/{row['id']}", json=payload, timeout=4)
+            if resp.status_code == 200:
+                updated += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    return updated, failed
 
 
 if st.session_state["mood_log_flash"]:
@@ -716,6 +787,64 @@ with st.sidebar:
                 st.session_state["bulk_delete_confirm"] = None
                 st.rerun()
 
+    st.markdown("---")
+    st.subheader("Bulk Rating Cleanup")
+    cleanup_default_names = [
+        name for name in ["Lifestyle", "Before Sleep", "During Sleep"] if name in category_id_by_name
+    ]
+    cleanup_target_names = st.multiselect(
+        "Categories to disassociate rating from",
+        options=sorted(category_id_by_name.keys()),
+        default=cleanup_default_names,
+    )
+    cleanup_include_mixed = st.checkbox(
+        "Include entries that also contain other categories",
+        value=False,
+        help="Off = only clear entries where all selected activities are in the chosen categories.",
+    )
+
+    cleanup_target_ids = {category_id_by_name[name] for name in cleanup_target_names}
+    cleanup_matches = matching_entries_for_rating_clear(cleanup_target_ids, include_mixed=cleanup_include_mixed)
+    st.caption(f"Matches with rating to clear: {len(cleanup_matches)}")
+
+    with st.expander("Preview matching entries", expanded=False):
+        if cleanup_matches:
+            for row in cleanup_matches[:50]:
+                ts_local = datetime.datetime.fromisoformat(row["timestamp"]).astimezone(uk_tz)
+                row_cat_names = sorted(
+                    {
+                        category_name_by_id.get(activity_full_lookup.get(aid, {}).get("category_id"), "(uncategorized)")
+                        for aid in (row.get("activity_ids") or [])
+                    }
+                )
+                st.write(
+                    f"#{row['id']} · {ts_local.strftime('%Y-%m-%d %H:%M')} · Mood {row.get('mood_score')} · "
+                    f"Categories: {', '.join(row_cat_names)}"
+                )
+            if len(cleanup_matches) > 50:
+                st.caption(f"Showing first 50 of {len(cleanup_matches)} matches.")
+        else:
+            st.caption("No matching rated entries found.")
+
+    if st.button("Clear Ratings for Matches", use_container_width=True, disabled=not cleanup_matches):
+        st.session_state["bulk_clear_rating_confirm"] = True
+        st.rerun()
+
+    if st.session_state.get("bulk_clear_rating_confirm"):
+        st.warning(f"Clear rating on {len(cleanup_matches)} matching entries?")
+        confirm_col, cancel_col = st.columns(2)
+        with confirm_col:
+            if st.button("Confirm Clear Ratings", use_container_width=True):
+                updated, failed = clear_ratings(cleanup_matches)
+                clear_mood_cache()
+                st.session_state["bulk_clear_rating_confirm"] = False
+                st.session_state["mood_log_flash"] = f"Rating cleanup complete: {updated} updated, {failed} failed."
+                st.rerun()
+        with cancel_col:
+            if st.button("Cancel Clear Ratings", use_container_width=True):
+                st.session_state["bulk_clear_rating_confirm"] = False
+                st.rerun()
+
 # Group entries by date
 grouped = {}
 for e in entries:
@@ -851,6 +980,7 @@ for day in sorted_days:
     for idx, (ts, e) in enumerate(day_entries):
         mood = e["mood_score"]
         mood_label, mood_bg = mood_meta(mood)
+        mood_class = mood_css_class(mood)
         notes = html.escape(e.get("notes") or "")
         activity_ids = e.get("activity_ids", [])
 
@@ -870,13 +1000,13 @@ for day in sorted_days:
         target_col = left_col if idx % 2 == 0 else right_col
         with target_col:
             with st.container(border=True):
-                st.markdown(f"<div class='mood-marker mood-marker-{mood}'></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='mood-marker mood-marker-{mood_class}'></div>", unsafe_allow_html=True)
                 header_left, header_mid, header_right = st.columns([0.2, 0.66, 0.14], vertical_alignment="center")
                 with header_left:
                     st.markdown(f"<span class='time-tag'>{ts.strftime('%H:%M')}</span>", unsafe_allow_html=True)
                 with header_mid:
                     st.markdown(
-                        f"<div style='text-align:right;'><span class='mood-pill mood-pill-{mood}'>Mood {mood} · {mood_label}</span></div>",
+                        f"<div style='text-align:right;'><span class='mood-pill mood-pill-{mood_class}'>{mood_label if mood is None else f'Mood {mood} · {mood_label}'}</span></div>",
                         unsafe_allow_html=True,
                     )
                 with header_right:

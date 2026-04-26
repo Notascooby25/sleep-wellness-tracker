@@ -69,6 +69,11 @@ class ActivityBase(BaseModel):
 class ActivityCreate(ActivityBase):
     pass
 
+
+class ActivityUpdate(BaseModel):
+    name: Optional[str] = None
+    category_id: Optional[int] = None
+
 class ActivityResponse(ActivityBase):
     id: int
 
