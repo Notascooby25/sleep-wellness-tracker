@@ -28,6 +28,8 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
+    require_rating = Column(Integer, nullable=False, default=1)  # 1=true (required), 0=false (optional)
+    rating_label = Column(String(80), nullable=True)  # e.g., "Pain/Discomfort Level", "Mood"
 
     activities = relationship("Activity", back_populates="category", cascade="all, delete-orphan")
 
@@ -45,7 +47,7 @@ class Mood(Base):
     __tablename__ = "moods"
 
     id = Column(Integer, primary_key=True, index=True)
-    mood_score = Column(Integer, nullable=False)
+    mood_score = Column(Integer, nullable=True)  # Nullable to support optional ratings
     notes = Column(Text, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

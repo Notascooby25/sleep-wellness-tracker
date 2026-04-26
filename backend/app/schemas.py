@@ -7,7 +7,7 @@ from datetime import datetime
 # -------------------------
 
 class MoodBase(BaseModel):
-    mood_score: int
+    mood_score: Optional[int] = None  # Optional to support categories that don't require rating
     notes: Optional[str] = None
     timestamp: datetime
     activity_ids: Optional[List[int]] = Field(default_factory=list)
@@ -46,10 +46,13 @@ class CategoryBase(BaseModel):
     name: str
 
 class CategoryCreate(CategoryBase):
-    pass
+    require_rating: int = 1
+    rating_label: Optional[str] = None
 
 class CategoryResponse(CategoryBase):
     id: int
+    require_rating: int
+    rating_label: Optional[str] = None
 
     class Config:
         from_attributes = True
