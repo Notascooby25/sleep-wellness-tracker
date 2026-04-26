@@ -1,0 +1,48 @@
+name: Build AMD64 Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-amd64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend (AMD64)
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t sleep-wellness-tracker-backend:latest \
+            -f backend/Dockerfile \
+            backend \
+            --output type=docker,dest=backend-amd64.tar
+
+      - name: Build frontend (AMD64)
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t sleep-wellness-tracker-frontend:latest \
+            -f frontend/Dockerfile \
+            frontend \
+            --output type=docker,dest=frontend-amd64.tar
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-amd64
+          path: backend-amd64.tar
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-amd64
+          path: frontend-amd64.tar
