@@ -569,6 +569,7 @@ entries = load_entries()
 categories_list = load_categories()
 activities_list = load_activities()
 activity_lookup = {a["id"]: a["name"] for a in activities_list}
+activity_full_lookup = {a["id"]: a for a in activities_list}  # Full activity objects with category_id
 entry_lookup = {e["id"]: e for e in entries}
 
 
@@ -762,7 +763,7 @@ if st.session_state["editing_entry_id"] is not None:
         rating_labels = set()
         
         for activity_id in edit_activities:
-            activity = activity_lookup.get(activity_id)
+            activity = activity_full_lookup.get(activity_id)
             if activity:
                 cat_id = activity.get("category_id")
                 cat = categories_lookup.get(cat_id)
