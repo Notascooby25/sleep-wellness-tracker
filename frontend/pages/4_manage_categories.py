@@ -90,26 +90,56 @@ else:
     for c in categories:
         st.markdown(f"### {c['name']} (ID {c['id']})")
 
-        col1, col2 = st.columns(2)
+        with st.expander("Edit Details", expanded=False):
+            col1, col2 = st.columns(2)
 
-        # Rename
-        with col1:
-            new_name = st.text_input(f"Rename {c['name']}", key=f"rename_{c['id']}")
-            if st.button(f"Save {c['id']}", key=f"save_{c['id']}"):
-                if new_name.strip():
-                    resp = put_json(f"/categories/{c['id']}", {"name": new_name})
+            # Rename
+            with col1:
+                new_name = st.text_input(f"Category name", value=c.get("name", ""), key=f"rename_{c['id']}")
+
+            # Rating requirement
+            with col2:
+                require_rating = st.checkbox(
+                    "Require rating?",
+                    value=bool(c.get("require_rating", 1)),
+                    key=f"require_rating_{c['id']}",
+                    help="If disabled, mood entry will show 'Rating not required' for activities in this category."
+                )
+
+            # Rating label (context-dependent)
+            rating_label = st.text_input(
+                "Rating label (optional)",
+                value=c.get("rating_label") or "",
+                placeholder="e.g., 'Pain/Discomfort Level', 'Prep Quality'",
+                key=f"rating_label_{c['id']}",
+                help="Shows this label instead of 'Mood Score'. Leave empty to use 'Mood Score'."
+            )
+
+            # Save button
+            save_col, delete_col = st.columns(2)
+            with save_col:
+                if st.button(f"Save Changes", key=f"save_{c['id']}", use_container_width=True):
+                    if new_name.strip():
+                        payload = {
+                            "name": new_name.strip(),
+                            "require_rating": 1 if require_rating else 0,
+                            "rating_label": rating_label.strip() if rating_label.strip() else None,
+                        }
+                        resp = put_json(f"/categories/{c['id']}", payload)
+                        if resp and resp.ok:
+                            st.success("Updated.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to update.")
+                    else:
+                        st.warning("Name cannot be empty.")
+
+            # Delete
+            with delete_col:
+                if st.button(f"Delete Category", key=f"delete_{c['id']}", use_container_width=True):
+                    resp = delete(f"/categories/{c['id']}")
                     if resp and resp.ok:
-                        st.success("Updated.")
+                        st.success("Deleted.")
                         st.rerun()
                     else:
-                        st.error("Failed to update.")
-
-        # Delete
-        with col2:
-            if st.button(f"Delete {c['id']}", key=f"delete_{c['id']}"):
-                resp = delete(f"/categories/{c['id']}")
-                if resp and resp.ok:
-                    st.success("Deleted.")
-                    st.rerun()
-                else:
-                    st.error("Failed to delete.")
+                        st.error("Failed to delete.")

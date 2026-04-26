@@ -25,7 +25,11 @@ def create_category(payload: schemas.CategoryCreate, db: Session = Depends(get_d
     existing = db.query(models.Category).filter(models.Category.name == payload.name).first()
     if existing:
         return existing
-    new_cat = models.Category(name=payload.name)
+    new_cat = models.Category(
+        name=payload.name,
+        require_rating=payload.require_rating,
+        rating_label=payload.rating_label,
+    )
     db.add(new_cat)
     db.commit()
     db.refresh(new_cat)
@@ -37,6 +41,8 @@ def update_category(category_id: int, payload: schemas.CategoryCreate, db: Sessi
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     cat.name = payload.name
+    cat.require_rating = payload.require_rating
+    cat.rating_label = payload.rating_label
     db.commit()
     db.refresh(cat)
     return cat
