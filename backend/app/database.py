@@ -2,7 +2,7 @@
 import logging
 import os
 import time
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from .models import Base
@@ -40,6 +40,45 @@ wait_for_db()
 
 logger.info("Running create_all to ensure all tables exist...")
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_legacy_schema_compatibility() -> None:
+    """Patch older databases with columns introduced after initial deployment."""
+    inspector = inspect(engine)
+    dialect = engine.dialect.name
+
+    if not inspector.has_table("categories"):
+        return
+
+    category_columns = {col["name"] for col in inspector.get_columns("categories")}
+    mood_columns = {col["name"]: col for col in inspector.get_columns("moods")} if inspector.has_table("moods") else {}
+
+    with engine.begin() as conn:
+        if "require_rating" not in category_columns:
+            logger.warning("Adding missing categories.require_rating column for legacy database")
+            conn.execute(
+                text("ALTER TABLE categories ADD COLUMN require_rating INTEGER NOT NULL DEFAULT 1")
+            )
+
+        if "rating_label" not in category_columns:
+            logger.warning("Adding missing categories.rating_label column for legacy database")
+            conn.execute(
+                text("ALTER TABLE categories ADD COLUMN rating_label VARCHAR(80)")
+            )
+
+        mood_score_col = mood_columns.get("mood_score")
+        if mood_score_col and mood_score_col.get("nullable") is False:
+            if dialect == "postgresql":
+                logger.warning("Dropping NOT NULL on moods.mood_score for optional ratings")
+                conn.execute(text("ALTER TABLE moods ALTER COLUMN mood_score DROP NOT NULL"))
+            else:
+                logger.warning(
+                    "moods.mood_score is NOT NULL, but automatic nullable migration is unsupported for dialect=%s",
+                    dialect,
+                )
+
+
+_ensure_legacy_schema_compatibility()
 logger.info("Database tables verified.")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
