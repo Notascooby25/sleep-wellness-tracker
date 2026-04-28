@@ -69,6 +69,13 @@ st.markdown(
     padding-bottom: 0.3rem;
 }
 
+.section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
 @media (max-width: 860px) {
     .block-container { padding-left: 0.75rem; padding-right: 0.75rem; padding-top: 0.95rem; }
     .hero h1 { font-size: 1.5rem; }
@@ -87,6 +94,15 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+
+def section_header(title: str, help_text: str):
+    title_col, help_col = st.columns([0.92, 0.08])
+    with title_col:
+        st.markdown(f"<div class='section-heading'>{title}</div>", unsafe_allow_html=True)
+    with help_col:
+        with st.popover("Info"):
+            st.markdown(help_text)
 
 # ── Date range controls ──────────────────────────────────────────────────────
 today = datetime.datetime.now(UK_TZ).date()
@@ -114,6 +130,23 @@ if preset != "Custom":
 start_iso = start_date.isoformat()
 end_iso = end_date.isoformat()
 num_days = (end_date - start_date).days + 1
+
+view_col1, view_col2 = st.columns([0.45, 0.55])
+with view_col1:
+    analytics_view_mode = st.radio(
+        "Display",
+        options=["Core", "Core + one extra"],
+        horizontal=True,
+        key="analytics_view_mode",
+    )
+with view_col2:
+    extra_section = st.radio(
+        "Extra section",
+        options=["Recovery Metrics", "Mood Distribution", "Activity Log"],
+        horizontal=True,
+        key="analytics_extra_section",
+        disabled=analytics_view_mode != "Core + one extra",
+    )
 
 
 # ── Data loading ─────────────────────────────────────────────────────────────
@@ -215,7 +248,10 @@ for entry in mood_entries:
 daily_avg_mood = {d: sum(v) / len(v) for d, v in daily_mood.items()}
 
 # ── Summary KPI cards ─────────────────────────────────────────────────────────
-st.markdown("<div class='section-heading'>Summary</div>", unsafe_allow_html=True)
+section_header(
+    "Summary",
+    "High-level snapshot for the selected date range: how many entries/sleep days you have, and average mood/sleep/recovery values.",
+)
 
 total_entries = len([e for e in mood_entries if e.get("mood_score") is not None])
 rated_scores = [e["mood_score"] for e in mood_entries if e.get("mood_score") is not None]
@@ -256,7 +292,10 @@ for col, (label, value, sub) in zip(kpi_cols, stats):
 
 # ── Mood trend chart ──────────────────────────────────────────────────────────
 if daily_avg_mood:
-    st.markdown("<div class='section-heading'>Mood Trend</div>", unsafe_allow_html=True)
+    section_header(
+        "Mood Trend",
+        "Daily average mood score over time. Lower is better: 1 is great, 5 is struggling.",
+    )
     import pandas as pd
 
     all_days = [
@@ -305,7 +344,10 @@ else:
 # ── Sleep + Mood correlation ──────────────────────────────────────────────────
 sleep_and_mood_dates = sorted(set(sleep_rows.keys()) & set(daily_avg_mood.keys()))
 if len(sleep_and_mood_dates) >= 3:
-    st.markdown("<div class='section-heading'>Sleep vs Mood</div>", unsafe_allow_html=True)
+    section_header(
+        "Sleep vs Mood",
+        "Compares sleep score and sleep duration against daily mood. Use it to spot whether better sleep tends to line up with better mood.",
+    )
     import pandas as pd
 
     sm_records = []
@@ -334,8 +376,12 @@ if len(sleep_and_mood_dates) >= 3:
             st.line_chart(dur_df, use_container_width=True, height=200)
 
 # ── HRV + Body Battery trend ──────────────────────────────────────────────────
-if hrv_rows or body_rows:
-    st.markdown("<div class='section-heading'>Recovery Metrics</div>", unsafe_allow_html=True)
+show_recovery = analytics_view_mode == "Core + one extra" and extra_section == "Recovery Metrics"
+if show_recovery and (hrv_rows or body_rows):
+    section_header(
+        "Recovery Metrics",
+        "Recovery-only panel. HRV trend and end-of-day body battery trend across the selected period.",
+    )
     import pandas as pd
 
     all_days = [(start_date + datetime.timedelta(days=i)).isoformat() for i in range(num_days)]
@@ -364,8 +410,12 @@ if hrv_rows or body_rows:
             st.caption("No body battery data in this range.")
 
 # ── Mood score distribution ───────────────────────────────────────────────────
-if rated_scores:
-    st.markdown("<div class='section-heading'>Mood Distribution</div>", unsafe_allow_html=True)
+show_distribution = analytics_view_mode == "Core + one extra" and extra_section == "Mood Distribution"
+if show_distribution and rated_scores:
+    section_header(
+        "Mood Distribution",
+        "How often each mood score appears, plus average mood by hour of day to highlight time-of-day patterns.",
+    )
     import pandas as pd
 
     from collections import Counter
@@ -412,8 +462,12 @@ if rated_scores:
             st.bar_chart(hod_df, use_container_width=True, height=220)
 
 # ── Top activities ─────────────────────────────────────────────────────────────
-if mood_entries and activity_name_map:
-    st.markdown("<div class='section-heading'>Activity Log</div>", unsafe_allow_html=True)
+show_activity_log = analytics_view_mode == "Core + one extra" and extra_section == "Activity Log"
+if show_activity_log and mood_entries and activity_name_map:
+    section_header(
+        "Activity Log",
+        "Most logged activities and the average mood score on entries where each activity was present.",
+    )
 
     activity_count: Counter = Counter()
     activity_mood_scores: dict = defaultdict(list)
@@ -457,14 +511,13 @@ if mood_entries and activity_name_map:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ── Before/During Sleep activities → next-night sleep impact ─────────────────
-# Load a wider window for sleep data so we can match evening entries to next morning's sleep.
-# We extend the sleep lookup one day beyond end_date to capture the night following the last day.
+# ── Before/During Sleep activities → sleep impact ─────────────────────────────
+# Load a slightly wider window for sleep data so edge dates still match cleanly.
 _sleep_ext_end = (end_date + datetime.timedelta(days=1)).isoformat()
 sleep_rows_ext = load_garmin_range("sleep", start_iso, _sleep_ext_end)
 
 # Build per-night activity sets for sleep-category entries.
-# Entry on evening of date D → sleep record for date D+1 (Garmin records the wake morning).
+# Entry logged on wakeup morning date D maps to Garmin sleep record date D.
 night_activities: dict = defaultdict(set)  # {sleep_date_iso: {activity_name, ...}}
 
 for entry in mood_entries_all:
@@ -491,7 +544,11 @@ if sleep_cat_ids and annotated_nights:
     import pandas as pd
     from collections import Counter
 
-    st.markdown("<div class='section-heading'>Before/During Sleep Activities & Sleep Quality</div>", unsafe_allow_html=True)
+    section_header(
+        "Before/During Sleep Activities & Sleep Quality",
+        "Links activities logged in Before Sleep / During Sleep categories to that same morning's Garmin sleep record. "
+        "'With' means nights where the activity was logged, and 'baseline' means nights where it was not logged.",
+    )
     st.caption(
         "Each night where you logged Before Sleep or During Sleep activities is matched to "
         "the Garmin sleep data for that night. Averages are shown per activity — nights without "
@@ -585,7 +642,11 @@ if sleep_cat_ids and annotated_nights:
 
             # ── Night-by-night timeline for a selected activity ─────────
             if len(all_sleep_acts) > 0:
-                st.markdown("**Night-by-night timeline for a specific activity**")
+                st.markdown("**Selected activity trend (night by night)**")
+                st.caption(
+                    "This compares nights where the selected activity appears versus nights it does not, "
+                    "so you can see whether it tends to align with better or worse sleep outcomes."
+                )
                 selected_act = st.selectbox(
                     "Select activity",
                     options=all_sleep_acts,
@@ -604,32 +665,47 @@ if sleep_cat_ids and annotated_nights:
                     if not s:
                         continue
                     had_act = selected_act in night_activities.get(d, set())
+                    score_value = s.get("sleep_score")
+                    total_sleep_h = round(s["total_sleep_minutes"] / 60, 2) if s.get("total_sleep_minutes") else None
                     timeline_rows.append({
                         "Date": pd.to_datetime(d),
-                        "Sleep score": s.get("sleep_score"),
-                        "Total sleep (h)": round(s["total_sleep_minutes"] / 60, 2) if s.get("total_sleep_minutes") else None,
+                        "Sleep score (with activity)": score_value if had_act else None,
+                        "Sleep score (other nights)": score_value if not had_act else None,
+                        "Total sleep (h) with activity": total_sleep_h if had_act else None,
+                        "Total sleep (h) other nights": total_sleep_h if not had_act else None,
                         "Deep sleep (h)": round(s["deep_sleep_minutes"] / 60, 2) if s.get("deep_sleep_minutes") else None,
-                        "Activity logged": 1 if had_act else 0,
                     })
                 if timeline_rows:
                     tl_df = pd.DataFrame(timeline_rows).set_index("Date")
+
+                    with_nights = int(tl_df["Sleep score (with activity)"].notna().sum())
+                    other_nights = int(tl_df["Sleep score (other nights)"].notna().sum())
+                    stats_col1, stats_col2 = st.columns(2)
+                    with stats_col1:
+                        st.metric("Nights with selected activity", with_nights)
+                    with stats_col2:
+                        st.metric("Other nights", other_nights)
+
                     tl_col1, tl_col2 = st.columns(2)
                     with tl_col1:
-                        score_tl = tl_df[["Sleep score", "Activity logged"]].dropna(subset=["Sleep score"])
+                        score_tl = tl_df[["Sleep score (with activity)", "Sleep score (other nights)"]]
                         if not score_tl.empty:
-                            st.caption("Sleep score over time — bar = night activity was logged (1=yes)")
+                            st.caption("Sleep score over time: selected activity nights vs other nights")
                             st.line_chart(score_tl, use_container_width=True, height=220)
                     with tl_col2:
-                        deep_tl = tl_df[["Deep sleep (h)", "Total sleep (h)"]].dropna(subset=["Total sleep (h)"])
+                        deep_tl = tl_df[["Total sleep (h) with activity", "Total sleep (h) other nights", "Deep sleep (h)"]]
                         if not deep_tl.empty:
-                            st.caption("Sleep duration & deep sleep over time")
+                            st.caption("Sleep duration/deep sleep over time")
                             st.line_chart(deep_tl, use_container_width=True, height=220)
         else:
             st.info("Not enough annotated nights with Garmin data to compare yet.")
     else:
         st.info("No annotated nights with Garmin sleep data found for this date range.")
 elif sleep_cat_ids and not annotated_nights:
-    st.markdown("<div class='section-heading'>Before/During Sleep Activities & Sleep Quality</div>", unsafe_allow_html=True)
+    section_header(
+        "Before/During Sleep Activities & Sleep Quality",
+        "Links sleep-related activity categories to Garmin sleep outcomes once enough overlap exists.",
+    )
     st.info(
         "No nights found with Before Sleep / During Sleep activities logged alongside Garmin sleep data yet. "
         "Log activities in those categories on evenings and this section will populate once sleep data syncs."
