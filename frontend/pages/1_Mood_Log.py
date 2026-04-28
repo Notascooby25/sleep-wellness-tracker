@@ -753,174 +753,185 @@ if st.session_state["mood_log_flash"]:
 
 
 with st.sidebar:
-    st.subheader("Mood Log Tools")
-    export_rows, export_json = build_export_json(entries)
-    export_csv = build_export_csv(entries)
-    backup_json = build_backup_json(entries, categories_list, activities_list)
-
-    st.download_button(
-        "Export JSON",
-        data=export_json,
-        file_name="mood_log_export.json",
-        mime="application/json",
-        use_container_width=True,
+    st.subheader("Settings")
+    show_mood_log_tools = st.checkbox(
+        "Show advanced sidebar tools",
+        value=st.session_state.get("show_mood_log_tools", False),
+        key="show_mood_log_tools",
+        help="Export/import/bulk operations are hidden by default to keep the sidebar lighter.",
     )
 
-    st.download_button(
-        "Export CSV",
-        data=export_csv,
-        file_name="mood_log_export.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+    if show_mood_log_tools:
+        st.subheader("Mood Log Tools")
+        export_rows, export_json = build_export_json(entries)
+        export_csv = build_export_csv(entries)
+        backup_json = build_backup_json(entries, categories_list, activities_list)
 
-    backup_name = f"mood_log_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
-    st.download_button(
-        "Download Full Backup (JSON)",
-        data=backup_json,
-        file_name=backup_name,
-        mime="application/json",
-        use_container_width=True,
-    )
+        st.download_button(
+            "Export JSON",
+            data=export_json,
+            file_name="mood_log_export.json",
+            mime="application/json",
+            use_container_width=True,
+        )
 
-    st.markdown("---")
-    import_file = st.file_uploader("Import mood log (JSON or CSV)", type=["json", "csv"])
-    if st.button("Import Entries", use_container_width=True, disabled=import_file is None):
-        try:
-            if import_file.name.lower().endswith(".json"):
-                payload_obj = json.loads(import_file.getvalue().decode("utf-8"))
-                rows = payload_obj.get("entries", []) if isinstance(payload_obj, dict) else payload_obj
-                if not isinstance(rows, list):
-                    raise ValueError("JSON import must be a list of rows or an object with an entries list")
-            else:
-                text = import_file.getvalue().decode("utf-8")
-                rows = list(csv.DictReader(io.StringIO(text)))
+        st.download_button(
+            "Export CSV",
+            data=export_csv,
+            file_name="mood_log_export.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
-            rows_to_import = normalize_import_rows(rows)
-            existing_signatures = {entry_signature(entry) for entry in entries}
-            seen_import_signatures = set()
+        backup_name = f"mood_log_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+        st.download_button(
+            "Download Full Backup (JSON)",
+            data=backup_json,
+            file_name=backup_name,
+            mime="application/json",
+            use_container_width=True,
+        )
 
-            imported = 0
-            failed = 0
-            skipped_duplicates = 0
-            for row in rows_to_import:
-                signature = entry_signature(row)
-                if signature in existing_signatures or signature in seen_import_signatures:
-                    skipped_duplicates += 1
-                    continue
-
-                resp = requests.post(f"{API_BASE}/mood/", json=row, timeout=4)
-                if resp.status_code in (200, 201):
-                    imported += 1
-                    existing_signatures.add(signature)
-                    seen_import_signatures.add(signature)
+        st.markdown("---")
+        import_file = st.file_uploader("Import mood log (JSON or CSV)", type=["json", "csv"])
+        if st.button("Import Entries", use_container_width=True, disabled=import_file is None):
+            try:
+                if import_file.name.lower().endswith(".json"):
+                    payload_obj = json.loads(import_file.getvalue().decode("utf-8"))
+                    rows = payload_obj.get("entries", []) if isinstance(payload_obj, dict) else payload_obj
+                    if not isinstance(rows, list):
+                        raise ValueError("JSON import must be a list of rows or an object with an entries list")
                 else:
-                    failed += 1
+                    text = import_file.getvalue().decode("utf-8")
+                    rows = list(csv.DictReader(io.StringIO(text)))
 
-            clear_mood_cache()
-            st.session_state["mood_log_flash"] = (
-                f"Import complete: {imported} imported, {skipped_duplicates} duplicates skipped, {failed} failed."
-            )
+                rows_to_import = normalize_import_rows(rows)
+                existing_signatures = {entry_signature(entry) for entry in entries}
+                seen_import_signatures = set()
+
+                imported = 0
+                failed = 0
+                skipped_duplicates = 0
+                for row in rows_to_import:
+                    signature = entry_signature(row)
+                    if signature in existing_signatures or signature in seen_import_signatures:
+                        skipped_duplicates += 1
+                        continue
+
+                    resp = requests.post(f"{API_BASE}/mood/", json=row, timeout=4)
+                    if resp.status_code in (200, 201):
+                        imported += 1
+                        existing_signatures.add(signature)
+                        seen_import_signatures.add(signature)
+                    else:
+                        failed += 1
+
+                clear_mood_cache()
+                st.session_state["mood_log_flash"] = (
+                    f"Import complete: {imported} imported, {skipped_duplicates} duplicates skipped, {failed} failed."
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Import failed: {exc}")
+
+        st.markdown("---")
+        st.subheader("Bulk Delete")
+        delete_target_date = st.date_input("Delete entries for date", value=datetime.datetime.now(uk_tz).date())
+
+        if st.button("Delete Selected Day", use_container_width=True):
+            st.session_state["bulk_delete_confirm"] = f"day:{delete_target_date.isoformat()}"
             st.rerun()
-        except Exception as exc:
-            st.error(f"Import failed: {exc}")
 
-    st.markdown("---")
-    st.subheader("Bulk Delete")
-    delete_target_date = st.date_input("Delete entries for date", value=datetime.datetime.now(uk_tz).date())
+        if st.button("Delete All Entries", use_container_width=True):
+            st.session_state["bulk_delete_confirm"] = "all"
+            st.rerun()
 
-    if st.button("Delete Selected Day", use_container_width=True):
-        st.session_state["bulk_delete_confirm"] = f"day:{delete_target_date.isoformat()}"
-        st.rerun()
+        confirm_value = st.session_state.get("bulk_delete_confirm")
+        if confirm_value:
+            if confirm_value == "all":
+                st.warning("Delete all mood log entries? This cannot be undone.")
+                target_entry_ids = [entry["id"] for entry in entries]
+            else:
+                target_date = datetime.date.fromisoformat(confirm_value.split(":", 1)[1])
+                st.warning(f"Delete all entries on {target_date.isoformat()}? This cannot be undone.")
+                target_entry_ids = [
+                    entry["id"]
+                    for entry in entries
+                    if datetime.datetime.fromisoformat(entry["timestamp"]).astimezone(uk_tz).date() == target_date
+                ]
 
-    if st.button("Delete All Entries", use_container_width=True):
-        st.session_state["bulk_delete_confirm"] = "all"
-        st.rerun()
+            confirm_col, cancel_col = st.columns(2)
+            with confirm_col:
+                if st.button("Confirm Bulk Delete", use_container_width=True):
+                    deleted, failed = delete_entries(target_entry_ids)
+                    clear_mood_cache()
+                    st.session_state["bulk_delete_confirm"] = None
+                    st.session_state["mood_log_flash"] = f"Bulk delete complete: {deleted} deleted, {failed} failed."
+                    st.rerun()
+            with cancel_col:
+                if st.button("Cancel Bulk Delete", use_container_width=True):
+                    st.session_state["bulk_delete_confirm"] = None
+                    st.rerun()
 
-    confirm_value = st.session_state.get("bulk_delete_confirm")
-    if confirm_value:
-        if confirm_value == "all":
-            st.warning("Delete all mood log entries? This cannot be undone.")
-            target_entry_ids = [entry["id"] for entry in entries]
-        else:
-            target_date = datetime.date.fromisoformat(confirm_value.split(":", 1)[1])
-            st.warning(f"Delete all entries on {target_date.isoformat()}? This cannot be undone.")
-            target_entry_ids = [
-                entry["id"]
-                for entry in entries
-                if datetime.datetime.fromisoformat(entry["timestamp"]).astimezone(uk_tz).date() == target_date
-            ]
+        st.markdown("---")
+        st.subheader("Bulk Rating Cleanup")
+        cleanup_default_names = [
+            name for name in ["Lifestyle", "Before Sleep", "During Sleep"] if name in category_id_by_name
+        ]
+        cleanup_target_names = st.multiselect(
+            "Categories to disassociate rating from",
+            options=sorted(category_id_by_name.keys()),
+            default=cleanup_default_names,
+        )
+        cleanup_include_mixed = st.checkbox(
+            "Include entries that also contain other categories",
+            value=False,
+            help="Off = only clear entries where all selected activities are in the chosen categories.",
+        )
 
-        confirm_col, cancel_col = st.columns(2)
-        with confirm_col:
-            if st.button("Confirm Bulk Delete", use_container_width=True):
-                deleted, failed = delete_entries(target_entry_ids)
-                clear_mood_cache()
-                st.session_state["bulk_delete_confirm"] = None
-                st.session_state["mood_log_flash"] = f"Bulk delete complete: {deleted} deleted, {failed} failed."
-                st.rerun()
-        with cancel_col:
-            if st.button("Cancel Bulk Delete", use_container_width=True):
-                st.session_state["bulk_delete_confirm"] = None
-                st.rerun()
+        cleanup_target_ids = {category_id_by_name[name] for name in cleanup_target_names}
+        cleanup_matches = matching_entries_for_rating_clear(cleanup_target_ids, include_mixed=cleanup_include_mixed)
+        st.caption(f"Matches with rating to clear: {len(cleanup_matches)}")
 
-    st.markdown("---")
-    st.subheader("Bulk Rating Cleanup")
-    cleanup_default_names = [
-        name for name in ["Lifestyle", "Before Sleep", "During Sleep"] if name in category_id_by_name
-    ]
-    cleanup_target_names = st.multiselect(
-        "Categories to disassociate rating from",
-        options=sorted(category_id_by_name.keys()),
-        default=cleanup_default_names,
-    )
-    cleanup_include_mixed = st.checkbox(
-        "Include entries that also contain other categories",
-        value=False,
-        help="Off = only clear entries where all selected activities are in the chosen categories.",
-    )
+        with st.expander("Preview matching entries", expanded=False):
+            if cleanup_matches:
+                for row in cleanup_matches[:50]:
+                    ts_local = datetime.datetime.fromisoformat(row["timestamp"]).astimezone(uk_tz)
+                    row_cat_names = sorted(
+                        {
+                            category_name_by_id.get(activity_full_lookup.get(aid, {}).get("category_id"), "(uncategorized)")
+                            for aid in (row.get("activity_ids") or [])
+                        }
+                    )
+                    st.write(
+                        f"#{row['id']} · {ts_local.strftime('%Y-%m-%d %H:%M')} · Mood {row.get('mood_score')} · "
+                        f"Categories: {', '.join(row_cat_names)}"
+                    )
+                if len(cleanup_matches) > 50:
+                    st.caption(f"Showing first 50 of {len(cleanup_matches)} matches.")
+            else:
+                st.caption("No matching rated entries found.")
 
-    cleanup_target_ids = {category_id_by_name[name] for name in cleanup_target_names}
-    cleanup_matches = matching_entries_for_rating_clear(cleanup_target_ids, include_mixed=cleanup_include_mixed)
-    st.caption(f"Matches with rating to clear: {len(cleanup_matches)}")
+        if st.button("Clear Ratings for Matches", use_container_width=True, disabled=not cleanup_matches):
+            st.session_state["bulk_clear_rating_confirm"] = True
+            st.rerun()
 
-    with st.expander("Preview matching entries", expanded=False):
-        if cleanup_matches:
-            for row in cleanup_matches[:50]:
-                ts_local = datetime.datetime.fromisoformat(row["timestamp"]).astimezone(uk_tz)
-                row_cat_names = sorted(
-                    {
-                        category_name_by_id.get(activity_full_lookup.get(aid, {}).get("category_id"), "(uncategorized)")
-                        for aid in (row.get("activity_ids") or [])
-                    }
-                )
-                st.write(
-                    f"#{row['id']} · {ts_local.strftime('%Y-%m-%d %H:%M')} · Mood {row.get('mood_score')} · "
-                    f"Categories: {', '.join(row_cat_names)}"
-                )
-            if len(cleanup_matches) > 50:
-                st.caption(f"Showing first 50 of {len(cleanup_matches)} matches.")
-        else:
-            st.caption("No matching rated entries found.")
-
-    if st.button("Clear Ratings for Matches", use_container_width=True, disabled=not cleanup_matches):
-        st.session_state["bulk_clear_rating_confirm"] = True
-        st.rerun()
-
-    if st.session_state.get("bulk_clear_rating_confirm"):
-        st.warning(f"Clear rating on {len(cleanup_matches)} matching entries?")
-        confirm_col, cancel_col = st.columns(2)
-        with confirm_col:
-            if st.button("Confirm Clear Ratings", use_container_width=True):
-                updated, failed = clear_ratings(cleanup_matches)
-                clear_mood_cache()
-                st.session_state["bulk_clear_rating_confirm"] = False
-                st.session_state["mood_log_flash"] = f"Rating cleanup complete: {updated} updated, {failed} failed."
-                st.rerun()
-        with cancel_col:
-            if st.button("Cancel Clear Ratings", use_container_width=True):
-                st.session_state["bulk_clear_rating_confirm"] = False
-                st.rerun()
+        if st.session_state.get("bulk_clear_rating_confirm"):
+            st.warning(f"Clear rating on {len(cleanup_matches)} matching entries?")
+            confirm_col, cancel_col = st.columns(2)
+            with confirm_col:
+                if st.button("Confirm Clear Ratings", use_container_width=True):
+                    updated, failed = clear_ratings(cleanup_matches)
+                    clear_mood_cache()
+                    st.session_state["bulk_clear_rating_confirm"] = False
+                    st.session_state["mood_log_flash"] = f"Rating cleanup complete: {updated} updated, {failed} failed."
+                    st.rerun()
+            with cancel_col:
+                if st.button("Cancel Clear Ratings", use_container_width=True):
+                    st.session_state["bulk_clear_rating_confirm"] = False
+                    st.rerun()
+    else:
+        st.caption("Advanced tools are hidden. Enable them in Settings when needed.")
 
 # Group entries by date
 grouped = {}
