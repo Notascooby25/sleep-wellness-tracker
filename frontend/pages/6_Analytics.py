@@ -152,13 +152,34 @@ def load_activities_list():
         return []
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def load_categories_list():
+    try:
+        r = requests.get(f"{API_BASE}/categories/", timeout=4)
+        r.raise_for_status()
+        return r.json() if isinstance(r.json(), list) else []
+    except Exception:
+        return []
+
+
 mood_entries_all = load_mood_all()
 sleep_rows = load_garmin_range("sleep", start_iso, end_iso)
 body_rows = load_garmin_range("body-battery", start_iso, end_iso)
 hrv_rows = load_garmin_range("hrv", start_iso, end_iso)
 rhr_rows = load_garmin_range("resting-heart-rate", start_iso, end_iso)
 activities_list = load_activities_list()
+categories_list = load_categories_list()
 activity_name_map = {a["id"]: a["name"] for a in activities_list if a.get("id")}
+activity_cat_map = {a["id"]: a.get("category_id") for a in activities_list if a.get("id")}
+category_name_map = {c["id"]: c["name"] for c in categories_list if c.get("id")}
+
+# Identify sleep-relevant category IDs by name (case-insensitive substring match)
+_SLEEP_CAT_KEYWORDS = ("before sleep", "during sleep", "presleep", "pre-sleep", "pre sleep")
+sleep_cat_ids = {
+    c["id"]
+    for c in categories_list
+    if c.get("name") and any(kw in c["name"].lower() for kw in _SLEEP_CAT_KEYWORDS)
+}
 
 # Filter mood entries to the selected date range
 def entry_date_uk(entry) -> datetime.date | None:
@@ -435,3 +456,181 @@ if mood_entries and activity_name_map:
                 st.bar_chart(mood_act_df, use_container_width=True, height=280)
 
 st.markdown("<br>", unsafe_allow_html=True)
+
+# ── Before/During Sleep activities → next-night sleep impact ─────────────────
+# Load a wider window for sleep data so we can match evening entries to next morning's sleep.
+# We extend the sleep lookup one day beyond end_date to capture the night following the last day.
+_sleep_ext_end = (end_date + datetime.timedelta(days=1)).isoformat()
+sleep_rows_ext = load_garmin_range("sleep", start_iso, _sleep_ext_end)
+
+# Build per-night activity sets for sleep-category entries.
+# Entry on evening of date D → sleep record for date D+1 (Garmin records the wake morning).
+night_activities: dict = defaultdict(set)  # {sleep_date_iso: {activity_name, ...}}
+
+for entry in mood_entries_all:
+    act_ids = entry.get("activity_ids") or []
+    # Only entries that have at least one activity in a sleep category
+    sleep_acts = [
+        aid for aid in act_ids
+        if activity_cat_map.get(aid) in sleep_cat_ids
+    ]
+    if not sleep_acts:
+        continue
+    entry_day = entry_date_uk(entry)
+    if entry_day is None:
+        continue
+    # Entry logged on wakeup morning D matches the Garmin sleep record also dated D.
+    sleep_date_iso = entry_day.isoformat()
+    for aid in sleep_acts:
+        night_activities[sleep_date_iso].add(activity_name_map.get(aid, f"#{aid}"))
+
+# Only proceed if we have at least some annotated nights with matching sleep data
+annotated_nights = {d: acts for d, acts in night_activities.items() if d in sleep_rows_ext}
+
+if sleep_cat_ids and annotated_nights:
+    import pandas as pd
+    from collections import Counter
+
+    st.markdown("<div class='section-heading'>Before/During Sleep Activities & Sleep Quality</div>", unsafe_allow_html=True)
+    st.caption(
+        "Each night where you logged Before Sleep or During Sleep activities is matched to "
+        "the Garmin sleep data for that night. Averages are shown per activity — nights without "
+        "that activity logged provide the baseline."
+    )
+
+    # Collect all unique activities appearing on tracked nights
+    all_sleep_acts = sorted({a for acts in annotated_nights.values() for a in acts})
+
+    # Build records: one row per annotated night with sleep metrics
+    night_records = []
+    for date_str, acts in annotated_nights.items():
+        s = sleep_rows_ext.get(date_str, {})
+        if not s:
+            continue
+        night_records.append({
+            "date": date_str,
+            "activities": acts,
+            "total_h": round(s["total_sleep_minutes"] / 60, 2) if s.get("total_sleep_minutes") else None,
+            "deep_h": round(s["deep_sleep_minutes"] / 60, 2) if s.get("deep_sleep_minutes") else None,
+            "light_h": round(s["light_sleep_minutes"] / 60, 2) if s.get("light_sleep_minutes") else None,
+            "rem_h": round(s["rem_sleep_minutes"] / 60, 2) if s.get("rem_sleep_minutes") else None,
+            "score": s.get("sleep_score"),
+        })
+
+    if night_records:
+        # Per-activity averages vs baseline (nights that activity was NOT logged)
+        metrics = [
+            ("Sleep score /100", "score"),
+            ("Total sleep (h)", "total_h"),
+            ("Deep sleep (h)", "deep_h"),
+            ("REM sleep (h)", "rem_h"),
+            ("Light sleep (h)", "light_h"),
+        ]
+
+        act_rows = []
+        for act_name in all_sleep_acts:
+            nights_with = [r for r in night_records if act_name in r["activities"]]
+            nights_without = [r for r in night_records if act_name not in r["activities"]]
+            if len(nights_with) < 1:
+                continue
+            row = {"Activity": act_name, "Nights logged": len(nights_with)}
+            for label, key in metrics:
+                with_vals = [r[key] for r in nights_with if r[key] is not None]
+                without_vals = [r[key] for r in nights_without if r[key] is not None]
+                row[f"{label} (with)"] = round(sum(with_vals) / len(with_vals), 1) if with_vals else None
+                row[f"{label} (baseline)"] = round(sum(without_vals) / len(without_vals), 1) if without_vals else None
+            act_rows.append(row)
+
+        if act_rows:
+            act_df = pd.DataFrame(act_rows)
+
+            # ── Comparison table ──────────────────────────────────────────
+            st.markdown("**Activity impact table** — *with* vs *baseline* (nights that activity wasn't logged)")
+            display_cols = ["Activity", "Nights logged"] + [f"{l} (with)" for l, _ in metrics] + [f"{l} (baseline)" for l, _ in metrics]
+            display_cols = [c for c in display_cols if c in act_df.columns]
+            st.dataframe(
+                act_df[display_cols].set_index("Activity"),
+                use_container_width=True,
+            )
+
+            # ── Bar charts: sleep score and total duration ─────────────
+            chart_acts = act_df.dropna(subset=["Sleep score /100 (with)"])
+            if not chart_acts.empty:
+                score_chart_col, dur_chart_col = st.columns(2)
+                with score_chart_col:
+                    score_cmp = chart_acts[["Activity", "Sleep score /100 (with)", "Sleep score /100 (baseline)"]].dropna()
+                    if not score_cmp.empty:
+                        st.caption("Avg sleep score — with vs baseline")
+                        st.bar_chart(
+                            score_cmp.set_index("Activity"),
+                            use_container_width=True,
+                            height=260,
+                        )
+                with dur_chart_col:
+                    dur_cmp = act_df[["Activity", "Total sleep (h) (with)", "Total sleep (h) (baseline)"]].dropna()
+                    if not dur_cmp.empty:
+                        st.caption("Avg total sleep (h) — with vs baseline")
+                        st.bar_chart(
+                            dur_cmp.set_index("Activity"),
+                            use_container_width=True,
+                            height=260,
+                        )
+
+            # ── Deep / REM detail for activities with enough data ───────
+            deep_rem_acts = act_df.dropna(subset=["Deep sleep (h) (with)", "REM sleep (h) (with)"])
+            if not deep_rem_acts.empty:
+                st.caption("Avg deep and REM sleep (h) when activity was logged")
+                detail_df = deep_rem_acts[["Activity", "Deep sleep (h) (with)", "REM sleep (h) (with)"]].set_index("Activity")
+                st.bar_chart(detail_df, use_container_width=True, height=240)
+
+            # ── Night-by-night timeline for a selected activity ─────────
+            if len(all_sleep_acts) > 0:
+                st.markdown("**Night-by-night timeline for a specific activity**")
+                selected_act = st.selectbox(
+                    "Select activity",
+                    options=all_sleep_acts,
+                    key="sleep_act_timeline_select",
+                )
+                timeline_rows = []
+                all_annotated_dates = sorted(annotated_nights.keys())
+                # Also include all sleep days in range for context
+                all_sleep_dates = sorted(sleep_rows_ext.keys())
+                context_dates = sorted(
+                    set(all_sleep_dates)
+                    | set(all_annotated_dates)
+                )
+                for d in context_dates:
+                    s = sleep_rows_ext.get(d)
+                    if not s:
+                        continue
+                    had_act = selected_act in night_activities.get(d, set())
+                    timeline_rows.append({
+                        "Date": pd.to_datetime(d),
+                        "Sleep score": s.get("sleep_score"),
+                        "Total sleep (h)": round(s["total_sleep_minutes"] / 60, 2) if s.get("total_sleep_minutes") else None,
+                        "Deep sleep (h)": round(s["deep_sleep_minutes"] / 60, 2) if s.get("deep_sleep_minutes") else None,
+                        "Activity logged": 1 if had_act else 0,
+                    })
+                if timeline_rows:
+                    tl_df = pd.DataFrame(timeline_rows).set_index("Date")
+                    tl_col1, tl_col2 = st.columns(2)
+                    with tl_col1:
+                        score_tl = tl_df[["Sleep score", "Activity logged"]].dropna(subset=["Sleep score"])
+                        if not score_tl.empty:
+                            st.caption("Sleep score over time — bar = night activity was logged (1=yes)")
+                            st.line_chart(score_tl, use_container_width=True, height=220)
+                    with tl_col2:
+                        deep_tl = tl_df[["Deep sleep (h)", "Total sleep (h)"]].dropna(subset=["Total sleep (h)"])
+                        if not deep_tl.empty:
+                            st.caption("Sleep duration & deep sleep over time")
+                            st.line_chart(deep_tl, use_container_width=True, height=220)
+        else:
+            st.info("Not enough annotated nights with Garmin data to compare yet.")
+    else:
+        st.info("No annotated nights with Garmin sleep data found for this date range.")
+elif sleep_cat_ids and not annotated_nights:
+    st.markdown("<div class='section-heading'>Before/During Sleep Activities & Sleep Quality</div>", unsafe_allow_html=True)
+    st.info(
+        "No nights found with Before Sleep / During Sleep activities logged alongside Garmin sleep data yet. "
+        "Log activities in those categories on evenings and this section will populate once sleep data syncs."
+    )
