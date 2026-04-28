@@ -1,0 +1,71 @@
+name: sleep-wellness-tracker
+
+services:
+  db:
+    image: postgres:15
+    container_name: sleep_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_strong_password}
+      POSTGRES_DB: ${POSTGRES_DB:-sleepdb}
+    volumes:
+      - /srv/shared/postgres-data:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-postgres}\" -d \"${POSTGRES_DB:-sleepdb}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/notascooby25/sleep-wellness-tracker-backend:latest}
+    container_name: sleep_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >-
+      sh -lc "mkdir -p /var/log/app/backend &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      2>&1 | tee -a /var/log/app/backend/backend.log"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /srv/shared/garmin-tokens:/app/garmin_tokens:Z
+      - /srv/shared/logs/backend:/var/log/app/backend:Z
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/notascooby25/sleep-wellness-tracker-frontend:latest}
+    container_name: sleep_frontend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - backend
+    command: >-
+      sh -lc "mkdir -p /var/log/app/frontend &&
+      streamlit run main.py --server.address=0.0.0.0 --server.port=8505
+      2>&1 | tee -a /var/log/app/frontend/frontend.log"
+    ports:
+      - "8505:8505"
+    volumes:
+      - /srv/shared/logs/frontend:/var/log/app/frontend:Z
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

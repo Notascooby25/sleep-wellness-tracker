@@ -2,9 +2,6 @@ name: Build ARM64 Images
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   build-arm64:
