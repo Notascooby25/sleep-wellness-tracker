@@ -324,9 +324,37 @@ section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] di
 
 @media (max-width: 860px) {
     section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        border: 1px solid #cbdcee !important;
         border-radius: 16px !important;
+        background: #eef5fb !important;
         box-shadow: none !important;
         margin-bottom: 0.88rem !important;
+    }
+
+    /* Re-assert mood-tinted backgrounds on mobile so colour shading is visible */
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-1) {
+        background: #dcefe5 !important;
+        border-color: #bdddcf !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-2) {
+        background: #ebe8d6 !important;
+        border-color: #ddd7bb !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-3) {
+        background: #ead9d0 !important;
+        border-color: #dcc4b7 !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-4) {
+        background: #ecd6cb !important;
+        border-color: #dbbfaf !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.mood-marker-5) {
+        background: #efd1d1 !important;
+        border-color: #deb6b6 !important;
     }
 
     .entry-row-chips {

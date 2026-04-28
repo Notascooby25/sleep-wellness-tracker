@@ -150,6 +150,26 @@ st.markdown(
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.55rem;
     }
+
+    /* Stack 4-col control row into 2+2 on mobile */
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="column"]:nth-child(4)) {
+        flex-wrap: wrap !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(div[data-testid="column"]:nth-child(4)) > div[data-testid="column"] {
+        min-width: 48% !important;
+        flex: 1 1 48% !important;
+    }
+
+    /* Stack 2-col metric cards inside day expanders on mobile */
+    section[data-testid="stMain"] div[data-testid="stExpander"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+
+    section[data-testid="stMain"] div[data-testid="stExpander"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
 }
 </style>
 """,
@@ -243,8 +263,8 @@ with control_cols[3]:
     sync_now_clicked = st.button("Sync Garmin", use_container_width=True, type="primary")
 
 with st.expander("Sync settings", expanded=False):
-    settings_cols = st.columns([0.45, 0.2, 0.18, 0.17])
-    with settings_cols[0]:
+    row1_cols = st.columns([0.6, 0.4])
+    with row1_cols[0]:
         sync_scope = st.selectbox(
             "Sync scope",
             options=[
@@ -261,7 +281,7 @@ with st.expander("Sync settings", expanded=False):
             index=0,
             help="Single-metric sync is usually more reliable for larger backfills.",
         )
-    with settings_cols[1]:
+    with row1_cols[1]:
         sync_days = st.number_input(
             "Backfill days",
             min_value=1,
@@ -270,9 +290,10 @@ with st.expander("Sync settings", expanded=False):
             step=1,
             help="Overrides env backfill days for this sync request only.",
         )
-    with settings_cols[2]:
+    row2_cols = st.columns(2)
+    with row2_cols[0]:
         force_sync = st.checkbox("Force sync", value=False)
-    with settings_cols[3]:
+    with row2_cols[1]:
         show_empty_days = st.checkbox("Show empty days", value=False)
 
 if sync_now_clicked:

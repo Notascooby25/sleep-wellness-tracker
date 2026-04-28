@@ -21,6 +21,9 @@ def reset_entry_form_state():
         st.session_state.pop(k, None)
     st.session_state["notes"] = ""
     st.session_state["selected_activities"] = set()
+    # Increment form version so all pill widget keys change, forcing Streamlit to
+    # create fresh widgets with default=[] instead of restoring old selections.
+    st.session_state["form_version"] = st.session_state.get("form_version", 0) + 1
     for key in list(st.session_state.keys()):
         if key.startswith("act_") or key.startswith("pill_cat_"):
             st.session_state.pop(key, None)
@@ -351,11 +354,12 @@ now_uk = datetime.datetime.now(uk_tz)
 
 garmin_col, garmin_sync_col = st.columns([0.82, 0.18])
 with garmin_col:
-    if now_uk.hour < 12:
-        sleep_data = load_garmin_latest_sleep()
-        battery_data = load_garmin_latest_battery()
+    sleep_data = load_garmin_latest_sleep()
+    battery_data = load_garmin_latest_battery()
+    if sleep_data or battery_data:
+        label = "Last Night Garmin Sleep" if now_uk.hour < 12 else "Last Recorded Garmin Sleep"
         with st.container(border=True):
-            st.markdown("**Last Night Garmin Sleep**")
+            st.markdown(f"**{label}**")
             if sleep_data:
                 st.caption(
                     f"Duration {fmt_minutes(sleep_data.get('total_sleep_minutes'))} | "
@@ -366,12 +370,12 @@ with garmin_col:
                 if sleep_data.get("sleep_score") is not None:
                     st.caption(f"Sleep score: {sleep_data.get('sleep_score')}/100")
             else:
-                st.caption("No Garmin sleep data yet. First sync starts from 08:00 UK.")
+                st.caption("No sleep data recorded yet.")
 
             if battery_data and battery_data.get("end_of_day_value") is not None:
-                st.caption(f"Yesterday end-of-day body battery: {battery_data.get('end_of_day_value')}")
+                st.caption(f"End-of-day body battery: {battery_data.get('end_of_day_value')}")
     else:
-        st.caption("Garmin sleep summary appears in the morning; use Mood Log for historical sleep details.")
+        st.caption("Garmin sleep data syncs at 08:00 UK — use Mood Log for historical sleep details.")
 
 with garmin_sync_col:
     st.markdown("<div style='height: 0.35rem;'></div>", unsafe_allow_html=True)
@@ -567,12 +571,13 @@ if rating_required or not st.session_state.selected_activities:
 
 | Score | Meaning |
 |-------|---------|
-| 🟢 **1** | Great — feeling really good |
-| 🟡 **2** | Good — above average |
-| 🟡 **3** | Neutral — neither good nor bad |
-| 🟠 **4** | Low — below average |
-| 🔴 **5** | Rubbish — really struggling |
-"""
+| <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#2ecc71;vertical-align:middle;margin-right:4px"></span> **1** | Great — feeling really good |
+| <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#84cc16;vertical-align:middle;margin-right:4px"></span> **2** | Good — above average |
+| <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#facc15;vertical-align:middle;margin-right:4px"></span> **3** | Neutral — neither good nor bad |
+| <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#fb923c;vertical-align:middle;margin-right:4px"></span> **4** | Low — below average |
+| <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ef4444;vertical-align:middle;margin-right:4px"></span> **5** | Rubbish — really struggling |
+""",
+                    unsafe_allow_html=True,
                 )
         elif rating_context == "Pain/Discomfort Level":
             with st.popover("Info"):
@@ -628,7 +633,7 @@ if categories:
             name_lookup = {item["id"]: item["name"] for item in items}
             default_selected = [aid for aid in option_ids if aid in st.session_state.selected_activities]
 
-            key = f"pill_cat_{cat.get('id')}"
+            key = f"pill_cat_{cat.get('id')}_v{st.session_state.get('form_version', 0)}"
             if hasattr(st, "pills"):
                 chosen_ids = st.pills(
                     "Activities",
