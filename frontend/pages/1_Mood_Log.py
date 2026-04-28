@@ -25,6 +25,14 @@ st.markdown(
     --chip-text: #1f4066;
 }
 
+html[data-theme="dark"], body[data-theme="dark"] {
+    --card-border: rgba(186, 202, 224, 0.42);
+    --text-main: #e8eef7;
+    --text-sub: #adc0d9;
+    --chip-bg: rgba(79, 111, 145, 0.25);
+    --chip-text: #d9e6f6;
+}
+
 [data-testid="stAppViewContainer"] {
     background:
       radial-gradient(900px 260px at 8% -12%, #dbeafe 0%, transparent 45%),
@@ -268,13 +276,19 @@ div[data-testid="stPopover"] button:has(div p:only-child) {
 
 /* Streamlit border container — entry cards in main content only */
 section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 1px solid #cbdcee !important;
+    border: 1px solid rgba(203, 220, 238, 0.92) !important;
     border-radius: 18px !important;
     background: #eef5fb !important;
-    box-shadow: none !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18) !important;
     overflow: hidden !important;
     padding: 0 !important;
     margin-bottom: 1rem !important;
+}
+
+html[data-theme="dark"] section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"],
+body[data-theme="dark"] section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 1px solid rgba(177, 196, 221, 0.55) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Remove Streamlit's internal block padding/gap — we control it */
@@ -538,7 +552,7 @@ def render_entry_actions(entry_id):
                 st.rerun()
 
 
-@st.cache_data(ttl=45, show_spinner=False)
+@st.cache_data(ttl=90, show_spinner=False)
 def load_entries():
     try:
         r = requests.get(f"{API_BASE}/mood/", timeout=3)
@@ -546,6 +560,67 @@ def load_entries():
         return r.json()
     except Exception:
         return []
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def build_export_json(entries):
+    export_rows = [
+        {
+            "mood_score": e.get("mood_score"),
+            "notes": e.get("notes"),
+            "timestamp": e.get("timestamp"),
+            "activity_ids": e.get("activity_ids", []),
+        }
+        for e in entries
+    ]
+    return export_rows, json.dumps(export_rows, indent=2)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def build_export_csv(entries):
+    rows = [
+        {
+            "mood_score": e.get("mood_score"),
+            "notes": e.get("notes"),
+            "timestamp": e.get("timestamp"),
+            "activity_ids": e.get("activity_ids", []),
+        }
+        for e in entries
+    ]
+    csv_buffer = io.StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=["mood_score", "notes", "timestamp", "activity_ids"])
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(
+            {
+                "mood_score": row["mood_score"],
+                "notes": row.get("notes") or "",
+                "timestamp": row["timestamp"],
+                "activity_ids": ";".join(str(aid) for aid in row.get("activity_ids", [])),
+            }
+        )
+    return csv_buffer.getvalue()
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def build_backup_json(entries, categories_list, activities_list):
+    export_rows = [
+        {
+            "mood_score": e.get("mood_score"),
+            "notes": e.get("notes"),
+            "timestamp": e.get("timestamp"),
+            "activity_ids": e.get("activity_ids", []),
+        }
+        for e in entries
+    ]
+    snapshot = {
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "mood_log_tools",
+        "entries": export_rows,
+        "categories": categories_list,
+        "activities": activities_list,
+    }
+    return json.dumps(snapshot, indent=2)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -679,17 +754,10 @@ if st.session_state["mood_log_flash"]:
 
 with st.sidebar:
     st.subheader("Mood Log Tools")
-    export_rows = [
-        {
-            "mood_score": e.get("mood_score"),
-            "notes": e.get("notes"),
-            "timestamp": e.get("timestamp"),
-            "activity_ids": e.get("activity_ids", []),
-        }
-        for e in entries
-    ]
+    export_rows, export_json = build_export_json(entries)
+    export_csv = build_export_csv(entries)
+    backup_json = build_backup_json(entries, categories_list, activities_list)
 
-    export_json = json.dumps(export_rows, indent=2)
     st.download_button(
         "Export JSON",
         data=export_json,
@@ -698,37 +766,18 @@ with st.sidebar:
         use_container_width=True,
     )
 
-    csv_buffer = io.StringIO()
-    writer = csv.DictWriter(csv_buffer, fieldnames=["mood_score", "notes", "timestamp", "activity_ids"])
-    writer.writeheader()
-    for row in export_rows:
-        writer.writerow(
-            {
-                "mood_score": row["mood_score"],
-                "notes": row.get("notes") or "",
-                "timestamp": row["timestamp"],
-                "activity_ids": ";".join(str(aid) for aid in row.get("activity_ids", [])),
-            }
-        )
     st.download_button(
         "Export CSV",
-        data=csv_buffer.getvalue(),
+        data=export_csv,
         file_name="mood_log_export.csv",
         mime="text/csv",
         use_container_width=True,
     )
 
-    backup_snapshot = {
-        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "source": "mood_log_tools",
-        "entries": export_rows,
-        "categories": categories_list,
-        "activities": activities_list,
-    }
     backup_name = f"mood_log_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
     st.download_button(
         "Download Full Backup (JSON)",
-        data=json.dumps(backup_snapshot, indent=2),
+        data=backup_json,
         file_name=backup_name,
         mime="application/json",
         use_container_width=True,
