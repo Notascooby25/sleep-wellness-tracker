@@ -59,6 +59,21 @@ def delete(path):
 # -----------------------------
 st.title("Manage Activities")
 
+with st.sidebar:
+    st.subheader("Settings")
+    show_activity_controls = st.checkbox(
+        "Show activity management controls",
+        value=st.session_state.get("show_activity_controls", False),
+        key="show_activity_controls",
+        help="Keeps this page cleaner and lighter unless you're actively editing activities.",
+    )
+    show_activity_delete = st.checkbox(
+        "Show delete buttons",
+        value=st.session_state.get("show_activity_delete", False),
+        key="show_activity_delete",
+        disabled=not show_activity_controls,
+    )
+
 # Load categories + activities
 categories = fetch_json("/categories")
 activities = fetch_json("/activities")
@@ -80,28 +95,31 @@ else:
     cid = category_map[selected_category]
     filtered = [a for a in activities if a["category_id"] == cid]
 
-# -----------------------------
-# Add new activity
-# -----------------------------
-st.subheader("Add Activity")
+if not show_activity_controls:
+    st.info("Activity management controls are hidden. Open sidebar Settings to enable them.")
+else:
+    # -----------------------------
+    # Add new activity
+    # -----------------------------
+    st.subheader("Add Activity")
 
-new_name = st.text_input("Activity name")
-new_cat = st.selectbox("Category for new activity", ["(uncategorized)"] + category_names)
+    new_name = st.text_input("Activity name")
+    new_cat = st.selectbox("Category for new activity", ["(uncategorized)"] + category_names)
 
-if st.button("Add Activity"):
-    if new_name.strip():
-        selected_new_category_id = None if new_cat == "(uncategorized)" else category_map[new_cat]
-        resp = post_json("/activities/", {
-            "name": new_name,
-            "category_id": selected_new_category_id
-        })
-        if resp and resp.ok:
-            st.success("Activity added.")
-            st.rerun()
+    if st.button("Add Activity"):
+        if new_name.strip():
+            selected_new_category_id = None if new_cat == "(uncategorized)" else category_map[new_cat]
+            resp = post_json("/activities/", {
+                "name": new_name,
+                "category_id": selected_new_category_id
+            })
+            if resp and resp.ok:
+                st.success("Activity added.")
+                st.rerun()
+            else:
+                st.error("Failed to add activity.")
         else:
-            st.error("Failed to add activity.")
-    else:
-        st.warning("Name cannot be empty.")
+            st.warning("Name cannot be empty.")
 
 # -----------------------------
 # Existing activities
@@ -115,6 +133,9 @@ else:
         current_category_name = category_name_by_id.get(a.get("category_id"), "(uncategorized)")
         st.markdown(f"### {a['name']} (ID {a['id']})")
         st.caption(f"Current category: {current_category_name}")
+
+        if not show_activity_controls:
+            continue
 
         col1, col2 = st.columns(2)
 
@@ -158,10 +179,11 @@ else:
 
         # Delete
         with col2:
-            if st.button(f"Delete {a['id']}", key=f"delete_{a['id']}"):
-                resp = delete(f"/activities/{a['id']}")
-                if resp and resp.ok:
-                    st.success("Deleted.")
-                    st.rerun()
-                else:
-                    st.error("Failed to delete.")
+            if show_activity_delete:
+                if st.button(f"Delete {a['id']}", key=f"delete_{a['id']}"):
+                    resp = delete(f"/activities/{a['id']}")
+                    if resp and resp.ok:
+                        st.success("Deleted.")
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete.")

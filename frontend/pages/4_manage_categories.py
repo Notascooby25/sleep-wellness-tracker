@@ -59,25 +59,43 @@ def delete(path):
 # -----------------------------
 st.title("Manage Categories")
 
+with st.sidebar:
+    st.subheader("Settings")
+    show_category_controls = st.checkbox(
+        "Show category management controls",
+        value=st.session_state.get("show_category_controls", False),
+        key="show_category_controls",
+        help="Keeps this page lightweight unless you need to edit or delete categories.",
+    )
+    show_category_delete = st.checkbox(
+        "Show delete buttons",
+        value=st.session_state.get("show_category_delete", False),
+        key="show_category_delete",
+        disabled=not show_category_controls,
+    )
+
 # Load categories
 categories = fetch_json("/categories")
 
-# -----------------------------
-# Add new category
-# -----------------------------
-st.subheader("Add Category")
-new_name = st.text_input("New category name")
+if not show_category_controls:
+    st.info("Category management controls are hidden. Open sidebar Settings to enable them.")
+else:
+    # -----------------------------
+    # Add new category
+    # -----------------------------
+    st.subheader("Add Category")
+    new_name = st.text_input("New category name")
 
-if st.button("Add Category"):
-    if new_name.strip():
-        resp = post_json("/categories/", {"name": new_name})
-        if resp and resp.ok:
-            st.success("Category added.")
-            st.rerun()
+    if st.button("Add Category"):
+        if new_name.strip():
+            resp = post_json("/categories/", {"name": new_name})
+            if resp and resp.ok:
+                st.success("Category added.")
+                st.rerun()
+            else:
+                st.error("Failed to add category.")
         else:
-            st.error("Failed to add category.")
-    else:
-        st.warning("Name cannot be empty.")
+            st.warning("Name cannot be empty.")
 
 # -----------------------------
 # Existing categories
@@ -89,6 +107,9 @@ if not categories:
 else:
     for c in categories:
         st.markdown(f"### {c['name']} (ID {c['id']})")
+
+        if not show_category_controls:
+            continue
 
         with st.expander("Edit Details", expanded=False):
             col1, col2 = st.columns(2)
@@ -136,10 +157,11 @@ else:
 
             # Delete
             with delete_col:
-                if st.button(f"Delete Category", key=f"delete_{c['id']}", use_container_width=True):
-                    resp = delete(f"/categories/{c['id']}")
-                    if resp and resp.ok:
-                        st.success("Deleted.")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete.")
+                if show_category_delete:
+                    if st.button(f"Delete Category", key=f"delete_{c['id']}", use_container_width=True):
+                        resp = delete(f"/categories/{c['id']}")
+                        if resp and resp.ok:
+                            st.success("Deleted.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete.")
