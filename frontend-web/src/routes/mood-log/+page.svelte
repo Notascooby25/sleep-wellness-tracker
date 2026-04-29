@@ -1,10 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { deleteJson, getJson } from '$lib/api';
-  import type { Activity, Category, MoodEntry } from '$lib/types';
+  import type { Activity, MoodEntry } from '$lib/types';
 
   let entries: MoodEntry[] = [];
-  let categories: Category[] = [];
   let activities: Activity[] = [];
   let status = '';
   let loading = false;
@@ -17,9 +16,8 @@
     loading = true;
     status = '';
     try {
-      [entries, categories, activities] = await Promise.all([
+      [entries, activities] = await Promise.all([
         getJson<MoodEntry[]>('/mood/'),
-        getJson<Category[]>('/categories/'),
         getJson<Activity[]>('/activities/')
       ]);
     } catch (error) {
