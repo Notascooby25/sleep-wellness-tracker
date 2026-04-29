@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import datetime as dt
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 
 from .. import models, schemas
 from ..database import get_db
@@ -8,8 +11,17 @@ from ..database import get_db
 router = APIRouter(prefix="/mood", tags=["mood"])
 
 @router.get("", response_model=List[schemas.MoodRead])
-def list_mood_entries(db: Session = Depends(get_db)):
-    rows = db.query(models.Mood).all()
+def list_mood_entries(
+    from_date: dt.date | None = Query(default=None),
+    to_date: dt.date | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    rows_query = db.query(models.Mood).options(selectinload(models.Mood.activities))
+    if from_date is not None:
+        rows_query = rows_query.filter(func.date(models.Mood.timestamp) >= from_date)
+    if to_date is not None:
+        rows_query = rows_query.filter(func.date(models.Mood.timestamp) <= to_date)
+    rows = rows_query.order_by(models.Mood.timestamp.desc()).all()
     result = []
     for r in rows:
         activity_ids = [a.id for a in r.activities]
@@ -33,14 +45,15 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
         timestamp=payload.timestamp,
     )
     db.add(db_mood)
-    db.commit()
+    db.flush()
 
     if payload.activity_ids:
         activities = db.query(models.Activity).filter(
             models.Activity.id.in_(payload.activity_ids)
         ).all()
         db_mood.activities = activities
-        db.commit()
+
+    db.commit()
 
     db.refresh(db_mood)
     activity_ids = [a.id for a in db_mood.activities]
