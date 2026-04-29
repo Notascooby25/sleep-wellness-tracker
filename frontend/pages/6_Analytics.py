@@ -151,13 +151,29 @@ with view_col2:
 
 # ── Data loading ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
-def load_mood_all():
+def load_mood_all(start: str, end: str):
     try:
-        r = requests.get(f"{API_BASE}/mood/", timeout=10)
+        r = requests.get(
+            f"{API_BASE}/mood/",
+            params={"from_date": start, "to_date": end},
+            timeout=10,
+        )
         r.raise_for_status()
         return r.json() if isinstance(r.json(), list) else []
     except Exception:
         return []
+
+
+def normalize_iso_timestamp(value: str) -> str:
+    ts = (value or "").strip()
+    if ts.endswith("Z"):
+        return ts[:-1] + "+00:00"
+    return ts
+
+
+def parse_entry_datetime_uk(entry: dict) -> datetime.datetime:
+    ts = normalize_iso_timestamp(entry.get("timestamp", ""))
+    return datetime.datetime.fromisoformat(ts).astimezone(UK_TZ)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -195,7 +211,7 @@ def load_categories_list():
         return []
 
 
-mood_entries_all = load_mood_all()
+mood_entries_all = load_mood_all(start_iso, end_iso)
 sleep_rows = load_garmin_range("sleep", start_iso, end_iso)
 body_rows = load_garmin_range("body-battery", start_iso, end_iso)
 hrv_rows = load_garmin_range("hrv", start_iso, end_iso)
@@ -217,10 +233,7 @@ sleep_cat_ids = {
 # Filter mood entries to the selected date range
 def entry_date_uk(entry) -> datetime.date | None:
     try:
-        ts = entry.get("timestamp", "")
-        if ts.endswith("Z"):
-            ts = ts[:-1] + "+00:00"
-        return datetime.datetime.fromisoformat(ts).astimezone(UK_TZ).date()
+        return parse_entry_datetime_uk(entry).date()
     except Exception:
         return None
 
@@ -236,10 +249,7 @@ for entry in mood_entries:
     if score is None:
         continue
     try:
-        ts = entry.get("timestamp", "")
-        if ts.endswith("Z"):
-            ts = ts[:-1] + "+00:00"
-        dt_uk = datetime.datetime.fromisoformat(ts).astimezone(UK_TZ)
+        dt_uk = parse_entry_datetime_uk(entry)
         day_str = dt_uk.date().isoformat()
     except Exception:
         continue
@@ -440,10 +450,7 @@ if show_distribution and rated_scores:
             if score is None:
                 continue
             try:
-                ts = entry.get("timestamp", "")
-                if ts.endswith("Z"):
-                    ts = ts[:-1] + "+00:00"
-                dt_uk = datetime.datetime.fromisoformat(ts).astimezone(UK_TZ)
+                dt_uk = parse_entry_datetime_uk(entry)
                 hour_scores[dt_uk.hour].append(score)
             except Exception:
                 continue

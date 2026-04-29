@@ -433,6 +433,17 @@ def clear_mood_cache():
     load_sleep_range.clear()
 
 
+def normalize_iso_timestamp(value: str) -> str:
+    ts = (value or "").strip()
+    if ts.endswith("Z"):
+        return ts[:-1] + "+00:00"
+    return ts
+
+
+def parse_entry_datetime_uk(timestamp_value: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(normalize_iso_timestamp(timestamp_value)).astimezone(uk_tz)
+
+
 def parse_timestamp(value):
     if isinstance(value, datetime.datetime):
         return value.isoformat()
@@ -440,9 +451,7 @@ def parse_timestamp(value):
     if not isinstance(value, str) or not value.strip():
         raise ValueError("timestamp is required")
 
-    ts = value.strip()
-    if ts.endswith("Z"):
-        ts = ts[:-1] + "+00:00"
+    ts = normalize_iso_timestamp(value)
 
     datetime.datetime.fromisoformat(ts)
     return ts
@@ -857,7 +866,7 @@ with st.sidebar:
                 target_entry_ids = [
                     entry["id"]
                     for entry in entries
-                    if datetime.datetime.fromisoformat(entry["timestamp"]).astimezone(uk_tz).date() == target_date
+                    if parse_entry_datetime_uk(entry["timestamp"]).date() == target_date
                 ]
 
             confirm_col, cancel_col = st.columns(2)
@@ -896,7 +905,7 @@ with st.sidebar:
         with st.expander("Preview matching entries", expanded=False):
             if cleanup_matches:
                 for row in cleanup_matches[:50]:
-                    ts_local = datetime.datetime.fromisoformat(row["timestamp"]).astimezone(uk_tz)
+                    ts_local = parse_entry_datetime_uk(row["timestamp"])
                     row_cat_names = sorted(
                         {
                             category_name_by_id.get(activity_full_lookup.get(aid, {}).get("category_id"), "(uncategorized)")
@@ -936,7 +945,7 @@ with st.sidebar:
 # Group entries by date
 grouped = {}
 for e in entries:
-    ts = datetime.datetime.fromisoformat(e["timestamp"]).astimezone(uk_tz)
+    ts = parse_entry_datetime_uk(e["timestamp"])
     date_key = ts.date()
     if date_key not in grouped:
         grouped[date_key] = []
@@ -960,7 +969,7 @@ if st.session_state["editing_entry_id"] is not None:
     if edit_entry is None:
         st.session_state["editing_entry_id"] = None
     else:
-        parsed_ts = datetime.datetime.fromisoformat(edit_entry["timestamp"]).astimezone(uk_tz)
+        parsed_ts = parse_entry_datetime_uk(edit_entry["timestamp"])
         st.markdown("---")
         st.subheader(f"Edit Entry #{edit_id}")
         edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
