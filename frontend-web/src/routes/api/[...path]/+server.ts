@@ -1,10 +1,19 @@
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 
-const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
+export const trailingSlash = 'ignore';
 
-const proxy: RequestHandler = async ({ params, request, url, fetch }) => {
-  const targetPath = params.path || '';
+const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
+const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
+
+const proxy: RequestHandler = async ({ request, url, fetch }) => {
+  let targetPath = url.pathname.replace(/^\/api\/?/, '');
+
+  // FastAPI routes with base-only path are defined with trailing slash.
+  if (SLASH_BASE_PATHS.has(targetPath)) {
+    targetPath = `${targetPath}/`;
+  }
+
   const targetUrl = `${BACKEND}/${targetPath}${url.search}`;
   try {
     const upstream = await fetch(targetUrl, {
