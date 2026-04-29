@@ -1,0 +1,9 @@
+{
+  "name": "Sleep Wellness Tracker",
+  "short_name": "SleepWell",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f6fc",
+  "theme_color": "#0e2f4f",
+  "icons": []
+}

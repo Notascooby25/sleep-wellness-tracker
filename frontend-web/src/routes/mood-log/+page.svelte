@@ -1,0 +1,95 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { deleteJson, getJson } from '$lib/api';
+  import type { Activity, Category, MoodEntry } from '$lib/types';
+
+  let entries: MoodEntry[] = [];
+  let categories: Category[] = [];
+  let activities: Activity[] = [];
+  let status = '';
+  let loading = false;
+
+  const fmtDate = (ts: string) => new Date(ts).toLocaleString('en-GB', { hour12: false });
+
+  const activityName = (id: number) => activities.find((a) => a.id === id)?.name || `#${id}`;
+
+  const load = async () => {
+    loading = true;
+    status = '';
+    try {
+      [entries, categories, activities] = await Promise.all([
+        getJson<MoodEntry[]>('/mood/'),
+        getJson<Category[]>('/categories/'),
+        getJson<Activity[]>('/activities/')
+      ]);
+    } catch (error) {
+      status = `Load failed: ${error}`;
+    } finally {
+      loading = false;
+    }
+  };
+
+  const remove = async (id: number) => {
+    if (!confirm(`Delete entry #${id}?`)) return;
+    try {
+      await deleteJson(`/mood/${id}`);
+      await load();
+    } catch (error) {
+      status = `Delete failed: ${error}`;
+    }
+  };
+
+  onMount(load);
+</script>
+
+<section class="hero">
+  <h2>Mood Log</h2>
+  <p>Review entries, activities, and remove records while keeping original backend routes.</p>
+</section>
+
+<section class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+    <h3 style="margin:0;">Entries ({entries.length})</h3>
+    <button on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
+  </div>
+  {#if status}<p>{status}</p>{/if}
+
+  {#if entries.length === 0}
+    <p>No entries found.</p>
+  {:else}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Mood</th>
+          <th>Notes</th>
+          <th>Activities</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each entries as entry (entry.id)}
+          <tr>
+            <td>{fmtDate(entry.timestamp)}</td>
+            <td>{entry.mood_score ?? 'n/a'}</td>
+            <td>{entry.notes || '-'}</td>
+            <td>
+              {#if entry.activity_ids?.length}
+                {#each entry.activity_ids as aid}
+                  <span class="badge" style="margin-right:0.25rem;">{activityName(aid)}</span>
+                {/each}
+              {:else}
+                -
+              {/if}
+            </td>
+            <td>
+              {#if entry.id !== undefined}
+                <button on:click={() => remove(entry.id)}>Delete</button>
+              {/if}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+</section>

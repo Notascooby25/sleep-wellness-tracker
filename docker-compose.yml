@@ -49,6 +49,20 @@ services:
       - ./frontend/main.py:/app/main.py:Z
       - ./frontend/pages:/app/pages:Z
 
+  frontend_web:
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
+    image: sleep-wellness-tracker-frontend-web:latest
+    container_name: sleep_frontend_web
+    env_file: .env
+    environment:
+      - API_BASE=http://backend:8000
+    depends_on:
+      - backend
+    ports:
+      - "8510:3000"
+
 volumes:
   db_data:
 
