@@ -8,25 +8,47 @@
   let status = '';
   let loading = false;
   const PAGE_SIZE = 100;
-  let visibleCount = PAGE_SIZE;
+  let hasMore = true;
+  let loadingMore = false;
 
   const fmtDate = (ts: string) => new Date(ts).toLocaleString('en-GB', { hour12: false });
 
   const activityName = (id: number) => activities.find((a) => a.id === id)?.name || `#${id}`;
 
+  const loadPage = async (offset: number) => {
+    return getJson<MoodEntry[]>(`/mood/?limit=${PAGE_SIZE}&offset=${offset}`);
+  };
+
   const load = async () => {
     loading = true;
     status = '';
     try {
-      [entries, activities] = await Promise.all([
-        getJson<MoodEntry[]>('/mood/'),
+      const [firstPage, acts] = await Promise.all([
+        loadPage(0),
         getJson<Activity[]>('/activities/')
       ]);
-      visibleCount = PAGE_SIZE;
+      entries = firstPage;
+      activities = acts;
+      hasMore = firstPage.length === PAGE_SIZE;
     } catch (error) {
       status = `Load failed: ${error}`;
     } finally {
       loading = false;
+    }
+  };
+
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    loadingMore = true;
+    status = '';
+    try {
+      const next = await loadPage(entries.length);
+      entries = [...entries, ...next];
+      hasMore = next.length === PAGE_SIZE;
+    } catch (error) {
+      status = `Load more failed: ${error}`;
+    } finally {
+      loadingMore = false;
     }
   };
 
@@ -39,9 +61,6 @@
       status = `Delete failed: ${error}`;
     }
   };
-
-  $: visibleEntries = entries.slice(0, visibleCount);
-  $: hasMore = visibleCount < entries.length;
 
   onMount(load);
 </script>
@@ -62,7 +81,7 @@
     <p>No entries found.</p>
   {:else}
     <p class="label" style="margin-top:0.45rem;">
-      Showing {visibleEntries.length} of {entries.length} entries
+      Loaded {entries.length} entries
     </p>
 
     <table class="table">
@@ -76,7 +95,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each visibleEntries as entry (entry.id)}
+        {#each entries as entry (entry.id)}
           <tr>
             <td>{fmtDate(entry.timestamp)}</td>
             <td>{entry.mood_score ?? 'n/a'}</td>
@@ -102,7 +121,9 @@
 
     {#if hasMore}
       <div style="margin-top:0.6rem;">
-        <button on:click={() => (visibleCount += PAGE_SIZE)}>Load 100 More</button>
+        <button on:click={loadMore} disabled={loadingMore}>
+          {loadingMore ? 'Loading...' : 'Load 100 More'}
+        </button>
       </div>
     {/if}
   {/if}

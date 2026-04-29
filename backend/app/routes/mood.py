@@ -14,6 +14,8 @@ router = APIRouter(prefix="/mood", tags=["mood"])
 def list_mood_entries(
     from_date: dt.date | None = Query(default=None),
     to_date: dt.date | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     rows_query = db.query(models.Mood).options(selectinload(models.Mood.activities))
@@ -21,7 +23,13 @@ def list_mood_entries(
         rows_query = rows_query.filter(func.date(models.Mood.timestamp) >= from_date)
     if to_date is not None:
         rows_query = rows_query.filter(func.date(models.Mood.timestamp) <= to_date)
-    rows = rows_query.order_by(models.Mood.timestamp.desc()).all()
+    rows_query = rows_query.order_by(models.Mood.timestamp.desc())
+    if offset:
+        rows_query = rows_query.offset(offset)
+    if limit is not None:
+        rows_query = rows_query.limit(limit)
+
+    rows = rows_query.all()
     result = []
     for r in rows:
         activity_ids = [a.id for a in r.activities]
