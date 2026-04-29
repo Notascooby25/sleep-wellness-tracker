@@ -10,6 +10,15 @@
     activity_ids: number[];
   };
 
+  type BackupPayload = {
+    version: string;
+    exported_at: string;
+    timezone: string;
+    entries: MoodEntry[];
+    activities: Activity[];
+    categories: Category[];
+  };
+
   let entries: MoodEntry[] = [];
   let activities: Activity[] = [];
   let categories: Category[] = [];
@@ -27,6 +36,9 @@
   let includeMixed = false;
   let previewOpen = false;
   let matches: MoodEntry[] = [];
+  let dryRun = true;
+
+  let importSummary = '';
 
   const dateFmtUk = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' });
 
@@ -37,6 +49,18 @@
       return `"${value.replaceAll('"', '""')}"`;
     }
     return value;
+  };
+
+  const downloadText = (filename: string, mime: string, content: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   const signatureOf = (row: ImportRow | MoodEntry): string => {
@@ -83,6 +107,14 @@
       timestamp: String(row.timestamp ?? ''),
       activity_ids: parseActivityIds(row.activity_ids ?? row.activities ?? [])
     };
+  };
+
+  const isoTimestamp = (value: string): string => {
+    const ts = (value || '').trim();
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString();
   };
 
   const parseCsv = (text: string): Record<string, unknown>[] => {
@@ -170,6 +202,18 @@
     return JSON.stringify({ entries }, null, 2);
   };
 
+  const exportBackup = (): string => {
+    const payload: BackupPayload = {
+      version: 'mood-backup-v1',
+      exported_at: new Date().toISOString(),
+      timezone: 'Europe/London',
+      entries,
+      activities,
+      categories
+    };
+    return JSON.stringify(payload, null, 2);
+  };
+
   const exportCsv = (): string => {
     const header = ['timestamp', 'mood_score', 'notes', 'activity_ids'];
     const body = entries.map((e) => {
@@ -182,6 +226,24 @@
     return [header.join(','), ...body].join('\n');
   };
 
+  const exportJsonFile = () => {
+    const stamp = new Date().toISOString().slice(0, 19).replaceAll(':', '').replace('T', '_');
+    downloadText(`mood_log_export_${stamp}.json`, 'application/json;charset=utf-8', exportJson());
+    status = 'JSON export downloaded.';
+  };
+
+  const exportCsvFile = () => {
+    const stamp = new Date().toISOString().slice(0, 19).replaceAll(':', '').replace('T', '_');
+    downloadText(`mood_log_export_${stamp}.csv`, 'text/csv;charset=utf-8', exportCsv());
+    status = 'CSV export downloaded.';
+  };
+
+  const exportBackupFile = () => {
+    const stamp = new Date().toISOString().slice(0, 19).replaceAll(':', '').replace('T', '_');
+    downloadText(`mood_log_backup_${stamp}.json`, 'application/json;charset=utf-8', exportBackup());
+    status = 'Full backup downloaded.';
+  };
+
   const importEntries = async () => {
     if (!selectedFile) return;
 
@@ -192,12 +254,19 @@
       const ext = selectedFile.name.toLowerCase();
 
       let rows: Record<string, unknown>[] = [];
+      let backupActivityNamesById = new Map<number, string>();
       if (ext.endsWith('.json')) {
         const obj = JSON.parse(text);
         if (Array.isArray(obj)) {
           rows = obj as Record<string, unknown>[];
         } else if (obj && typeof obj === 'object' && Array.isArray((obj as { entries?: unknown }).entries)) {
           rows = (obj as { entries: Record<string, unknown>[] }).entries;
+          const backupActivities = (obj as { activities?: Activity[] }).activities || [];
+          backupActivityNamesById = new Map(
+            backupActivities
+              .filter((a) => a?.id !== undefined && !!a?.name)
+              .map((a) => [Number(a.id), String(a.name)])
+          );
         } else {
           throw new Error('JSON must be an array or an object with an entries array');
         }
@@ -207,8 +276,40 @@
         throw new Error('Only JSON and CSV are supported');
       }
 
+      const localActivityIdByName = new Map(
+        activities
+          .filter((a) => a?.id !== undefined && !!a?.name)
+          .map((a) => [String(a.name).trim().toLowerCase(), Number(a.id)])
+      );
+
+      let remappedActivities = 0;
       const toImport = rows
         .map((row) => normalizeImportRow(row))
+        .map((row) => {
+          const ts = isoTimestamp(row.timestamp);
+          if (!ts) return { ...row, timestamp: '' };
+
+          const mappedIds: number[] = [];
+          for (const aid of row.activity_ids) {
+            if (activities.some((a) => a.id === aid)) {
+              mappedIds.push(aid);
+              continue;
+            }
+            const backupName = backupActivityNamesById.get(aid);
+            if (!backupName) continue;
+            const localId = localActivityIdByName.get(backupName.trim().toLowerCase());
+            if (localId !== undefined) {
+              mappedIds.push(localId);
+              remappedActivities += 1;
+            }
+          }
+
+          return {
+            ...row,
+            timestamp: ts,
+            activity_ids: Array.from(new Set(mappedIds))
+          };
+        })
         .filter((row) => row.timestamp.trim().length > 0);
 
       const existing = new Set(entries.map((e) => signatureOf(e)));
@@ -226,7 +327,13 @@
         }
 
         try {
-          await postJson('/mood', row);
+          if (dryRun) {
+            imported += 1;
+            existing.add(sig);
+            seen.add(sig);
+            continue;
+          }
+          await postJson('/mood/', row);
           imported += 1;
           existing.add(sig);
           seen.add(sig);
@@ -235,10 +342,16 @@
         }
       }
 
-      await load();
-      status = `Import complete: ${imported} imported, ${skipped} duplicates skipped, ${failed} failed.`;
+      if (!dryRun) {
+        await load();
+      }
+      importSummary = `Checked ${toImport.length} rows: ${imported} ready/imported, ${skipped} duplicates skipped, ${failed} failed, ${remappedActivities} activity IDs remapped.`;
+      status = dryRun
+        ? 'Dry run finished. Disable dry run and import again to apply changes.'
+        : `Import complete: ${imported} imported, ${skipped} duplicates skipped, ${failed} failed.`;
     } catch (error) {
       status = `Import failed: ${error}`;
+      importSummary = '';
     } finally {
       busy = false;
     }
@@ -361,7 +474,7 @@
 
 <section class="hero">
   <h2>Mood Log Tools</h2>
-  <p>Import exports and run bulk maintenance tools for your mood log.</p>
+  <p>Export, backup, restore, and run bulk maintenance tools for your mood log.</p>
 </section>
 
 <section class="card">
@@ -376,15 +489,19 @@
 </section>
 
 <section class="card">
-  <h3>Mood Log Tools</h3>
+  <h3>Export and Backup</h3>
   <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.6rem;">
-    <a download="mood_log_export.json" href={`data:application/json;charset=utf-8,${encodeURIComponent(exportJson())}`}>
-      <button>Export JSON</button>
-    </a>
-    <a download="mood_log_export.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(exportCsv())}`}>
-      <button>Export CSV</button>
-    </a>
+    <button on:click={exportJsonFile} disabled={busy || entries.length === 0}>Export JSON</button>
+    <button on:click={exportCsvFile} disabled={busy || entries.length === 0}>Export CSV</button>
+    <button on:click={exportBackupFile} disabled={busy || entries.length === 0}>Export Full Backup</button>
   </div>
+  <p class="label" style="margin-top:0;">
+    Full backup includes entries, activities, categories, and metadata. Use this for migration/reinstall recovery.
+  </p>
+</section>
+
+<section class="card">
+  <h3>Import and Restore</h3>
 
   <div class="label">Import mood log (JSON or CSV)</div>
   <input
@@ -392,9 +509,21 @@
     accept=".json,.csv,application/json,text/csv"
     on:change={handleFileChange}
   />
+  {#if selectedFile}
+    <p class="label" style="margin:0.45rem 0 0;">Selected: {selectedFile.name}</p>
+  {/if}
+  <label style="display:flex; gap:0.4rem; align-items:center; margin-top:0.55rem;">
+    <input type="checkbox" bind:checked={dryRun} style="width:auto;" />
+    <span>Dry run first (validate and count only, no writes)</span>
+  </label>
   <div style="margin-top:0.5rem;">
-    <button on:click={importEntries} disabled={!selectedFile || busy}>Import Entries</button>
+    <button on:click={importEntries} disabled={!selectedFile || busy}>
+      {dryRun ? 'Validate Import' : 'Run Import'}
+    </button>
   </div>
+  {#if importSummary}
+    <p class="label" style="margin-top:0.55rem;">{importSummary}</p>
+  {/if}
 </section>
 
 <section class="card">
