@@ -6,9 +6,8 @@
     { href: '/mood-entry', label: 'Mood Entry' },
     { href: '/mood-log', label: 'Mood Log' },
     { href: '/garmin-log', label: 'Garmin Log' },
-    { href: '/manage-categories', label: 'Manage Categories' },
-    { href: '/manage-activities', label: 'Manage Activities' },
-    { href: '/analytics', label: 'Analytics' }
+    { href: '/analytics', label: 'Analytics' },
+    { href: '/settings', label: 'Settings' }
   ];
 </script>
 
