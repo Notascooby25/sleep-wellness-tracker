@@ -53,14 +53,14 @@
 
   const load = async () => {
     try {
-      [categories, activities] = await Promise.all([
+      const [cats, acts, sleepWrap, batteryWrap] = await Promise.all([
         getJson<Category[]>('/categories/'),
-        getJson<Activity[]>('/activities/')
-      ]);
-      const [sleepWrap, batteryWrap] = await Promise.all([
+        getJson<Activity[]>('/activities/'),
         getJson<GarminLatestWrap<SleepLatest>>('/garmin/sleep/latest'),
         getJson<GarminLatestWrap<BatteryLatest>>('/garmin/body-battery/latest')
       ]);
+      categories = cats;
+      activities = acts;
       latestSleep = sleepWrap?.data || null;
       latestBattery = batteryWrap?.data || null;
     } catch (error) {
