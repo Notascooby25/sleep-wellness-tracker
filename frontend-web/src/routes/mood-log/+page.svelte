@@ -7,6 +7,8 @@
   let activities: Activity[] = [];
   let status = '';
   let loading = false;
+  const PAGE_SIZE = 100;
+  let visibleCount = PAGE_SIZE;
 
   const fmtDate = (ts: string) => new Date(ts).toLocaleString('en-GB', { hour12: false });
 
@@ -20,6 +22,7 @@
         getJson<MoodEntry[]>('/mood/'),
         getJson<Activity[]>('/activities/')
       ]);
+      visibleCount = PAGE_SIZE;
     } catch (error) {
       status = `Load failed: ${error}`;
     } finally {
@@ -36,6 +39,9 @@
       status = `Delete failed: ${error}`;
     }
   };
+
+  $: visibleEntries = entries.slice(0, visibleCount);
+  $: hasMore = visibleCount < entries.length;
 
   onMount(load);
 </script>
@@ -55,6 +61,10 @@
   {#if entries.length === 0}
     <p>No entries found.</p>
   {:else}
+    <p class="label" style="margin-top:0.45rem;">
+      Showing {visibleEntries.length} of {entries.length} entries
+    </p>
+
     <table class="table">
       <thead>
         <tr>
@@ -66,7 +76,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each entries as entry (entry.id)}
+        {#each visibleEntries as entry (entry.id)}
           <tr>
             <td>{fmtDate(entry.timestamp)}</td>
             <td>{entry.mood_score ?? 'n/a'}</td>
@@ -89,5 +99,11 @@
         {/each}
       </tbody>
     </table>
+
+    {#if hasMore}
+      <div style="margin-top:0.6rem;">
+        <button on:click={() => (visibleCount += PAGE_SIZE)}>Load 100 More</button>
+      </div>
+    {/if}
   {/if}
 </section>
