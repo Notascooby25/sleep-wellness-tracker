@@ -64,12 +64,12 @@
     selected = new Set<number>();
   };
 
-  const moodColors: Record<number, { bg: string; active: string }> = {
-    1: { bg: '#bbf7d0', active: '#16a34a' },
-    2: { bg: '#d9f99d', active: '#65a30d' },
-    3: { bg: '#fef08a', active: '#ca8a04' },
-    4: { bg: '#fed7aa', active: '#ea580c' },
-    5: { bg: '#fecaca', active: '#dc2626' },
+  const moodColors: Record<number, { bg: string; active: string; label: string }> = {
+    1: { bg: '#c8f3d6', active: '#1f9d53', label: 'Green' },
+    2: { bg: '#e6f5a7', active: '#8fae14', label: 'Green-yellow' },
+    3: { bg: '#ffe991', active: '#d19b00', label: 'Yellow' },
+    4: { bg: '#ffd1a4', active: '#e27a1b', label: 'Orange' },
+    5: { bg: '#ffc2be', active: '#d9423a', label: 'Red' },
   };
 
   const load = async () => {
@@ -153,7 +153,7 @@
             class:mood-pill-active={moodScore === score}
             style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
             on:click={() => (moodScore = score)}
-          >{score}{moodScore === score ? ' ✓' : ''}</button>
+          ><span>{score}</span><small>{moodColors[score].label}</small>{moodScore === score ? ' ✓' : ''}</button>
         {/each}
       </div>
       <p class="label" style="margin-top:0.3rem;">Selected mood score: {moodScore}</p>
@@ -234,14 +234,17 @@
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
     flex: 1 1 0; min-width: 52px; max-width: 100px;
-    padding: 0.6rem 0; border-radius: 999px; border: 2px solid transparent;
+    padding: 0.55rem 0.15rem; border-radius: 14px; border: 2px solid transparent;
     background: var(--pill-bg); color: #132238;
     font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.12s;
+    display: flex; flex-direction: column; align-items: center; line-height: 1.05;
   }
+  .mood-pill small { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; }
   .mood-pill-active {
     background: var(--pill-active) !important; border-color: var(--pill-active) !important;
     color: #fff !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
   }
+  .mood-pill-active small { opacity: 1; }
   .badge-info { font-size: 0.84rem; color: #496685; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
   .btn-clear { background: transparent; border-color: #c7d9ef; color: #496685; font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }

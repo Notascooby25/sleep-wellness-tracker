@@ -46,6 +46,12 @@
     const total = Number(v);
     return `${Math.floor(total / 60)}h ${String(total % 60).padStart(2, '0')}m`;
   };
+  const fmtMl = (v: unknown) => {
+    if (v === null || v === undefined) return '-';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '-';
+    return `${n} ml`;
+  };
 
   const load = async () => {
     status = '';
@@ -162,8 +168,8 @@
         </div>
         <div class="num-wrap">
           <button class="num-btn" on:click={() => (backfillDays = Math.max(1, backfillDays - 1))}>−</button>
-          <input class="num-input" type="number" min="1" max="365" bind:value={backfillDays} />
-          <button class="num-btn" on:click={() => (backfillDays = Math.min(365, backfillDays + 1))}>+</button>
+          <input class="num-input" type="number" min="1" max="730" bind:value={backfillDays} />
+          <button class="num-btn" on:click={() => (backfillDays = Math.min(730, backfillDays + 1))}>+</button>
         </div>
       </label>
     </div>
@@ -252,7 +258,10 @@
           </div>
           <div class="mc">
             <div class="mc-name">Hydration</div>
-            {#if hydration}<div class="mr"><span>Logged</span><span>✓</span></div>
+            {#if hydration}
+              <div class="mr"><span>Consumed</span><span>{fmtMl(hydration.consumed_ml)}</span></div>
+              <div class="mr"><span>Goal</span><span>{fmtMl(hydration.goal_ml)}</span></div>
+              <div class="mr"><span>Goal achieved</span><span>{hydration.goal_ml != null && hydration.consumed_ml != null && Number(hydration.consumed_ml) >= Number(hydration.goal_ml) ? '✓' : '-'}</span></div>
             {:else}<p class="no-data">No data</p>{/if}
           </div>
         </div>

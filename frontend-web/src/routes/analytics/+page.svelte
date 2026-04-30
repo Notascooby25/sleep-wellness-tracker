@@ -25,6 +25,20 @@
   let selectedActivity = '';
 
   const avg = (numbers: number[]) => (numbers.length ? numbers.reduce((a, b) => a + b, 0) / numbers.length : null);
+  const avgOfNullable = (numbers: Array<number | null>) => {
+    const clean = numbers.filter((n): n is number => n !== null && Number.isFinite(n));
+    return clean.length ? clean.reduce((a, b) => a + b, 0) / clean.length : null;
+  };
+  const pctDiffLowerIsBetter = (withValue: number | null, withoutValue: number | null) => {
+    if (withValue === null || withoutValue === null || withoutValue === 0) return null;
+    return ((withoutValue - withValue) / withoutValue) * 100;
+  };
+  const confidenceLabel = (withCount: number, withoutCount: number) => {
+    const minSide = Math.min(withCount, withoutCount);
+    if (minSide >= 20) return 'High';
+    if (minSide >= 8) return 'Medium';
+    return 'Low';
+  };
 
   const ukDate = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 
@@ -86,15 +100,9 @@
       .join(' ');
   };
 
-<<<<<<< HEAD
   $: sleepByDateMap = new Map(sleepRows.map((r) => [String(r.date), r]));
   $: bodyByDateMap = new Map(bodyRows.map((r) => [String(r.date), r]));
   $: hrvByDateMap = new Map(hrvRows.map((r) => [String(r.date), r]));
-=======
-  const sleepByDate = () => new Map(sleepRows.map((r) => [String(r.date), r]));
-  const bodyByDate = () => new Map(bodyRows.map((r) => [String(r.date), r]));
-  const hrvByDate = () => new Map(hrvRows.map((r) => [String(r.date), r]));
->>>>>>> feat/new-frontend-sveltekit
 
   $: rated = entries.filter((e) => e.mood_score !== null).map((e) => Number(e.mood_score));
   $: sleepScores = sleepRows.map((r) => Number(r.sleep_score)).filter((n) => Number.isFinite(n));
@@ -148,36 +156,21 @@
     return pairs.reduce((worst, p) => (p[1] > worst[1] ? p : worst), pairs[0]);
   })();
 
-<<<<<<< HEAD
   $: sleepMoodDates = dayList.filter((d) => sleepByDateMap.has(d) && dailyMoodMap.has(d));
   $: sleepScoreSeries = sleepMoodDates.map((d) => Number(sleepByDateMap.get(d)?.sleep_score ?? null));
   $: sleepDurationSeries = sleepMoodDates.map((d) => {
     const m = Number(sleepByDateMap.get(d)?.total_sleep_minutes);
-=======
-  $: sleepMoodDates = dayList.filter((d) => sleepByDate().has(d) && dailyMoodMap.has(d));
-  $: sleepScoreSeries = sleepMoodDates.map((d) => Number(sleepByDate().get(d)?.sleep_score ?? null));
-  $: sleepDurationSeries = sleepMoodDates.map((d) => {
-    const m = Number(sleepByDate().get(d)?.total_sleep_minutes);
->>>>>>> feat/new-frontend-sveltekit
     return Number.isFinite(m) ? m / 60 : null;
   });
   $: moodOnSleepDates = sleepMoodDates.map((d) => dailyMoodMap.get(d) ?? null);
 
   $: recoveryDates = dayList;
   $: hrvSeries = recoveryDates.map((d) => {
-<<<<<<< HEAD
     const n = Number(hrvByDateMap.get(d)?.weekly_avg);
     return Number.isFinite(n) ? n : null;
   });
   $: batterySeries = recoveryDates.map((d) => {
     const n = Number(bodyByDateMap.get(d)?.end_of_day_value);
-=======
-    const n = Number(hrvByDate().get(d)?.weekly_avg);
-    return Number.isFinite(n) ? n : null;
-  });
-  $: batterySeries = recoveryDates.map((d) => {
-    const n = Number(bodyByDate().get(d)?.end_of_day_value);
->>>>>>> feat/new-frontend-sveltekit
     return Number.isFinite(n) ? n : null;
   });
 
@@ -243,13 +236,24 @@
     const scoreOther: Array<number | null> = [];
     const totalWith: Array<number | null> = [];
     const totalOther: Array<number | null> = [];
+    const withEntryMoods: number[] = [];
+    const withoutEntryMoods: number[] = [];
+
+    const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+    for (const d of withDates) {
+      const day = new Date(d + 'T12:00:00').getDay();
+      weekdayCounts[day] += 1;
+    }
+
+    for (const e of entries) {
+      if (e.mood_score === null || e.mood_score === undefined) continue;
+      const has = (e.activity_ids || []).some((id: number) => selectedIds.has(id));
+      if (has) withEntryMoods.push(Number(e.mood_score));
+      else withoutEntryMoods.push(Number(e.mood_score));
+    }
 
     for (const d of dayList) {
-<<<<<<< HEAD
       const row = sleepByDateMap.get(d);
-=======
-      const row = sleepByDate().get(d);
->>>>>>> feat/new-frontend-sveltekit
       const score = row ? Number(row.sleep_score) : null;
       const total = row ? Number(row.total_sleep_minutes) / 60 : null;
       if (withDates.has(d)) {
@@ -265,6 +269,51 @@
       }
     }
 
+    const sameDayWithMoods = Array.from(withDates)
+      .map((d) => dailyMoodMap.get(d) ?? null)
+      .filter((n): n is number => n !== null);
+    const sameDayWithoutMoods = dayList
+      .filter((d) => !withDates.has(d))
+      .map((d) => dailyMoodMap.get(d) ?? null)
+      .filter((n): n is number => n !== null);
+
+    const previousDayMoods = Array.from(withDates)
+      .map((d) => {
+        const x = new Date(d + 'T12:00:00');
+        x.setDate(x.getDate() - 1);
+        return dailyMoodMap.get(x.toISOString().slice(0, 10)) ?? null;
+      })
+      .filter((n): n is number => n !== null);
+
+    const nextDayMoods = Array.from(withDates)
+      .map((d) => {
+        const x = new Date(d + 'T12:00:00');
+        x.setDate(x.getDate() + 1);
+        return dailyMoodMap.get(x.toISOString().slice(0, 10)) ?? null;
+      })
+      .filter((n): n is number => n !== null);
+
+    const withWithoutPct = pctDiffLowerIsBetter(avg(withEntryMoods), avg(withoutEntryMoods));
+    const previousDayPct = pctDiffLowerIsBetter(avg(previousDayMoods), avg(sameDayWithoutMoods));
+    const sameDayPct = pctDiffLowerIsBetter(avg(sameDayWithMoods), avg(sameDayWithoutMoods));
+    const nextDayPct = pctDiffLowerIsBetter(avg(nextDayMoods), avg(sameDayWithoutMoods));
+
+    let longestWith = 0;
+    let longestWithout = 0;
+    let runWith = 0;
+    let runWithout = 0;
+    for (const d of dayList) {
+      if (withDates.has(d)) {
+        runWith += 1;
+        runWithout = 0;
+      } else {
+        runWithout += 1;
+        runWith = 0;
+      }
+      if (runWith > longestWith) longestWith = runWith;
+      if (runWithout > longestWithout) longestWithout = runWithout;
+    }
+
     return {
       withCount: withDates.size,
       otherCount: Math.max(0, dayList.length - withDates.size),
@@ -272,6 +321,18 @@
       scoreOther,
       totalWith,
       totalOther,
+      withWithoutPct,
+      previousDayPct,
+      sameDayPct,
+      nextDayPct,
+      confidence: confidenceLabel(withEntryMoods.length, withoutEntryMoods.length),
+      weekdayCounts,
+      longestWith,
+      longestWithout,
+      avgScoreWith: avgOfNullable(scoreWith),
+      avgScoreOther: avgOfNullable(scoreOther),
+      avgTotalWith: avgOfNullable(totalWith),
+      avgTotalOther: avgOfNullable(totalOther),
     };
   })();
 
@@ -331,6 +392,16 @@
     </label>
   </div>
   {#if status}<p class="status">{status}</p>{/if}
+
+  <div class="legend-box">
+    <div class="legend-title">How to read this</div>
+    <div class="legend-grid">
+      <span><b>Mood scale:</b> lower is better (1 = great, 5 = struggling).</span>
+      <span><b>Effect %:</b> positive means better mood with the activity.</span>
+      <span><b>Confidence:</b> High (20+ each side), Medium (8+), Low (&lt;8).</span>
+      <span><b>Lines:</b> dark blue = selected group, light blue = comparison, red = mood.</span>
+    </div>
+  </div>
 </section>
 
 <section class="summary-grid">
@@ -449,6 +520,26 @@
           <div class="stat-card"><div class="sl">Nights with selected activity</div><div class="sv">{selectedActivityStats.withCount}</div></div>
           <div class="stat-card"><div class="sl">Other nights</div><div class="sv">{selectedActivityStats.otherCount}</div></div>
         </div>
+        <div class="grid two" style="margin-top:0.6rem;">
+          <div class="stat-card"><div class="sl">Confidence</div><div class="sv">{selectedActivityStats.confidence}</div></div>
+          <div class="stat-card"><div class="sl">Longest streak with activity</div><div class="sv">{selectedActivityStats.longestWith} days</div></div>
+        </div>
+        <div class="grid two" style="margin-top:0.6rem;">
+          <div class="stat-card"><div class="sl">Longest streak without activity</div><div class="sv">{selectedActivityStats.longestWithout} days</div></div>
+          <div class="stat-card"><div class="sl">Sleep score avg (with vs other)</div><div class="sv">{selectedActivityStats.avgScoreWith === null ? '-' : selectedActivityStats.avgScoreWith.toFixed(0)} / {selectedActivityStats.avgScoreOther === null ? '-' : selectedActivityStats.avgScoreOther.toFixed(0)}</div></div>
+        </div>
+        <div class="grid two" style="margin-top:0.6rem;">
+          <div class="stat-card"><div class="sl">Sleep hours avg (with vs other)</div><div class="sv">{selectedActivityStats.avgTotalWith === null ? '-' : selectedActivityStats.avgTotalWith.toFixed(1)}h / {selectedActivityStats.avgTotalOther === null ? '-' : selectedActivityStats.avgTotalOther.toFixed(1)}h</div></div>
+          <div class="stat-card"><div class="sl">Influence on mood (with/without)</div><div class="sv">{selectedActivityStats.withWithoutPct === null ? '-' : `${selectedActivityStats.withWithoutPct >= 0 ? '+' : ''}${selectedActivityStats.withWithoutPct.toFixed(1)}%`}</div></div>
+        </div>
+        <div class="grid two" style="margin-top:0.6rem;">
+          <div class="stat-card"><div class="sl">Previous day effect</div><div class="sv">{selectedActivityStats.previousDayPct === null ? '-' : `${selectedActivityStats.previousDayPct >= 0 ? '+' : ''}${selectedActivityStats.previousDayPct.toFixed(1)}%`}</div></div>
+          <div class="stat-card"><div class="sl">Same day effect</div><div class="sv">{selectedActivityStats.sameDayPct === null ? '-' : `${selectedActivityStats.sameDayPct >= 0 ? '+' : ''}${selectedActivityStats.sameDayPct.toFixed(1)}%`}</div></div>
+        </div>
+        <div class="grid two" style="margin-top:0.6rem;">
+          <div class="stat-card"><div class="sl">Next day effect</div><div class="sv">{selectedActivityStats.nextDayPct === null ? '-' : `${selectedActivityStats.nextDayPct >= 0 ? '+' : ''}${selectedActivityStats.nextDayPct.toFixed(1)}%`}</div></div>
+          <div class="stat-card"><div class="sl">Interpretation</div><div class="sv" style="font-size:0.95rem;line-height:1.2;">Positive % means better mood (lower mood score).</div></div>
+        </div>
         <div style="margin-top:0.6rem;">
           <div class="label">Sleep score over time</div>
           <svg class="chart" viewBox="0 0 640 160" preserveAspectRatio="none">
@@ -462,6 +553,16 @@
             <path class="line main" d={getSeriesPath(selectedActivityStats.totalWith, 640, 160)}></path>
             <path class="line sleep" d={getSeriesPath(selectedActivityStats.totalOther, 640, 160)}></path>
           </svg>
+        </div>
+        <div style="margin-top:0.6rem;">
+          <div class="label">Occurrence during week</div>
+          {#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day, idx}
+            <div class="bar-row">
+              <span class="bar-label">{day}</span>
+              <div class="bar-bg"><div class="bar-fill" style={`width:${Math.min(100, Math.max(...selectedActivityStats.weekdayCounts, 1) ? (selectedActivityStats.weekdayCounts[idx] / Math.max(...selectedActivityStats.weekdayCounts, 1)) * 100 : 0)}%`}></div></div>
+              <span class="bar-val">{selectedActivityStats.weekdayCounts[idx]}</span>
+            </div>
+          {/each}
         </div>
       {/if}
     </article>
@@ -487,6 +588,9 @@
   .bar-bg { height: 12px; background: #e8f0f9; border-radius: 999px; overflow: hidden; }
   .bar-fill { height: 100%; background: #3c79c5; }
   .bar-label, .bar-val { font-size: 0.82rem; color: #496685; }
+  .legend-box { margin-top: 0.7rem; border: 1px solid #d7e6f7; border-radius: 10px; background: #f7fbff; padding: 0.55rem 0.7rem; }
+  .legend-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #496685; margin-bottom: 0.3rem; }
+  .legend-grid { display: grid; gap: 0.2rem; color: #2a3f58; font-size: 0.82rem; }
   @media (max-width: 900px) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
