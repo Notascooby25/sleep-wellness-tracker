@@ -8,7 +8,7 @@ from datetime import datetime
 
 class MoodBase(BaseModel):
     mood_score: Optional[int] = None  # Optional to support categories that don't require rating
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=5000)
     timestamp: datetime
     activity_ids: Optional[List[int]] = Field(default_factory=list)
 
@@ -43,11 +43,11 @@ class MoodRead(MoodBase):
 # -------------------------
 
 class CategoryBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
 
 class CategoryCreate(CategoryBase):
     require_rating: int = 1
-    rating_label: Optional[str] = None
+    rating_label: Optional[str] = Field(default=None, max_length=80)
 
 class CategoryResponse(CategoryBase):
     id: int
@@ -63,7 +63,7 @@ class CategoryResponse(CategoryBase):
 # -------------------------
 
 class ActivityBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
     category_id: Optional[int] = None
 
 class ActivityCreate(ActivityBase):
@@ -71,7 +71,7 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     category_id: Optional[int] = None
 
 class ActivityResponse(ActivityBase):
