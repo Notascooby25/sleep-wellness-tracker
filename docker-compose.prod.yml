@@ -69,3 +69,22 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  frontend_web:
+    image: ${FRONTEND_WEB_IMAGE:-ghcr.io/notascooby25/sleep-wellness-tracker-frontend-web:latest}
+    container_name: sleep_frontend_web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - API_BASE=http://backend:8000
+      - HOST=0.0.0.0
+      - PORT=3000
+    depends_on:
+      - backend
+    ports:
+      - "8510:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

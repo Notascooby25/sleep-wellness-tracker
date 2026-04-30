@@ -9,6 +9,12 @@ services:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
       - POSTGRES_DB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - db_data:/var/lib/postgresql/data
 
@@ -23,7 +29,8 @@ services:
       - DATABASE_URL
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -48,6 +55,20 @@ services:
     volumes:
       - ./frontend/main.py:/app/main.py:Z
       - ./frontend/pages:/app/pages:Z
+
+  frontend_web:
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
+    image: sleep-wellness-tracker-frontend-web:latest
+    container_name: sleep_frontend_web
+    env_file: .env
+    environment:
+      - API_BASE=http://backend:8000
+    depends_on:
+      - backend
+    ports:
+      - "8510:3000"
 
 volumes:
   db_data:
