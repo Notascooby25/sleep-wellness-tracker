@@ -7,9 +7,13 @@ const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
 const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
 
 const proxy: RequestHandler = async ({ request, url, fetch }) => {
+<<<<<<< HEAD
   // Strip any trailing slash from the path before checking SLASH_BASE_PATHS,
   // so requests like /api/categories/ are normalised to 'categories' for the set lookup.
   let targetPath = url.pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
+=======
+  let targetPath = url.pathname.replace(/^\/api\/?/, '');
+>>>>>>> feat/new-frontend-sveltekit
 
   // FastAPI routes with base-only path are defined with trailing slash.
   if (SLASH_BASE_PATHS.has(targetPath)) {

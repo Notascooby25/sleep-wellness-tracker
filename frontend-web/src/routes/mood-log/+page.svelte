@@ -19,10 +19,14 @@
   let editBusy = false;
 
   const fmtDate = (ts: string) => new Date(ts).toLocaleString('en-GB', { hour12: false });
+<<<<<<< HEAD
   const toLocalInput = (ts: string) => {
     const d = new Date(ts);
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
+=======
+  const toLocalInput = (ts: string) => new Date(ts).toISOString().slice(0, 16);
+>>>>>>> feat/new-frontend-sveltekit
 
   const activityName = (id: number) => activities.find((a) => a.id === id)?.name || `#${id}`;
 
