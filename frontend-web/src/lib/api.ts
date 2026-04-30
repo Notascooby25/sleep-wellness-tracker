@@ -22,6 +22,8 @@ function withTimeout(signal?: AbortSignal | null): { signal: AbortSignal; clear:
     }
   }
 
+  // clearTimeout is idempotent; registering it on both the abort event and the
+  // finally block ensures the timer is cancelled on both early abort and normal completion.
   controller.signal.addEventListener('abort', clear, { once: true });
   return { signal: controller.signal, clear };
 }

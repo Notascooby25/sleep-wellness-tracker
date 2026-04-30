@@ -20,10 +20,11 @@
   let selected = new Set<number>();
   let notes = '';
   let moodScore = 3;
-  const _now = new Date();
-  const _localIso = new Date(_now.getTime() - _now.getTimezoneOffset() * 60000).toISOString();
-  let date = _localIso.slice(0, 10);
-  let time = _localIso.slice(11, 16);
+  // Derive both date and time from the same local instant to avoid UTC/local mismatch.
+  const now = new Date();
+  const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
+  let date = localIso.slice(0, 10);
+  let time = localIso.slice(11, 16);
   let status = '';
   let busy = false;
   let latestSleep: SleepLatest | null = null;
