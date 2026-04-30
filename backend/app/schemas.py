@@ -71,6 +71,7 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(BaseModel):
+    # None means "keep existing name"; if provided, must be non-empty
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     category_id: Optional[int] = None
 
