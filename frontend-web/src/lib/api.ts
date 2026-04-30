@@ -9,9 +9,10 @@ type CacheEntry = {
 const getCache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<unknown>>();
 
-function withTimeout(signal?: AbortSignal | null): AbortSignal {
+function withTimeout(signal?: AbortSignal | null): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const clear = () => clearTimeout(timeout);
 
   if (signal) {
     if (signal.aborted) {
@@ -21,8 +22,8 @@ function withTimeout(signal?: AbortSignal | null): AbortSignal {
     }
   }
 
-  controller.signal.addEventListener('abort', () => clearTimeout(timeout), { once: true });
-  return controller.signal;
+  controller.signal.addEventListener('abort', clear, { once: true });
+  return { signal: controller.signal, clear };
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -42,32 +43,37 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const requestPromise = (async () => {
-    const response = await fetch(`/api${path}`, {
-      ...init,
-      signal: withTimeout(init?.signal),
-      headers: {
-        'content-type': 'application/json',
-        ...(init?.headers || {})
-      }
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`${response.status} ${text || response.statusText}`);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    const data = (await response.json()) as T;
-    if (method === 'GET') {
-      getCache.set(cacheKey, {
-        data,
-        expiresAt: Date.now() + GET_CACHE_TTL_MS
+    const { signal, clear } = withTimeout(init?.signal);
+    try {
+      const response = await fetch(`/api${path}`, {
+        ...init,
+        signal,
+        headers: {
+          'content-type': 'application/json',
+          ...(init?.headers || {})
+        }
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${response.status} ${text || response.statusText}`);
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      const data = (await response.json()) as T;
+      if (method === 'GET') {
+        getCache.set(cacheKey, {
+          data,
+          expiresAt: Date.now() + GET_CACHE_TTL_MS
+        });
+      }
+      return data;
+    } finally {
+      clear();
     }
-    return data;
   })();
 
   if (method === 'GET') {

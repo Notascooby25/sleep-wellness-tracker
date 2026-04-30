@@ -20,8 +20,10 @@
   let selected = new Set<number>();
   let notes = '';
   let moodScore = 3;
-  let date = new Date().toISOString().slice(0, 10);
-  let time = new Date().toTimeString().slice(0, 5);
+  const _now = new Date();
+  const _localIso = new Date(_now.getTime() - _now.getTimezoneOffset() * 60000).toISOString();
+  let date = _localIso.slice(0, 10);
+  let time = _localIso.slice(11, 16);
   let status = '';
   let busy = false;
   let latestSleep: SleepLatest | null = null;

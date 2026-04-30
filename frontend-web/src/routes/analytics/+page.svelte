@@ -86,9 +86,9 @@
       .join(' ');
   };
 
-  const sleepByDate = () => new Map(sleepRows.map((r) => [String(r.date), r]));
-  const bodyByDate = () => new Map(bodyRows.map((r) => [String(r.date), r]));
-  const hrvByDate = () => new Map(hrvRows.map((r) => [String(r.date), r]));
+  $: sleepByDateMap = new Map(sleepRows.map((r) => [String(r.date), r]));
+  $: bodyByDateMap = new Map(bodyRows.map((r) => [String(r.date), r]));
+  $: hrvByDateMap = new Map(hrvRows.map((r) => [String(r.date), r]));
 
   $: rated = entries.filter((e) => e.mood_score !== null).map((e) => Number(e.mood_score));
   $: sleepScores = sleepRows.map((r) => Number(r.sleep_score)).filter((n) => Number.isFinite(n));
@@ -142,21 +142,21 @@
     return pairs.reduce((worst, p) => (p[1] > worst[1] ? p : worst), pairs[0]);
   })();
 
-  $: sleepMoodDates = dayList.filter((d) => sleepByDate().has(d) && dailyMoodMap.has(d));
-  $: sleepScoreSeries = sleepMoodDates.map((d) => Number(sleepByDate().get(d)?.sleep_score ?? null));
+  $: sleepMoodDates = dayList.filter((d) => sleepByDateMap.has(d) && dailyMoodMap.has(d));
+  $: sleepScoreSeries = sleepMoodDates.map((d) => Number(sleepByDateMap.get(d)?.sleep_score ?? null));
   $: sleepDurationSeries = sleepMoodDates.map((d) => {
-    const m = Number(sleepByDate().get(d)?.total_sleep_minutes);
+    const m = Number(sleepByDateMap.get(d)?.total_sleep_minutes);
     return Number.isFinite(m) ? m / 60 : null;
   });
   $: moodOnSleepDates = sleepMoodDates.map((d) => dailyMoodMap.get(d) ?? null);
 
   $: recoveryDates = dayList;
   $: hrvSeries = recoveryDates.map((d) => {
-    const n = Number(hrvByDate().get(d)?.weekly_avg);
+    const n = Number(hrvByDateMap.get(d)?.weekly_avg);
     return Number.isFinite(n) ? n : null;
   });
   $: batterySeries = recoveryDates.map((d) => {
-    const n = Number(bodyByDate().get(d)?.end_of_day_value);
+    const n = Number(bodyByDateMap.get(d)?.end_of_day_value);
     return Number.isFinite(n) ? n : null;
   });
 
@@ -224,7 +224,7 @@
     const totalOther: Array<number | null> = [];
 
     for (const d of dayList) {
-      const row = sleepByDate().get(d);
+      const row = sleepByDateMap.get(d);
       const score = row ? Number(row.sleep_score) : null;
       const total = row ? Number(row.total_sleep_minutes) / 60 : null;
       if (withDates.has(d)) {
