@@ -20,11 +20,16 @@
   let selected = new Set<number>();
   let notes = '';
   let moodScore = 3;
+<<<<<<< HEAD
   // Derive both date and time from the same local instant to avoid UTC/local mismatch.
   const now = new Date();
   const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
   let date = localIso.slice(0, 10);
   let time = localIso.slice(11, 16);
+=======
+  let date = new Date().toISOString().slice(0, 10);
+  let time = new Date().toTimeString().slice(0, 5);
+>>>>>>> feat/new-frontend-sveltekit
   let status = '';
   let busy = false;
   let latestSleep: SleepLatest | null = null;
