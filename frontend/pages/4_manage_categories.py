@@ -59,6 +59,9 @@ def delete(path):
 # -----------------------------
 st.title("Manage Categories")
 
+if "confirm_delete_category_id" not in st.session_state:
+    st.session_state["confirm_delete_category_id"] = None
+
 with st.sidebar:
     st.subheader("Settings")
     show_category_controls = st.checkbox(
@@ -159,9 +162,24 @@ else:
             with delete_col:
                 if show_category_delete:
                     if st.button(f"Delete Category", key=f"delete_{c['id']}", use_container_width=True):
-                        resp = delete(f"/categories/{c['id']}")
-                        if resp and resp.ok:
-                            st.success("Deleted.")
-                            st.rerun()
-                        else:
-                            st.error("Failed to delete.")
+                        st.session_state["confirm_delete_category_id"] = c["id"]
+                        st.rerun()
+
+        if st.session_state.get("confirm_delete_category_id") == c["id"]:
+            st.warning(
+                f"Delete category **{c['name']}**? This will also delete all its activities. This cannot be undone."
+            )
+            confirm_col, cancel_col = st.columns(2)
+            with confirm_col:
+                if st.button(f"Confirm Delete", key=f"confirm_del_cat_{c['id']}", use_container_width=True):
+                    resp = delete(f"/categories/{c['id']}")
+                    if resp and resp.ok:
+                        st.session_state["confirm_delete_category_id"] = None
+                        st.success("Deleted.")
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete.")
+            with cancel_col:
+                if st.button(f"Cancel", key=f"cancel_del_cat_{c['id']}", use_container_width=True):
+                    st.session_state["confirm_delete_category_id"] = None
+                    st.rerun()

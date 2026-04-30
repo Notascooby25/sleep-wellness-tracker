@@ -59,6 +59,9 @@ def delete(path):
 # -----------------------------
 st.title("Manage Activities")
 
+if "confirm_delete_activity_id" not in st.session_state:
+    st.session_state["confirm_delete_activity_id"] = None
+
 with st.sidebar:
     st.subheader("Settings")
     show_activity_controls = st.checkbox(
@@ -181,9 +184,24 @@ else:
         with col2:
             if show_activity_delete:
                 if st.button(f"Delete {a['id']}", key=f"delete_{a['id']}"):
+                    st.session_state["confirm_delete_activity_id"] = a["id"]
+                    st.rerun()
+
+        if st.session_state.get("confirm_delete_activity_id") == a["id"]:
+            st.warning(
+                f"Delete activity **{a['name']}**? It will be removed from all mood entries. This cannot be undone."
+            )
+            confirm_col, cancel_col = st.columns(2)
+            with confirm_col:
+                if st.button(f"Confirm Delete", key=f"confirm_del_act_{a['id']}", use_container_width=True):
                     resp = delete(f"/activities/{a['id']}")
                     if resp and resp.ok:
+                        st.session_state["confirm_delete_activity_id"] = None
                         st.success("Deleted.")
                         st.rerun()
                     else:
                         st.error("Failed to delete.")
+            with cancel_col:
+                if st.button(f"Cancel", key=f"cancel_del_act_{a['id']}", use_container_width=True):
+                    st.session_state["confirm_delete_activity_id"] = None
+                    st.rerun()
