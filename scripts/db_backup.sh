@@ -12,9 +12,9 @@
 #   CONTAINER  = sleep_db   (the postgres container name set in docker-compose.prod.yml)
 #   RUNTIME    = auto-detected: docker or podman (whichever is available)
 #
-# The dump is created inside the running container via pg_dump and written to
-# OUTPUT_DIR/<db>_<timestamp>.dump  (custom pg_dump format — use pg_restore to restore).
-# A plain-SQL copy (<db>_<timestamp>.sql.gz) is also created for easy inspection.
+# The script runs pg_dump inside the running container and streams the output
+# to host files in OUTPUT_DIR: <db>_<timestamp>.dump (custom pg_dump format —
+# use pg_restore to restore) and <db>_<timestamp>.sql.gz for easy inspection.
 
 set -euo pipefail
 
@@ -80,7 +80,9 @@ info "Container '$CONTAINER' is running."
 
 # ── prepare output directory ──────────────────────────────────────────────────
 
+umask 077
 mkdir -p "$OUTPUT_DIR"
+chmod 700 "$OUTPUT_DIR"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DUMP_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.dump"
 SQL_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
@@ -88,18 +90,24 @@ SQL_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
 # ── run pg_dump (custom format) ───────────────────────────────────────────────
 
 info "Creating custom-format dump: $DUMP_FILE"
+DUMP_TMP="$OUTPUT_DIR/.${POSTGRES_DB}_${TIMESTAMP}.dump.tmp"
 PGPASSWORD="$POSTGRES_PASSWORD" "$EXEC" exec -e PGPASSWORD="$POSTGRES_PASSWORD" \
     "$CONTAINER" \
     pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc \
-    > "$DUMP_FILE"
+    > "$DUMP_TMP"
+[[ -s "$DUMP_TMP" ]] || { rm -f "$DUMP_TMP"; die "pg_dump (custom format) produced an empty file."; }
+mv "$DUMP_TMP" "$DUMP_FILE"
 
 # ── run pg_dump (plain SQL, gzipped) ─────────────────────────────────────────
 
 info "Creating plain-SQL dump: $SQL_FILE"
+SQL_TMP="$OUTPUT_DIR/.${POSTGRES_DB}_${TIMESTAMP}.sql.gz.tmp"
 PGPASSWORD="$POSTGRES_PASSWORD" "$EXEC" exec -e PGPASSWORD="$POSTGRES_PASSWORD" \
     "$CONTAINER" \
     pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-password \
-    | gzip -9 > "$SQL_FILE"
+    | gzip -9 > "$SQL_TMP"
+[[ -s "$SQL_TMP" ]] || { rm -f "$SQL_TMP"; die "pg_dump (plain SQL) produced an empty file."; }
+mv "$SQL_TMP" "$SQL_FILE"
 
 # ── report ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +119,6 @@ info "  Custom dump : $DUMP_FILE  ($DUMP_SIZE)"
 info "  SQL (gzip)  : $SQL_FILE  ($SQL_SIZE)"
 info ""
 info "To restore the custom dump on a fresh container:"
+info "(First copy the .dump file into the container with: $EXEC cp <dump> ${CONTAINER}:/tmp/)"
 info "  PGPASSWORD=<password> $EXEC exec -e PGPASSWORD=<password> $CONTAINER \\"
-info "    pg_restore -U $POSTGRES_USER -d $POSTGRES_DB -Fc --clean --if-exists /path/to/$(basename "$DUMP_FILE")"
-info "(Copy the .dump file into the container first with: $EXEC cp <dump> ${CONTAINER}:/tmp/)"
+info "    pg_restore -U $POSTGRES_USER -d $POSTGRES_DB -Fc --clean --if-exists /tmp/$(basename "$DUMP_FILE")"
