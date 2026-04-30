@@ -70,11 +70,7 @@ jobs:
           tags: ${{ steps.frontend_meta.outputs.tags }}
           labels: ${{ steps.frontend_meta.outputs.labels }}
 
-<<<<<<< HEAD
       - name: Extract frontend-web image metadata
-=======
-      - name: Extract frontend_web image metadata
->>>>>>> ba8efa4 (fix: resolve frontend-web merge markers and publish frontend-web image to GHCR)
         id: frontend_web_meta
         uses: docker/metadata-action@v5
         with:
@@ -83,11 +79,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
 
-<<<<<<< HEAD
       - name: Build and push frontend-web image
-=======
-      - name: Build and push frontend_web image
->>>>>>> ba8efa4 (fix: resolve frontend-web merge markers and publish frontend-web image to GHCR)
         uses: docker/build-push-action@v6
         with:
           context: frontend-web
