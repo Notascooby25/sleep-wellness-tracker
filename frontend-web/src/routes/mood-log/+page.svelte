@@ -20,6 +20,9 @@
   let editActivityFilter = '';
   let editBusy = false;
 
+  // Filter state
+  let filterActivity = '';
+
   const fmtDate = (ts: string) => new Date(ts).toLocaleString('en-GB', { hour12: false });
   const toLocalInput = (ts: string) => {
     const d = new Date(ts);
@@ -103,6 +106,15 @@
     return activities.filter((a) => a.name.toLowerCase().includes(q));
   })();
 
+  $: filteredEntries = (() => {
+    const q = filterActivity.trim().toLowerCase();
+    if (!q) return entries;
+    const actMap = new Map(activities.map((a) => [a.id, a.name.toLowerCase()]));
+    return entries.filter((entry) =>
+      (entry.activity_ids || []).some((id) => actMap.get(id)?.includes(q))
+    );
+  })();
+
   const saveEdit = async () => {
     if (editId === null) return;
     editBusy = true;
@@ -135,7 +147,7 @@
 
 <section class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
-    <h3 style="margin:0;">Entries ({entries.length})</h3>
+    <h3 style="margin:0;">Entries ({filterActivity.trim() ? `${filteredEntries.length} of ${entries.length}` : entries.length})</h3>
     <button on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
   </div>
   {#if status}<p class="status-msg">{status}</p>{/if}
@@ -143,8 +155,23 @@
   {#if entries.length === 0}
     <p>No entries found.</p>
   {:else}
+    <div class="filter-row">
+      <input
+        type="text"
+        bind:value={filterActivity}
+        placeholder="Search activities..."
+        class="filter-input"
+      />
+      {#if filterActivity}
+        <button class="btn-sm clear-btn" on:click={() => (filterActivity = '')}>✕</button>
+      {/if}
+    </div>
+
     <p class="label" style="margin-top:0.45rem;">Loaded {entries.length} entries</p>
 
+    {#if filteredEntries.length === 0}
+      <p style="margin-top:0.5rem; color:#496685;">No entries match the activity filter.</p>
+    {:else}
     <div class="table-wrap">
       <table class="table">
         <thead>
@@ -157,7 +184,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each entries as entry (entry.id)}
+          {#each filteredEntries as entry (entry.id)}
             {#if editId === entry.id}
               <tr class="edit-row">
                 <td>
@@ -223,6 +250,7 @@
         </button>
       </div>
     {/if}
+    {/if}
   {/if}
 </section>
 
@@ -240,4 +268,8 @@
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
   .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
   .status-msg { font-size: 0.88rem; color: #22543d; background: #d4edda; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
+  .filter-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.75rem; }
+  .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid #ccddf4; border-radius: 6px; background: #f5f9ff; color: #1f4066; }
+  .filter-input:focus { outline: none; border-color: #3c79c5; background: #fff; }
+  .clear-btn { background: #ecf2fb; border-color: #ccddf4; color: #496685; }
 </style>
