@@ -95,7 +95,7 @@ def _serialize_hydration(row: models.GarminHydrationDaily) -> dict:
 def sync_now(
     mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|all)$"),
     force: bool = Query(default=False),
-    backfill_days: int | None = Query(default=None, ge=1, le=365),
+    backfill_days: int | None = Query(default=None, ge=1, le=730),
     db: Session = Depends(get_db),
 ):
     logger.info("/garmin/sync-now called; mode=%s force=%s backfill_days=%s", mode, force, backfill_days)
