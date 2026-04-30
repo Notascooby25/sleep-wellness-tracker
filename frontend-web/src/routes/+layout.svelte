@@ -16,11 +16,7 @@
     <h1>Sleep Wellness Tracker</h1>
     <nav>
       {#each links as link}
-<<<<<<< HEAD
         <a href={link.href} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
-=======
-        <a href={link.href} class:active={$page.url.pathname === link.href}>{link.label}</a>
->>>>>>> feat/new-frontend-sveltekit
       {/each}
     </nav>
   </div>
