@@ -526,10 +526,33 @@ def delete_entries(entry_ids):
     return deleted, failed
 
 
+def edit_acts_state_key(entry_id, version):
+    """Return the session-state key used to track the activity set for a given edit form instance."""
+    return f"edit_acts_{entry_id}_v{version}"
+
+
+def init_edit_acts_state(entry_id, version):
+    """Ensure the edit-activities set exists in session_state, pre-populated from the entry and
+    filtered to only include activity IDs that still exist in activity_lookup."""
+    key = edit_acts_state_key(entry_id, version)
+    if key not in st.session_state:
+        valid_ids = set(activity_lookup.keys())
+        st.session_state[key] = set(
+            aid for aid in entry_lookup.get(entry_id, {}).get("activity_ids", [])
+            if aid in valid_ids
+        )
+    return key
+
+
 def render_entry_actions(entry_id):
     st.markdown('<div class="entry-row-actions">', unsafe_allow_html=True)
     with st.popover("⋯"):
         if st.button("Edit", key=f"menu_edit_{entry_id}", use_container_width=True):
+            # Increment form version so all edit widget keys are fresh (avoids stale state)
+            v = st.session_state.get(f"edit_form_v_{entry_id}", 0) + 1
+            st.session_state[f"edit_form_v_{entry_id}"] = v
+            # Pre-populate selected activities, filtering out any deleted activity IDs
+            init_edit_acts_state(entry_id, v)
             st.session_state["editing_entry_id"] = entry_id
             st.session_state["delete_confirm_id"] = None
             st.rerun()
@@ -970,24 +993,90 @@ if st.session_state["editing_entry_id"] is not None:
         st.session_state["editing_entry_id"] = None
     else:
         parsed_ts = parse_entry_datetime_uk(edit_entry["timestamp"])
+        version = st.session_state.get(f"edit_form_v_{edit_id}", 0)
+        acts_key = init_edit_acts_state(edit_id, version)
+
         st.markdown("---")
         st.subheader(f"Edit Entry #{edit_id}")
-        edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}")
-        edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}")
-        
-        edit_activities = st.multiselect(
-            "Activities",
-            options=sorted(activity_lookup.keys()),
-            default=edit_entry.get("activity_ids", []),
-            format_func=lambda aid: activity_lookup.get(aid, f"Unknown ({aid})"),
-            key=f"edit_acts_{edit_id}",
-        )
-        
-        # Determine if rating is required for edited activities
+        edit_date = st.date_input("Date", value=parsed_ts.date(), key=f"edit_date_{edit_id}_v{version}")
+        edit_time = st.time_input("Time", value=parsed_ts.time(), key=f"edit_time_{edit_id}_v{version}")
+
+        # --- Activities (tab + pills/multiselect per category, matching Mood Entry page) ---
+        acts_count = len(st.session_state[acts_key])
+        acts_label_col, acts_clear_col = st.columns([0.78, 0.22])
+        with acts_label_col:
+            st.markdown(f"**Activities** — {acts_count} selected")
+        with acts_clear_col:
+            if st.button("Clear", key=f"edit_clear_acts_{edit_id}_v{version}", use_container_width=True):
+                st.session_state[acts_key] = set()
+                st.rerun()
+
+        acts_by_cat = {}
+        for a in activities_list:
+            cid = a.get("category_id")
+            acts_by_cat.setdefault(cid, []).append(a)
+
+        if categories_list:
+            edit_tabs = st.tabs([cat["name"] for cat in categories_list])
+            for cat, tab in zip(categories_list, edit_tabs):
+                with tab:
+                    items = acts_by_cat.get(cat["id"], [])
+                    if not items:
+                        st.caption("No activities in this category.")
+                        continue
+
+                    option_ids = [item["id"] for item in items]
+                    name_lkp = {item["id"]: item["name"] for item in items}
+                    default_sel = [aid for aid in option_ids if aid in st.session_state[acts_key]]
+                    tab_key = f"edit_tab_{cat['id']}_{edit_id}_v{version}"
+
+                    if hasattr(st, "pills"):
+                        chosen = st.pills(
+                            "Activities",
+                            options=option_ids,
+                            default=default_sel,
+                            selection_mode="multi",
+                            format_func=lambda aid, lkp=name_lkp: lkp.get(aid, str(aid)),
+                            key=tab_key,
+                            label_visibility="collapsed",
+                        )
+                        chosen = chosen or []
+                    else:
+                        chosen = st.multiselect(
+                            "Activities",
+                            options=option_ids,
+                            default=default_sel,
+                            format_func=lambda aid, lkp=name_lkp: lkp.get(aid, str(aid)),
+                            key=tab_key,
+                            label_visibility="collapsed",
+                        )
+
+                    cat_option_set = set(option_ids)
+                    st.session_state[acts_key].difference_update(cat_option_set)
+                    st.session_state[acts_key].update(set(chosen))
+        elif activities_list:
+            option_ids = [a["id"] for a in activities_list]
+            name_lkp = {a["id"]: a["name"] for a in activities_list}
+            default_sel = [aid for aid in option_ids if aid in st.session_state[acts_key]]
+            tab_key = f"edit_all_acts_{edit_id}_v{version}"
+            chosen = st.multiselect(
+                "Activities",
+                options=option_ids,
+                default=default_sel,
+                format_func=lambda aid, lkp=name_lkp: lkp.get(aid, str(aid)),
+                key=tab_key,
+            )
+            st.session_state[acts_key] = set(chosen)
+        else:
+            st.caption("No activities available.")
+
+        edit_activities = list(st.session_state[acts_key])
+
+        # --- Rating (depends on selected activities) ---
         categories_lookup = {cat["id"]: cat for cat in categories_list}
         any_require_rating = False
         rating_labels = set()
-        
+
         for activity_id in edit_activities:
             activity = activity_full_lookup.get(activity_id)
             if activity:
@@ -997,32 +1086,32 @@ if st.session_state["editing_entry_id"] is not None:
                     any_require_rating = True
                     if cat.get("rating_label"):
                         rating_labels.add(cat.get("rating_label"))
-        
+
         rating_context = "Mood Score" if not rating_labels else list(rating_labels)[0]
-        
+
         if any_require_rating or not edit_activities:
             edit_score = st.radio(
                 rating_context,
                 options=[1, 2, 3, 4, 5],
                 horizontal=True,
-                key=f"edit_score_{edit_id}",
+                key=f"edit_score_{edit_id}_v{version}",
                 index=max(0, min(4, int(edit_entry.get("mood_score", 3)) - 1)) if edit_entry.get("mood_score") else 2,
             )
         else:
             st.caption("Rating not required for selected activities.")
             edit_score = None
-        
-        edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}")
+
+        edit_notes = st.text_area("Notes", value=edit_entry.get("notes") or "", key=f"edit_notes_{edit_id}_v{version}")
 
         save_col, cancel_col = st.columns(2)
         with save_col:
-            if st.button("Save Changes", key=f"save_edit_{edit_id}", use_container_width=True):
+            if st.button("Save Changes", key=f"save_edit_{edit_id}_v{version}", use_container_width=True):
                 new_ts = datetime.datetime.combine(edit_date, edit_time, tzinfo=uk_tz).isoformat()
                 payload = {
                     "mood_score": int(edit_score) if edit_score is not None else None,
                     "notes": edit_notes,
                     "timestamp": new_ts,
-                    "activity_ids": sorted(edit_activities),
+                    "activity_ids": sorted(st.session_state.get(acts_key, [])),
                 }
                 try:
                     resp = requests.put(f"{API_BASE}/mood/{edit_id}", json=payload, timeout=4)
@@ -1036,7 +1125,7 @@ if st.session_state["editing_entry_id"] is not None:
                 except Exception as exc:
                     st.error(f"Update failed: {exc}")
         with cancel_col:
-            if st.button("Cancel", key=f"cancel_edit_{edit_id}", use_container_width=True):
+            if st.button("Cancel", key=f"cancel_edit_{edit_id}_v{version}", use_container_width=True):
                 st.session_state["editing_entry_id"] = None
                 st.rerun()
 
