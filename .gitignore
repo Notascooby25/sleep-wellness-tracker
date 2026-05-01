@@ -17,7 +17,6 @@ build/
 docker-compose.yml.local
 backend/garmin_tokens.json
 backend/.env
-frontend/.env
 
 # IDE & Editor
 .vscode/
