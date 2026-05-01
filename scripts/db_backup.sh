@@ -1,4 +1,4 @@
-ta#!/usr/bin/env bash
+#!/usr/bin/env bash
 # db_backup.sh — create a timestamped pg_dump of the sleep-wellness-tracker database.
 #
 # Run this on the NUC BEFORE pulling and restarting containers after a code update.
@@ -8,7 +8,7 @@ ta#!/usr/bin/env bash
 #
 # Defaults:
 #   ENV_FILE   = .env in the project root (same directory as this script's parent)
-#   OUTPUT_DIR = ~/sleep-db-backups
+#   OUTPUT_DIR = /srv/shared/backups
 #   CONTAINER  = sleep_db   (the postgres container name set in docker-compose.prod.yml)
 #   RUNTIME    = auto-detected: docker or podman (whichever is available)
 #

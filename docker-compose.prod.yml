@@ -78,6 +78,7 @@ services:
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_POLL_INTERVAL=300
+      - DOCKER_API_VERSION=${DOCKER_API_VERSION:-1.41}
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
     command: sleep_backend sleep_frontend_web
     logging:
