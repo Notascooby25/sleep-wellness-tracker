@@ -28,14 +28,14 @@ jobs:
             backend \
             --output type=docker,dest=backend-arm64.tar
 
-      - name: Build frontend (ARM64)
+      - name: Build frontend-web (ARM64)
         run: |
           docker buildx build \
             --platform linux/arm64 \
-            -t sleep-wellness-tracker-frontend:latest \
-            -f frontend/Dockerfile \
-            frontend \
-            --output type=docker,dest=frontend-arm64.tar
+            -t sleep-wellness-tracker-frontend-web:latest \
+            -f frontend-web/Dockerfile \
+            frontend-web \
+            --output type=docker,dest=frontend-web-arm64.tar
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
@@ -43,8 +43,8 @@ jobs:
           name: backend-arm64
           path: backend-arm64.tar
 
-      - name: Upload frontend artifact
+      - name: Upload frontend-web artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-arm64
-          path: frontend-arm64.tar
+          name: frontend-web-arm64
+          path: frontend-web-arm64.tar

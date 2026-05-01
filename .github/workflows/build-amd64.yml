@@ -51,25 +51,6 @@ jobs:
           tags: ${{ steps.backend_meta.outputs.tags }}
           labels: ${{ steps.backend_meta.outputs.labels }}
 
-      - name: Extract frontend image metadata
-        id: frontend_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/notascooby25/sleep-wellness-tracker-frontend
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: frontend
-          file: frontend/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.frontend_meta.outputs.tags }}
-          labels: ${{ steps.frontend_meta.outputs.labels }}
-
       - name: Extract frontend-web image metadata
         id: frontend_web_meta
         uses: docker/metadata-action@v5
