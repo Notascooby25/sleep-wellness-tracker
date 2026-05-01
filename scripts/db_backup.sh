@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+ta#!/usr/bin/env bash
 # db_backup.sh — create a timestamped pg_dump of the sleep-wellness-tracker database.
 #
 # Run this on the NUC BEFORE pulling and restarting containers after a code update.
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ENV_FILE="${1:-$ROOT_DIR/.env}"
-OUTPUT_DIR="${OUTPUT_DIR:-$HOME/sleep-db-backups}"
+OUTPUT_DIR="${OUTPUT_DIR:-/srv/shared/backups}"
 CONTAINER="${CONTAINER:-sleep_db}"
 
 # ── helpers ──────────────────────────────────────────────────────────────────

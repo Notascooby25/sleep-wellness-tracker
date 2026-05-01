@@ -67,3 +67,21 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: sleep_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+    command: sleep_backend sleep_frontend_web
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
