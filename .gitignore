@@ -46,6 +46,11 @@ frontend.tar
 # Logs
 logs/*.err
 logs/*.log
+logs/
+
+# Local heavy artifacts
+Images_issues/
+build_podman.log
 
 # OS
 .DS_Store

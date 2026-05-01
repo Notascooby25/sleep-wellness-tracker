@@ -2,12 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Apply Patch Script",
+      "label": "Auto Start Lean Watcher",
       "type": "shell",
-      "command": "${workspaceFolder}/scripts/apply_patch.sh ${file}",
+      "command": "AUTO_PUSH=0 DEBOUNCE_SECONDS=20 ./scripts/watcher_commit_open.sh .",
+      "isBackground": true,
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
       "presentation": {
         "reveal": "always",
-        "panel": "shared"
+        "panel": "dedicated",
+        "focus": false
       },
       "problemMatcher": []
     }
