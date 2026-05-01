@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from .database import SessionLocal
 from .routes import mood, categories, activities, garmin
 from .services.garmin_sync import (
+    sync_activities_if_due,
     sync_sleep_if_due,
     sync_body_battery_if_due,
     sync_hrv_if_due,
@@ -91,11 +92,12 @@ def _garmin_sleep_autosync_loop() -> None:
         elif _in_evening_window(now_local) and _evening_synced_date != today:
             db = SessionLocal()
             try:
-                logger.info("Garmin evening sync starting (body battery + hydration + stress); date=%s", today)
+                logger.info("Garmin evening sync starting (body battery + hydration + stress + activities); date=%s", today)
                 for fn, label in [
                     (sync_body_battery_if_due, "body_battery"),
                     (sync_hydration_if_due, "hydration"),
                     (sync_stress_if_due, "stress"),
+                    (sync_activities_if_due, "activities"),
                 ]:
                     try:
                         result = fn(db, force=False)

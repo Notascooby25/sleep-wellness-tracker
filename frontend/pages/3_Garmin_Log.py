@@ -72,7 +72,7 @@ st.markdown(
 
 .summary-grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 0.75rem;
     margin: 0.25rem 0 0.9rem;
 }
@@ -203,6 +203,31 @@ def fmt_duration_minutes(value):
     return f"{hours}h {minutes}m"
 
 
+def fmt_activity_duration_seconds(value):
+    if value is None:
+        return "No data"
+    total_seconds = int(value)
+    mins = total_seconds // 60
+    hours = mins // 60
+    rem = mins % 60
+    if hours:
+        return f"{hours}h {rem:02d}m"
+    return f"{mins}m"
+
+
+def fmt_km(value):
+    if value is None:
+        return "No data"
+    return f"{float(value) / 1000:.2f} km"
+
+
+def is_key_activity(activity_type: str | None) -> bool:
+    if not activity_type:
+        return False
+    lowered = activity_type.lower()
+    return "run" in lowered or "walk" in lowered or "hike" in lowered
+
+
 def metric_count(rows_by_date: dict) -> int:
     return sum(1 for row in rows_by_date.values() if isinstance(row, dict))
 
@@ -226,8 +251,34 @@ def load_metric_range(metric_path: str, start_date: str, end_date: str):
         return {}
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def load_activity_range(start_date: str, end_date: str):
+    try:
+        response = requests.get(
+            f"{API_BASE}/garmin/activities/range",
+            params={"start_date": start_date, "end_date": end_date},
+            timeout=8,
+        )
+        response.raise_for_status()
+        rows = response.json().get("data") or []
+        by_date: dict[str, list[dict]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            row_date = row.get("date")
+            if not row_date:
+                continue
+            by_date.setdefault(str(row_date), []).append(row)
+        for row_date in by_date:
+            by_date[row_date].sort(key=lambda entry: str(entry.get("start_time") or ""), reverse=True)
+        return by_date
+    except Exception:
+        return {}
+
+
 def clear_garmin_cache():
     load_metric_range.clear()
+    load_activity_range.clear()
 
 
 st.session_state.setdefault("garmin_log_flash", None)
@@ -276,6 +327,7 @@ with st.expander("Sync settings", expanded=False):
                 ("rhr", "Resting HR only"),
                 ("stress", "Stress only"),
                 ("hydration", "Hydration only"),
+                ("activities", "Activities only"),
             ],
             format_func=lambda item: item[1],
             index=0,
@@ -335,6 +387,7 @@ hrv_rows = load_metric_range("hrv", start_iso, end_iso)
 rhr_rows = load_metric_range("resting-heart-rate", start_iso, end_iso)
 stress_rows = load_metric_range("stress", start_iso, end_iso)
 hydration_rows = load_metric_range("hydration", start_iso, end_iso)
+activity_rows = load_activity_range(start_iso, end_iso)
 
 summary_data = [
     ("Sleep days", metric_count(sleep_rows)),
@@ -343,6 +396,7 @@ summary_data = [
     ("Resting HR days", metric_count(rhr_rows)),
     ("Stress days", metric_count(stress_rows)),
     ("Hydration days", metric_count(hydration_rows)),
+    ("Activities", sum(len(rows) for rows in activity_rows.values())),
 ]
 
 summary_cards_html = "".join(
@@ -359,6 +413,7 @@ all_dates = sorted(
         *rhr_rows.keys(),
         *stress_rows.keys(),
         *hydration_rows.keys(),
+        *activity_rows.keys(),
     },
     reverse=True,
 )
@@ -373,8 +428,10 @@ for idx, date_str in enumerate(all_dates):
     rhr_row = rhr_rows.get(date_str)
     stress_row = stress_rows.get(date_str)
     hydration_row = hydration_rows.get(date_str)
+    activities = activity_rows.get(date_str) or []
+    key_activities = [a for a in activities if is_key_activity(a.get("activity_type"))]
 
-    if not show_empty_days and not any([sleep_row, body_row, hrv_row, rhr_row, stress_row, hydration_row]):
+    if not show_empty_days and not any([sleep_row, body_row, hrv_row, rhr_row, stress_row, hydration_row, activities]):
         continue
 
     day = datetime.date.fromisoformat(date_str)
@@ -387,6 +444,10 @@ for idx, date_str in enumerate(all_dates):
         pill_parts.append(f"<span class='metric-pill'>HRV {hrv_row.get('weekly_avg')}</span>")
     if rhr_row and rhr_row.get("resting_heart_rate") is not None:
         pill_parts.append(f"<span class='metric-pill'>Resting HR {rhr_row.get('resting_heart_rate')}</span>")
+    if activities:
+        pill_parts.append(f"<span class='metric-pill'>Activities {len(activities)}</span>")
+    if key_activities:
+        pill_parts.append(f"<span class='metric-pill'>Run/Walk/Hike {len(key_activities)}</span>")
 
     is_latest_day = idx == 0
     with st.expander(day.strftime("%A, %d %B %Y"), expanded=is_latest_day):
@@ -468,3 +529,19 @@ for idx, date_str in enumerate(all_dates):
                     st.caption(f"Goal {fmt_ml(hydration_row.get('goal_ml'))}")
                 else:
                     st.markdown("<div class='metric-empty'>No hydration data</div>", unsafe_allow_html=True)
+
+            with st.container(border=True):
+                st.markdown("<div class='metric-name'>Activities</div>", unsafe_allow_html=True)
+                if activities:
+                    for activity in activities:
+                        activity_type = activity.get("activity_type") or "Activity"
+                        activity_name = activity.get("activity_name") or ""
+                        title = activity_type if activity_name == activity_type else f"{activity_type}: {activity_name}".strip(": ")
+                        st.markdown(f"<div class='metric-value'>{title}</div>", unsafe_allow_html=True)
+                        st.caption(
+                            f"{fmt_km(activity.get('distance_meters'))} | "
+                            f"{fmt_activity_duration_seconds(activity.get('duration_seconds'))} | "
+                            f"{activity.get('calories') or 'No data'} kcal"
+                        )
+                else:
+                    st.markdown("<div class='metric-empty'>No activities</div>", unsafe_allow_html=True)
