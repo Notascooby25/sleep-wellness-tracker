@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models
 from ..services.garmin_sync import (
+    sync_activities_if_due,
     sync_body_battery_if_due,
     sync_hrv_if_due,
     sync_hydration_if_due,
@@ -91,9 +92,25 @@ def _serialize_hydration(row: models.GarminHydrationDaily) -> dict:
     }
 
 
+def _serialize_activity(row: models.GarminActivity) -> dict:
+    return {
+        "id": row.garmin_activity_id,
+        "date": row.activity_date.isoformat(),
+        "start_time": row.start_time.isoformat() if row.start_time else None,
+        "activity_type": row.activity_type,
+        "activity_name": row.activity_name,
+        "distance_meters": row.distance_meters,
+        "duration_seconds": row.duration_seconds,
+        "calories": row.calories,
+        "average_hr": row.average_hr,
+        "max_hr": row.max_hr,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
 @router.post("/sync-now")
 def sync_now(
-    mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|all)$"),
+    mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|activities|all)$"),
     force: bool = Query(default=False),
     backfill_days: int | None = Query(default=None, ge=1, le=730),
     db: Session = Depends(get_db),
@@ -112,6 +129,8 @@ def sync_now(
             return {"stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "hydration":
             return {"hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days)}
+        if mode == "activities":
+            return {"activities": sync_activities_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "all":
             return {
                 "sleep": sync_sleep_if_due(db, force=True, backfill_days=backfill_days),
@@ -120,6 +139,7 @@ def sync_now(
                 "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=True, backfill_days=backfill_days),
                 "stress": sync_stress_if_due(db, force=True, backfill_days=backfill_days),
                 "hydration": sync_hydration_if_due(db, force=True, backfill_days=backfill_days),
+                "activities": sync_activities_if_due(db, force=True, backfill_days=backfill_days),
             }
         return sync_smart(db, force=force, backfill_days=backfill_days)
     except GarminRateLimitError as exc:
@@ -355,3 +375,32 @@ def get_hydration_range(
         .all()
     )
     return {"data": [_serialize_hydration(row) for row in rows]}
+
+
+@router.get("/activities/range")
+def get_activities_range(
+    start_date: dt.date = Query(...),
+    end_date: dt.date = Query(...),
+    activity_type: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    logger.info(
+        "/garmin/activities/range called; start_date=%s end_date=%s activity_type=%s",
+        start_date.isoformat(),
+        end_date.isoformat(),
+        activity_type,
+    )
+
+    query = (
+        db.query(models.GarminActivity)
+        .filter(models.GarminActivity.activity_date >= start_date)
+        .filter(models.GarminActivity.activity_date <= end_date)
+    )
+
+    if activity_type:
+        normalized = activity_type.strip().lower()
+        if normalized:
+            query = query.filter(models.GarminActivity.activity_type.ilike(f"%{normalized}%"))
+
+    rows = query.order_by(models.GarminActivity.start_time.desc()).all()
+    return {"data": [_serialize_activity(row) for row in rows]}

@@ -18,6 +18,7 @@ HRV_SYNC_KEY = "hrv_daily"
 RHR_SYNC_KEY = "resting_heart_rate_daily"
 STRESS_SYNC_KEY = "stress_daily"
 HYDRATION_SYNC_KEY = "hydration_daily"
+ACTIVITY_SYNC_KEY = "activities"
 MIN_SYNC_INTERVAL_MINUTES = 45
 UK_TZ = ZoneInfo("Europe/London")
 
@@ -39,6 +40,7 @@ HRV_BACKFILL_DAYS = _env_int("GARMIN_HRV_BACKFILL_DAYS", 7)
 RHR_BACKFILL_DAYS = _env_int("GARMIN_RHR_BACKFILL_DAYS", 7)
 STRESS_BACKFILL_DAYS = _env_int("GARMIN_STRESS_BACKFILL_DAYS", 7)
 HYDRATION_BACKFILL_DAYS = _env_int("GARMIN_HYDRATION_BACKFILL_DAYS", 7)
+ACTIVITY_BACKFILL_DAYS = _env_int("GARMIN_ACTIVITY_BACKFILL_DAYS", 30)
 
 
 def _uk_now() -> dt.datetime:
@@ -137,6 +139,240 @@ def _to_datetime(ms_epoch: Optional[int]) -> Optional[dt.datetime]:
         return dt.datetime.fromtimestamp(int(ms_epoch) / 1000, tz=dt.timezone.utc)
     except Exception:
         return None
+
+
+def _parse_datetime(value: Any) -> Optional[dt.datetime]:
+    if value is None:
+        return None
+
+    if isinstance(value, dt.datetime):
+        return value if value.tzinfo else value.replace(tzinfo=dt.timezone.utc)
+
+    if isinstance(value, (int, float)):
+        raw = int(value)
+        # Heuristic: Garmin sometimes returns epoch milliseconds, sometimes seconds.
+        if raw > 10_000_000_000:
+            raw = raw // 1000
+        try:
+            return dt.datetime.fromtimestamp(raw, tz=dt.timezone.utc)
+        except Exception:
+            return None
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+        except Exception:
+            return None
+
+    return None
+
+
+def _normalize_activity_type(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    compact = value.strip()
+    if not compact:
+        return None
+    return compact.replace("_", " ").title()
+
+
+def _activity_id(payload: Dict[str, Any], default_index: int) -> str:
+    raw = _get_text(
+        payload,
+        "activityId",
+        "activityUUID",
+        "activityUuid",
+        "uuid",
+        "summaryId",
+    )
+    if raw:
+        return raw
+    fallback_bits = [
+        _get_text(payload, "startTimeGMT", "startTimeLocal", "startTime", "startDate"),
+        _get_text(payload, "activityName", "activityType.typeKey", "activityTypeDTO.typeKey"),
+        str(_get_int(payload, "duration", "durationInSeconds") or ""),
+    ]
+    joined = "|".join(bit for bit in fallback_bits if bit)
+    return joined or f"unknown-{default_index}"
+
+
+def _normalize_activities_payload(payload: Any) -> List[Dict[str, Any]]:
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        for key in ["activities", "activityList", "results"]:
+            val = payload.get(key)
+            if isinstance(val, list):
+                return [row for row in val if isinstance(row, dict)]
+        return [payload]
+    return []
+
+
+def _extract_activity_start(payload: Dict[str, Any]) -> Optional[dt.datetime]:
+    nested = payload.get("summaryDTO") if isinstance(payload.get("summaryDTO"), dict) else {}
+
+    start = _parse_datetime(
+        _get_value(
+            payload,
+            "startTimeGMT",
+            "startTimeLocal",
+            "startTime",
+            "startDate",
+            "beginTimestamp",
+            "startTimeInMillis",
+            "startTimeInSeconds",
+        )
+    )
+    if start:
+        return start
+
+    return _parse_datetime(
+        _get_value(
+            nested,
+            "startTimeGMT",
+            "startTimeLocal",
+            "startTimeInMillis",
+            "startTimeInSeconds",
+        )
+    )
+
+
+def _filter_activity_rows(rows: List[Dict[str, Any]], start_date: dt.date, end_date: dt.date) -> List[Dict[str, Any]]:
+    filtered: List[Dict[str, Any]] = []
+    for row in rows:
+        start = _extract_activity_start(row)
+        if not start:
+            filtered.append(row)
+            continue
+        d = start.astimezone(UK_TZ).date()
+        if start_date <= d <= end_date:
+            filtered.append(row)
+    return filtered
+
+
+def _fetch_activities_payload(client: Any, start_date: dt.date, end_date: dt.date) -> List[Dict[str, Any]]:
+    start_iso = start_date.isoformat()
+    end_iso = end_date.isoformat()
+
+    ranged_methods = ["get_activities_by_date", "get_activities_by_dates", "get_activities_for_date_range"]
+    for method_name in ranged_methods:
+        method = getattr(client, method_name, None)
+        if not callable(method):
+            continue
+        for args in [(start_iso, end_iso), (start_date, end_date), (start_iso, end_iso, 0, 500)]:
+            try:
+                rows = _normalize_activities_payload(method(*args))
+                if rows:
+                    return _filter_activity_rows(rows, start_date, end_date)
+            except TypeError:
+                continue
+
+    per_day_methods = ["get_activities_fordate", "get_activities_for_date"]
+    gathered: List[Dict[str, Any]] = []
+    for method_name in per_day_methods:
+        method = getattr(client, method_name, None)
+        if not callable(method):
+            continue
+        for target_date in _recent_dates((end_date - start_date).days + 1, end_date=end_date):
+            date_str = target_date.isoformat()
+            try:
+                gathered.extend(_normalize_activities_payload(method(date_str)))
+            except TypeError:
+                continue
+        if gathered:
+            return _filter_activity_rows(gathered, start_date, end_date)
+
+    method = getattr(client, "get_activities", None)
+    if callable(method):
+        page = 0
+        page_size = 100
+        paged_rows: List[Dict[str, Any]] = []
+        for _ in range(20):
+            try:
+                batch = _normalize_activities_payload(method(page * page_size, page_size))
+            except TypeError:
+                batch = _normalize_activities_payload(method())
+            if not batch:
+                break
+            paged_rows.extend(batch)
+            oldest_in_batch = None
+            for item in batch:
+                start = _extract_activity_start(item)
+                if start:
+                    candidate = start.astimezone(UK_TZ).date()
+                    if oldest_in_batch is None or candidate < oldest_in_batch:
+                        oldest_in_batch = candidate
+            if oldest_in_batch and oldest_in_batch < start_date:
+                break
+            if len(batch) < page_size:
+                break
+            page += 1
+        return _filter_activity_rows(paged_rows, start_date, end_date)
+
+    raise GarminClientError("Garmin client does not support activity retrieval methods")
+
+
+def _upsert_activity(db: Session, payload: Dict[str, Any], fallback_index: int) -> Optional[models.GarminActivity]:
+    activity_start = _extract_activity_start(payload)
+    if not activity_start:
+        logger.warning("Skipping Garmin activity without start time; payload_keys=%s", sorted(payload.keys()))
+        return None
+
+    activity_date = activity_start.astimezone(UK_TZ).date()
+    garmin_activity_id = _activity_id(payload, fallback_index)
+
+    row = (
+        db.query(models.GarminActivity)
+        .filter(models.GarminActivity.garmin_activity_id == garmin_activity_id)
+        .first()
+    )
+    if not row:
+        row = models.GarminActivity(garmin_activity_id=garmin_activity_id, activity_date=activity_date)
+        db.add(row)
+
+    nested = payload.get("summaryDTO") if isinstance(payload.get("summaryDTO"), dict) else {}
+    row.activity_date = activity_date
+    row.start_time = activity_start
+    row.activity_type = _normalize_activity_type(
+        _get_text(
+            payload,
+            "activityType.typeKey",
+            "activityTypeDTO.typeKey",
+            "activityType.typeName",
+            "activityType",
+        )
+    )
+    row.activity_name = _get_text(payload, "activityName", "activity_type", "activityType.typeName")
+    row.distance_meters = _get_int(payload, "distance", "distanceInMeters", "distanceMeters")
+    if row.distance_meters is None:
+        row.distance_meters = _get_int(nested, "distance")
+    row.duration_seconds = _get_int(
+        payload,
+        "duration",
+        "durationInSeconds",
+        "movingDuration",
+        "movingDurationInSeconds",
+        "elapsedDuration",
+        "elapsedDurationInSeconds",
+    )
+    if row.duration_seconds is None:
+        row.duration_seconds = _get_int(nested, "duration", "movingDurationInSeconds")
+    row.calories = _get_int(payload, "calories", "activeKilocalories", "totalKilocalories")
+    if row.calories is None:
+        row.calories = _get_int(nested, "calories")
+    row.average_hr = _get_int(payload, "averageHR", "averageHeartRate", "avgHr")
+    if row.average_hr is None:
+        row.average_hr = _get_int(nested, "averageHR", "averageHeartRate")
+    row.max_hr = _get_int(payload, "maxHR", "maxHeartRate")
+    if row.max_hr is None:
+        row.max_hr = _get_int(nested, "maxHR", "maxHeartRate")
+    row.payload = payload
+
+    return row
 
 
 def _call_client_method(client: Any, candidates: List[str], date_str: str) -> Dict[str, Any]:
@@ -494,6 +730,47 @@ def _fetch_hydration_payload(client: Any, date_str: str) -> Dict[str, Any]:
     return _call_client_method(client, ["get_hydration_data", "get_hydration", "get_hydration_stats"], date_str)
 
 
+def _sync_activities_window(
+    client: Any,
+    db: Session,
+    start_date: dt.date,
+    end_date: dt.date,
+) -> Tuple[List[str], List[Dict[str, str]]]:
+    synced_dates: List[str] = []
+    failed_dates: List[Dict[str, str]] = []
+    seen_dates: set[str] = set()
+
+    try:
+        logger.info("Requesting Garmin activities; start_date=%s end_date=%s", start_date.isoformat(), end_date.isoformat())
+        rows = _fetch_activities_payload(client, start_date, end_date)
+    except Exception as exc:
+        logger.exception("Failed retrieving Garmin activities")
+        return synced_dates, [{"date": f"{start_date.isoformat()}..{end_date.isoformat()}", "error": str(exc)}]
+
+    for idx, payload in enumerate(rows, start=1):
+        try:
+            row = _upsert_activity(db, payload, idx)
+            if row is None:
+                continue
+            seen_dates.add(row.activity_date.isoformat())
+        except Exception as exc:
+            activity_id = _activity_id(payload, idx)
+            logger.exception("Failed upserting Garmin activity; garmin_activity_id=%s", activity_id)
+            failed_dates.append({"date": activity_id, "error": str(exc)})
+
+    if seen_dates:
+        db.commit()
+        synced_dates = sorted(seen_dates)
+
+    logger.info(
+        "Garmin activities sync complete; activities=%s date_count=%s failed=%s",
+        len(rows),
+        len(synced_dates),
+        len(failed_dates),
+    )
+    return synced_dates, failed_dates
+
+
 def _sync_metric_dates(
     client: Any,
     db: Session,
@@ -721,6 +998,63 @@ def sync_hydration_if_due(db: Session, force: bool = False, backfill_days: Optio
     )
 
 
+def sync_activities_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
+    now_local = _uk_now()
+    state = _get_sync_state(db, ACTIVITY_SYNC_KEY)
+
+    logger.info(
+        "activities sync requested; force=%s now_local=%s last_synced_at=%s",
+        force,
+        now_local.isoformat(),
+        state.last_synced_at.isoformat() if state.last_synced_at else None,
+    )
+
+    if not is_garmin_configured():
+        logger.warning("activities sync skipped: garmin_not_configured")
+        return {"status": "skipped", "reason": "garmin_not_configured"}
+    if not force and _recently_synced(state.last_synced_at):
+        logger.info("activities sync skipped: throttled_recent_sync")
+        return {"status": "skipped", "reason": "throttled_recent_sync"}
+    if not force and state.last_synced_at and state.last_synced_at.date() >= _today():
+        logger.info("activities sync skipped: already_synced_today")
+        return {"status": "skipped", "reason": "already_synced_today"}
+
+    effective_backfill_days = max(1, int(backfill_days_override)) if (backfill_days_override := backfill_days) else ACTIVITY_BACKFILL_DAYS
+    end_date = _today()
+    start_date = end_date - dt.timedelta(days=effective_backfill_days - 1)
+
+    try:
+        client = get_garmin_client()
+        synced_dates, failed_dates = _sync_activities_window(client, db, start_date, end_date)
+    except GarminRateLimitError:
+        raise
+    except GarminClientError as exc:
+        logger.error("activities sync failed with Garmin client error: %s", exc)
+        return {"status": "error", "reason": str(exc)}
+    except Exception as exc:
+        logger.exception("Unexpected activities sync failure")
+        return {"status": "error", "reason": f"{ACTIVITY_SYNC_KEY}_sync_failed: {exc}"}
+
+    if not synced_dates and failed_dates:
+        return {
+            "status": "error",
+            "reason": f"{ACTIVITY_SYNC_KEY}_backfill_failed",
+            "failed_dates": failed_dates,
+        }
+
+    state.last_synced_at = dt.datetime.now(dt.timezone.utc)
+    state.detail = f"{ACTIVITY_SYNC_KEY}_partial" if failed_dates else f"{ACTIVITY_SYNC_KEY}_ok"
+    db.commit()
+
+    return {
+        "status": "partial" if failed_dates else "ok",
+        "activity_date": synced_dates[-1] if synced_dates else None,
+        "synced_dates": synced_dates,
+        "failed_dates": failed_dates,
+        "backfill_days": effective_backfill_days,
+    }
+
+
 def sync_smart(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     logger.info("Smart Garmin sync requested; force=%s backfill_days=%s", force, backfill_days)
     results = {
@@ -730,6 +1064,7 @@ def sync_smart(db: Session, force: bool = False, backfill_days: Optional[int] = 
         "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force, backfill_days=backfill_days),
         "stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days),
         "hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days),
+        "activities": sync_activities_if_due(db, force=force, backfill_days=backfill_days),
     }
     logger.info("Smart Garmin sync finished; results=%s", results)
     return results

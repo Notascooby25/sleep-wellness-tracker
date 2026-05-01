@@ -143,6 +143,25 @@ class GarminHydrationDaily(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class GarminActivity(Base):
+    __tablename__ = "garmin_activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    garmin_activity_id = Column(String(80), unique=True, nullable=False, index=True)
+    activity_date = Column(Date, nullable=False, index=True)
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    activity_type = Column(String(80), nullable=True, index=True)
+    activity_name = Column(String(255), nullable=True)
+    distance_meters = Column(Integer, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    calories = Column(Integer, nullable=True)
+    average_hr = Column(Integer, nullable=True)
+    max_hr = Column(Integer, nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class GarminSyncState(Base):
     __tablename__ = "garmin_sync_state"
 
