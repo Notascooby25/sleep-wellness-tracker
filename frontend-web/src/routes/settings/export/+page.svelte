@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+
+  import { getJson } from '$lib/api';
+
+  type Category = { id: number; name: string };
+  type Activity = { id: number; name: string; category_id?: number | null };
+
   const today = new Date().toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
 
@@ -17,8 +24,24 @@
   let startDate = thirtyDaysAgo;
   let endDate = today;
   let selected = new Set<string>(['sleep', 'hrv', 'stress', 'body_battery', 'steps']);
+  let categories: Category[] = [];
+  let activities: Activity[] = [];
+  let selectedActivityIds = new Set<number>();
   let busy = false;
   let status = '';
+
+  const loadCatalog = async () => {
+    try {
+      const [categoryRows, activityRows] = await Promise.all([
+        getJson<Category[]>('/categories'),
+        getJson<Activity[]>('/activities')
+      ]);
+      categories = (categoryRows || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+      activities = (activityRows || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      status = `Could not load activity catalog: ${error}`;
+    }
+  };
 
   const toggleSource = (value: string) => {
     if (selected.has(value)) {
@@ -27,6 +50,30 @@
       selected.add(value);
     }
     selected = new Set(selected);
+  };
+
+  const toggleActivity = (activityId: number) => {
+    if (selectedActivityIds.has(activityId)) {
+      selectedActivityIds.delete(activityId);
+    } else {
+      selectedActivityIds.add(activityId);
+    }
+    selectedActivityIds = new Set(selectedActivityIds);
+  };
+
+  const groupedActivities = () => {
+    const categoryMap = new Map<number, string>(categories.map((c) => [c.id, c.name]));
+    const groups = new Map<string, Activity[]>();
+    for (const activity of activities) {
+      const groupName = categoryMap.get(activity.category_id ?? -1) || 'Uncategorised';
+      if (!groups.has(groupName)) {
+        groups.set(groupName, []);
+      }
+      groups.get(groupName)!.push(activity);
+    }
+    return Array.from(groups.entries())
+      .map(([name, items]) => [name, items.slice().sort((a, b) => a.name.localeCompare(b.name))] as const)
+      .sort((a, b) => a[0].localeCompare(b[0]));
   };
 
   const exportCsv = async () => {
@@ -52,6 +99,10 @@
         end_date: endDate
       });
 
+      if (selectedActivityIds.size > 0) {
+        params.set('activity_ids', Array.from(selectedActivityIds).join(','));
+      }
+
       const response = await fetch(`/api/export/csv?${params.toString()}`);
       if (!response.ok) {
         const text = await response.text();
@@ -75,6 +126,8 @@
       busy = false;
     }
   };
+
+  onMount(loadCatalog);
 </script>
 
 <section class="hero">
@@ -105,6 +158,28 @@
         />
         <span>{source.label}</span>
       </label>
+    {/each}
+  </div>
+
+  <div class="label block-gap">Filter Mood Export by Activities (optional)</div>
+  <p class="hint">If selected, only mood entries with these activities are included, and mood activity names are limited to this selection.</p>
+  <div class="activity-groups">
+    {#each groupedActivities() as [groupName, groupActivities]}
+      <section class="activity-group">
+        <h4>{groupName}</h4>
+        <div class="activity-grid">
+          {#each groupActivities as activity}
+            <label class="activity-item">
+              <input
+                type="checkbox"
+                checked={selectedActivityIds.has(activity.id)}
+                on:change={() => toggleActivity(activity.id)}
+              />
+              <span>{activity.name}</span>
+            </label>
+          {/each}
+        </div>
+      </section>
     {/each}
   </div>
 
@@ -159,10 +234,49 @@
     border-radius: 8px;
     padding: 0.4rem 0.6rem;
   }
+  .hint {
+    margin: 0.3rem 0 0.65rem;
+    color: #486888;
+    font-size: 0.85rem;
+  }
+  .activity-groups {
+    display: grid;
+    gap: 0.7rem;
+    max-height: 340px;
+    overflow: auto;
+    padding-right: 0.25rem;
+  }
+  .activity-group {
+    border: 1px solid #d7e6f7;
+    border-radius: 10px;
+    background: #f8fbff;
+    padding: 0.55rem 0.65rem;
+  }
+  .activity-group h4 {
+    margin: 0 0 0.45rem;
+    color: #163c61;
+    font-size: 0.9rem;
+  }
+  .activity-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+  .activity-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #1e4b76;
+    font-size: 0.86rem;
+  }
+  .activity-item input { width: auto; }
 
   @media (max-width: 860px) {
     .source-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .activity-grid {
+      grid-template-columns: 1fr;
     }
   }
 

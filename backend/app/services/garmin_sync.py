@@ -726,8 +726,10 @@ def _upsert_steps_daily(db: Session, steps_date: dt.date, payload: Dict[str, Any
     row.distance_meters = _get_int(
         payload,
         "distanceInMeters",
+        "totalDistanceMeters",
         "distanceMeters",
         "dailyStepDTO.distanceInMeters",
+        "dailyStepDTO.totalDistanceMeters",
         "distance",
     )
     row.calories_burned = _get_int(
@@ -775,11 +777,37 @@ def _fetch_hydration_payload(client: Any, date_str: str) -> Dict[str, Any]:
 
 
 def _fetch_steps_payload(client: Any, date_str: str) -> Dict[str, Any]:
-    return _call_client_method(
-        client,
-        ["get_steps_data", "get_daily_steps", "get_steps", "get_stats"],
-        date_str,
-    )
+    def _normalize(raw: Any) -> Dict[str, Any]:
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, list):
+            if not raw:
+                return {}
+            if all(isinstance(item, dict) for item in raw):
+                merged: Dict[str, Any] = {}
+                for item in raw:
+                    merged.update(item)
+                if "totalSteps" not in merged:
+                    merged["totalSteps"] = _get_int({"v": sum(_get_int(item, "steps", "stepCount") or 0 for item in raw)}, "v")
+                return merged
+            numeric_items = [int(item) for item in raw if isinstance(item, (int, float))]
+            if numeric_items:
+                return {"totalSteps": sum(numeric_items)}
+        return {}
+
+    candidates = ["get_steps_data", "get_daily_steps", "get_steps", "get_stats"]
+    for method_name in candidates:
+        method = getattr(client, method_name, None)
+        if not callable(method):
+            continue
+        for args in [(date_str,), (date_str, date_str), tuple()]:
+            try:
+                payload = _normalize(method(*args))
+                if payload:
+                    return payload
+            except TypeError:
+                continue
+    raise GarminClientError("Garmin client does not support steps retrieval methods")
 
 
 def _sync_activities_window(
