@@ -143,6 +143,19 @@ class GarminHydrationDaily(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class GarminStepsDaily(Base):
+    __tablename__ = "garmin_steps_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    steps_date = Column(Date, unique=True, nullable=False, index=True)
+    total_steps = Column(Integer, nullable=True)
+    distance_meters = Column(Integer, nullable=True)
+    calories_burned = Column(Integer, nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class GarminActivity(Base):
     __tablename__ = "garmin_activities"
 

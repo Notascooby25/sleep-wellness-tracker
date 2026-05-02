@@ -18,6 +18,7 @@ HRV_SYNC_KEY = "hrv_daily"
 RHR_SYNC_KEY = "resting_heart_rate_daily"
 STRESS_SYNC_KEY = "stress_daily"
 HYDRATION_SYNC_KEY = "hydration_daily"
+STEPS_SYNC_KEY = "steps_daily"
 ACTIVITY_SYNC_KEY = "activities"
 MIN_SYNC_INTERVAL_MINUTES = 45
 UK_TZ = ZoneInfo("Europe/London")
@@ -40,6 +41,7 @@ HRV_BACKFILL_DAYS = _env_int("GARMIN_HRV_BACKFILL_DAYS", 7)
 RHR_BACKFILL_DAYS = _env_int("GARMIN_RHR_BACKFILL_DAYS", 7)
 STRESS_BACKFILL_DAYS = _env_int("GARMIN_STRESS_BACKFILL_DAYS", 7)
 HYDRATION_BACKFILL_DAYS = _env_int("GARMIN_HYDRATION_BACKFILL_DAYS", 7)
+STEPS_BACKFILL_DAYS = _env_int("GARMIN_STEPS_BACKFILL_DAYS", 7)
 ACTIVITY_BACKFILL_DAYS = _env_int("GARMIN_ACTIVITY_BACKFILL_DAYS", 30)
 
 
@@ -706,6 +708,48 @@ def _upsert_hydration_daily(db: Session, hydration_date: dt.date, payload: Dict[
     return row
 
 
+def _upsert_steps_daily(db: Session, steps_date: dt.date, payload: Dict[str, Any]) -> models.GarminStepsDaily:
+    row = db.query(models.GarminStepsDaily).filter(models.GarminStepsDaily.steps_date == steps_date).first()
+    if not row:
+        row = models.GarminStepsDaily(steps_date=steps_date)
+        db.add(row)
+
+    row.total_steps = _get_int(
+        payload,
+        "totalSteps",
+        "steps",
+        "dailyStepDTO.totalSteps",
+        "dailySteps",
+        "allDaySteps",
+        "stepCount",
+    )
+    row.distance_meters = _get_int(
+        payload,
+        "distanceInMeters",
+        "distanceMeters",
+        "dailyStepDTO.distanceInMeters",
+        "distance",
+    )
+    row.calories_burned = _get_int(
+        payload,
+        "caloriesBurned",
+        "activeKilocalories",
+        "dailyStepDTO.caloriesBurned",
+        "calories",
+    )
+    row.payload = payload
+
+    db.commit()
+    db.refresh(row)
+    logger.info(
+        "Upserted Garmin steps row; date=%s total_steps=%s payload_keys=%s",
+        steps_date.isoformat(),
+        row.total_steps,
+        sorted(payload.keys()),
+    )
+    return row
+
+
 def _fetch_sleep_payload(client: Any, date_str: str) -> Dict[str, Any]:
     return _call_client_method(client, ["get_sleep_data"], date_str)
 
@@ -728,6 +772,14 @@ def _fetch_stress_payload(client: Any, date_str: str) -> Dict[str, Any]:
 
 def _fetch_hydration_payload(client: Any, date_str: str) -> Dict[str, Any]:
     return _call_client_method(client, ["get_hydration_data", "get_hydration", "get_hydration_stats"], date_str)
+
+
+def _fetch_steps_payload(client: Any, date_str: str) -> Dict[str, Any]:
+    return _call_client_method(
+        client,
+        ["get_steps_data", "get_daily_steps", "get_steps", "get_stats"],
+        date_str,
+    )
 
 
 def _sync_activities_window(
@@ -824,6 +876,10 @@ def _sync_stress_dates(client: Any, db: Session, dates: List[dt.date]) -> Tuple[
 
 def _sync_hydration_dates(client: Any, db: Session, dates: List[dt.date]) -> Tuple[List[str], List[Dict[str, str]]]:
     return _sync_metric_dates(client, db, dates, "hydration", _fetch_hydration_payload, _upsert_hydration_daily)
+
+
+def _sync_steps_dates(client: Any, db: Session, dates: List[dt.date]) -> Tuple[List[str], List[Dict[str, str]]]:
+    return _sync_metric_dates(client, db, dates, "steps", _fetch_steps_payload, _upsert_steps_daily)
 
 
 def _run_metric_sync(
@@ -998,6 +1054,21 @@ def sync_hydration_if_due(db: Session, force: bool = False, backfill_days: Optio
     )
 
 
+def sync_steps_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
+    return _run_metric_sync(
+        db,
+        force=force,
+        state_key=STEPS_SYNC_KEY,
+        metric_name="steps",
+        backfill_days=STEPS_BACKFILL_DAYS,
+        backfill_days_override=backfill_days,
+        sync_dates_fn=_sync_steps_dates,
+        latest_field="steps_date",
+        window_open=_day_close_window_open,
+        skipped_reason="outside_steps_sync_window",
+    )
+
+
 def sync_activities_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
     now_local = _uk_now()
     state = _get_sync_state(db, ACTIVITY_SYNC_KEY)
@@ -1064,6 +1135,7 @@ def sync_smart(db: Session, force: bool = False, backfill_days: Optional[int] = 
         "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=force, backfill_days=backfill_days),
         "stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days),
         "hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days),
+        "steps": sync_steps_if_due(db, force=force, backfill_days=backfill_days),
         "activities": sync_activities_if_due(db, force=force, backfill_days=backfill_days),
     }
     logger.info("Smart Garmin sync finished; results=%s", results)
