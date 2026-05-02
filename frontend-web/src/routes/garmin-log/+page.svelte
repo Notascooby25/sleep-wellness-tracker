@@ -4,6 +4,13 @@
 
   type MetricRow = Record<string, unknown>;
   type WrappedRows = { data: MetricRow[] };
+  type StepsRow = {
+    date: string;
+    total_steps: number | null;
+    distance_meters: number | null;
+    calories_burned: number | null;
+  };
+  type WrappedSteps = { data: StepsRow[] };
   type ActivityRow = {
     id: string;
     date: string;
@@ -41,6 +48,7 @@
     { value: 'rhr', label: 'Resting HR only' },
     { value: 'stress', label: 'Stress only' },
     { value: 'hydration', label: 'Hydration only' },
+    { value: 'steps', label: 'Steps only' },
     { value: 'activities', label: 'Activities only' },
   ];
 
@@ -50,6 +58,7 @@
   let rhrByDate: Record<string, MetricRow> = {};
   let stressByDate: Record<string, MetricRow> = {};
   let hydrationByDate: Record<string, MetricRow> = {};
+  let stepsByDate: Record<string, StepsRow> = {};
   let activitiesByDate: Record<string, ActivityRow[]> = {};
 
   const toByDate = (rows: MetricRow[], dateKey: string): Record<string, MetricRow> =>
@@ -94,13 +103,14 @@
   const load = async () => {
     status = '';
     try {
-      const [sleepWrap, bodyWrap, hrvWrap, rhrWrap, stressWrap, hydWrap, activitiesWrap] = await Promise.all([
+      const [sleepWrap, bodyWrap, hrvWrap, rhrWrap, stressWrap, hydWrap, stepsWrap, activitiesWrap] = await Promise.all([
         getJson<WrappedRows>(`/garmin/sleep/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedRows>(`/garmin/body-battery/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedRows>(`/garmin/hrv/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedRows>(`/garmin/resting-heart-rate/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedRows>(`/garmin/stress/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedRows>(`/garmin/hydration/range?start_date=${startDate}&end_date=${endDate}`),
+        getJson<WrappedSteps>(`/garmin/steps/range?start_date=${startDate}&end_date=${endDate}`),
         getJson<WrappedActivities>(`/garmin/activities/range?start_date=${startDate}&end_date=${endDate}`),
       ]);
       sleepByDate = toByDate(sleepWrap?.data || [], 'date');
@@ -109,6 +119,7 @@
       rhrByDate = toByDate(rhrWrap?.data || [], 'date');
       stressByDate = toByDate(stressWrap?.data || [], 'date');
       hydrationByDate = toByDate(hydWrap?.data || [], 'date');
+      stepsByDate = toByDate(stepsWrap?.data || [], 'date') as Record<string, StepsRow>;
       activitiesByDate = (activitiesWrap?.data || []).reduce<Record<string, ActivityRow[]>>((acc, row) => {
         const key = row.date;
         if (!key) return acc;
@@ -152,6 +163,7 @@
       ...Object.keys(rhrByDate),
       ...Object.keys(stressByDate),
       ...Object.keys(hydrationByDate),
+      ...Object.keys(stepsByDate),
       ...Object.keys(activitiesByDate),
     ]);
     return [...s].sort().reverse();
@@ -164,6 +176,7 @@
     rhr: Object.keys(rhrByDate).length,
     stress: Object.keys(stressByDate).length,
     hydration: Object.keys(hydrationByDate).length,
+    steps: Object.keys(stepsByDate).length,
     activities: Object.values(activitiesByDate).reduce((sum, rows) => sum + rows.length, 0),
   };
 
@@ -234,7 +247,7 @@
 </section>
 
 <div class="summary-grid">
-  {#each [['SLEEP DAYS', counts.sleep], ['BODY BATTERY DAYS', counts.body], ['HRV DAYS', counts.hrv], ['RESTING HR DAYS', counts.rhr], ['STRESS DAYS', counts.stress], ['HYDRATION DAYS', counts.hydration], ['ACTIVITIES', counts.activities]] as [label, count]}
+  {#each [['SLEEP DAYS', counts.sleep], ['BODY BATTERY DAYS', counts.body], ['HRV DAYS', counts.hrv], ['RESTING HR DAYS', counts.rhr], ['STRESS DAYS', counts.stress], ['HYDRATION DAYS', counts.hydration], ['STEPS DAYS', counts.steps], ['ACTIVITIES', counts.activities]] as [label, count]}
     <div class="summary-card">
       <div class="sum-label">{label}</div>
       <div class="sum-value">{count}</div>
@@ -252,9 +265,10 @@
     {@const rhr = rhrByDate[dateStr]}
     {@const stress = stressByDate[dateStr]}
     {@const hydration = hydrationByDate[dateStr]}
+    {@const steps = stepsByDate[dateStr]}
     {@const activities = activitiesByDate[dateStr] || []}
     {@const keyActivities = activities.filter((a) => keyActivity(a.activity_type))}
-    {@const hasAny = !!(sleep || body || hrv || rhr || stress || hydration || activities.length)}
+    {@const hasAny = !!(sleep || body || hrv || rhr || stress || hydration || steps || activities.length)}
     {#if hasAny || showEmptyDays}
       <details class="day-card" open={idx === 0}>
         <summary class="day-summary">
@@ -264,6 +278,7 @@
             {#if body?.end_of_day_value != null}<span class="mpill">Body battery {body.end_of_day_value}</span>{/if}
             {#if hrv?.weekly_avg != null}<span class="mpill">HRV {hrv.weekly_avg}</span>{/if}
             {#if rhr?.resting_heart_rate != null}<span class="mpill">Resting HR {rhr.resting_heart_rate}</span>{/if}
+            {#if steps?.total_steps != null}<span class="mpill">Steps {steps.total_steps}</span>{/if}
             {#if activities.length > 0}<span class="mpill">Activities {activities.length}</span>{/if}
             {#if keyActivities.length > 0}<span class="mpill">Run/Walk/Hike {keyActivities.length}</span>{/if}
           </span>
@@ -320,6 +335,14 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
+            <div class="mc-name">Steps</div>
+            {#if steps}
+              <div class="mr"><span>Total</span><span>{fmt(steps.total_steps)}</span></div>
+              <div class="mr"><span>Distance</span><span>{fmtKm(steps.distance_meters)}</span></div>
+              <div class="mr"><span>Calories</span><span>{steps.calories_burned != null ? `${steps.calories_burned} kcal` : '-'}</span></div>
+            {:else}<p class="no-data">No data</p>{/if}
+          </div>
+          <div class="mc">
             <div class="mc-name">Activities</div>
             {#if activities.length > 0}
               {#each activities as a}
@@ -354,7 +377,7 @@
   .chk input { width: auto; }
   .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: #d7e6f7; color: #496685; font-size: 0.68rem; font-weight: 700; cursor: help; margin-left: 2px; }
   .status-msg { font-size: 0.88rem; background: #d4edda; color: #22543d; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.5rem; }
-  .summary-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.75rem; }
+  .summary-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.75rem; }
   @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .summary-card { background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; padding: 0.75rem; }
   .sum-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #496685; }

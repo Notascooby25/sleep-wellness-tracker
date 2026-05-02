@@ -13,6 +13,7 @@ from ..services.garmin_sync import (
     sync_resting_heart_rate_if_due,
     sync_sleep_if_due,
     sync_smart,
+    sync_steps_if_due,
     sync_stress_if_due,
 )
 from ..garmin_client import GarminRateLimitError
@@ -92,6 +93,16 @@ def _serialize_hydration(row: models.GarminHydrationDaily) -> dict:
     }
 
 
+def _serialize_steps(row: models.GarminStepsDaily) -> dict:
+    return {
+        "date": row.steps_date.isoformat(),
+        "total_steps": row.total_steps,
+        "distance_meters": row.distance_meters,
+        "calories_burned": row.calories_burned,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
 def _serialize_activity(row: models.GarminActivity) -> dict:
     return {
         "id": row.garmin_activity_id,
@@ -110,7 +121,7 @@ def _serialize_activity(row: models.GarminActivity) -> dict:
 
 @router.post("/sync-now")
 def sync_now(
-    mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|activities|all)$"),
+    mode: str = Query(default="smart", pattern="^(smart|sleep|body|hrv|rhr|stress|hydration|steps|activities|all)$"),
     force: bool = Query(default=False),
     backfill_days: int | None = Query(default=None, ge=1, le=730),
     db: Session = Depends(get_db),
@@ -129,6 +140,8 @@ def sync_now(
             return {"stress": sync_stress_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "hydration":
             return {"hydration": sync_hydration_if_due(db, force=force, backfill_days=backfill_days)}
+        if mode == "steps":
+            return {"steps": sync_steps_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "activities":
             return {"activities": sync_activities_if_due(db, force=force, backfill_days=backfill_days)}
         if mode == "all":
@@ -139,6 +152,7 @@ def sync_now(
                 "resting_heart_rate": sync_resting_heart_rate_if_due(db, force=True, backfill_days=backfill_days),
                 "stress": sync_stress_if_due(db, force=True, backfill_days=backfill_days),
                 "hydration": sync_hydration_if_due(db, force=True, backfill_days=backfill_days),
+                "steps": sync_steps_if_due(db, force=True, backfill_days=backfill_days),
                 "activities": sync_activities_if_due(db, force=True, backfill_days=backfill_days),
             }
         return sync_smart(db, force=force, backfill_days=backfill_days)
@@ -375,6 +389,41 @@ def get_hydration_range(
         .all()
     )
     return {"data": [_serialize_hydration(row) for row in rows]}
+
+
+@router.get("/steps/latest")
+def get_latest_steps(db: Session = Depends(get_db)):
+    logger.info("/garmin/steps/latest called")
+    row = db.query(models.GarminStepsDaily).order_by(models.GarminStepsDaily.steps_date.desc()).first()
+    if not row:
+        return {"data": None}
+    return {"data": _serialize_steps(row)}
+
+
+@router.get("/steps/by-date")
+def get_steps_by_date(date: dt.date = Query(...), db: Session = Depends(get_db)):
+    logger.info("/garmin/steps/by-date called; date=%s", date.isoformat())
+    row = db.query(models.GarminStepsDaily).filter(models.GarminStepsDaily.steps_date == date).first()
+    if not row:
+        return {"data": None}
+    return {"data": _serialize_steps(row)}
+
+
+@router.get("/steps/range")
+def get_steps_range(
+    start_date: dt.date = Query(...),
+    end_date: dt.date = Query(...),
+    db: Session = Depends(get_db),
+):
+    logger.info("/garmin/steps/range called; start_date=%s end_date=%s", start_date.isoformat(), end_date.isoformat())
+    rows = (
+        db.query(models.GarminStepsDaily)
+        .filter(models.GarminStepsDaily.steps_date >= start_date)
+        .filter(models.GarminStepsDaily.steps_date <= end_date)
+        .order_by(models.GarminStepsDaily.steps_date.desc())
+        .all()
+    )
+    return {"data": [_serialize_steps(row) for row in rows]}
 
 
 @router.get("/activities/range")
