@@ -44,17 +44,36 @@ def _parse_sources(raw_sources: str) -> list[str]:
     return unique_values
 
 
+def _parse_activity_ids(raw_activity_ids: str | None) -> set[int]:
+    if not raw_activity_ids:
+        return set()
+    parsed: set[int] = set()
+    for chunk in raw_activity_ids.split(","):
+        trimmed = chunk.strip()
+        if not trimmed:
+            continue
+        try:
+            value = int(trimmed)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid activity id: {trimmed}") from exc
+        if value > 0:
+            parsed.add(value)
+    return parsed
+
+
 @router.get("/csv")
 def export_csv(
     sources: str = Query(..., description="Comma-separated sources"),
     start_date: dt.date = Query(...),
     end_date: dt.date = Query(...),
+    activity_ids: str | None = Query(default=None, description="Optional comma-separated mood activity IDs"),
     db: Session = Depends(get_db),
 ):
     if end_date < start_date:
         raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
 
     selected_sources = _parse_sources(sources)
+    selected_activity_ids = _parse_activity_ids(activity_ids)
 
     by_date: dict[str, dict[str, object]] = {}
     column_order: list[str] = []
@@ -220,13 +239,19 @@ def export_csv(
 
     if "mood" in selected_sources:
         add_columns(["mood_score", "mood_activities", "mood_notes", "mood_entries"])
-        rows = (
+        query = (
             db.query(models.Mood)
             .options(selectinload(models.Mood.activities))
             .filter(func.date(models.Mood.timestamp) >= start_date)
             .filter(func.date(models.Mood.timestamp) <= end_date)
-            .all()
         )
+        if selected_activity_ids:
+            query = (
+                query.join(models.Mood.activities)
+                .filter(models.Activity.id.in_(selected_activity_ids))
+                .distinct()
+            )
+        rows = query.all()
 
         grouped_scores: dict[dt.date, list[int]] = defaultdict(list)
         grouped_activities: dict[dt.date, set[str]] = defaultdict(set)
@@ -243,6 +268,8 @@ def export_csv(
                 if text:
                     grouped_notes[row_date].append(text)
             for activity in row.activities:
+                if selected_activity_ids and activity.id not in selected_activity_ids:
+                    continue
                 if activity.name and activity.name.strip():
                     grouped_activities[row_date].add(activity.name.strip())
 

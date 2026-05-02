@@ -12,6 +12,8 @@ from ..database import get_db
 
 router = APIRouter(prefix="/lifestyle-impact", tags=["lifestyle-impact"])
 
+_SLEEP_CATEGORY_TOKENS = ("lifestyle", "before sleep", "during sleep", "pre-sleep", "presleep")
+
 _METRIC_CONFIG = {
     "sleep_score": {
         "model": models.GarminSleepDaily,
@@ -57,6 +59,13 @@ def _mark_highest(entries: list[dict]) -> list[dict]:
     return entries
 
 
+def _is_sleep_category(name: str | None) -> bool:
+    if not name:
+        return False
+    lowered = name.strip().lower()
+    return any(token in lowered for token in _SLEEP_CATEGORY_TOKENS)
+
+
 @router.get("")
 def get_lifestyle_impact(
     metric: str = Query(..., pattern="^(sleep_score|overnight_hrv|overnight_stress)$"),
@@ -99,7 +108,7 @@ def get_lifestyle_impact(
 
     mood_rows = (
         db.query(models.Mood)
-        .options(selectinload(models.Mood.activities))
+        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
         .filter(func.date(models.Mood.timestamp) >= start_date)
         .filter(func.date(models.Mood.timestamp) <= end_date)
         .all()
@@ -109,6 +118,8 @@ def get_lifestyle_impact(
     for mood in mood_rows:
         mood_date = mood.timestamp.date()
         for activity in mood.activities:
+            if not _is_sleep_category(activity.category.name if activity.category else None):
+                continue
             name = (activity.name or "").strip()
             if name:
                 activity_dates[name].add(mood_date)
