@@ -75,6 +75,19 @@ def export_csv(
     selected_sources = _parse_sources(sources)
     selected_activity_ids = _parse_activity_ids(activity_ids)
 
+    allowed_dates: set[dt.date] = set()
+    if selected_activity_ids:
+        mood_date_rows = (
+            db.query(func.date(models.Mood.timestamp))
+            .join(models.Mood.activities)
+            .filter(func.date(models.Mood.timestamp) >= start_date)
+            .filter(func.date(models.Mood.timestamp) <= end_date)
+            .filter(models.Activity.id.in_(selected_activity_ids))
+            .distinct()
+            .all()
+        )
+        allowed_dates = {row_date for (row_date,) in mood_date_rows if isinstance(row_date, dt.date)}
+
     by_date: dict[str, dict[str, object]] = {}
     column_order: list[str] = []
 
@@ -88,6 +101,11 @@ def export_csv(
         for column in columns:
             if column not in column_order:
                 column_order.append(column)
+
+    def date_allowed(target_date: dt.date) -> bool:
+        if not selected_activity_ids:
+            return True
+        return target_date in allowed_dates
 
     if "sleep" in selected_sources:
         add_columns([
@@ -105,6 +123,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.sleep_date):
+                continue
             target = ensure_row(row.sleep_date)
             target["sleep_score"] = row.sleep_score
             target["total_sleep_minutes"] = row.total_sleep_minutes
@@ -122,6 +142,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.hrv_date):
+                continue
             target = ensure_row(row.hrv_date)
             target["hrv_weekly_avg"] = row.weekly_avg
             target["hrv_status"] = row.status
@@ -141,6 +163,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.stress_date):
+                continue
             target = ensure_row(row.stress_date)
             target["stress_overall_level"] = row.overall_stress_level
             target["stress_rest_minutes"] = row.rest_stress_duration
@@ -157,6 +181,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.battery_date):
+                continue
             target = ensure_row(row.battery_date)
             target["body_battery_morning"] = row.morning_value
             target["body_battery_end_of_day"] = row.end_of_day_value
@@ -172,6 +198,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.heart_rate_date):
+                continue
             target = ensure_row(row.heart_rate_date)
             target["resting_heart_rate"] = row.resting_heart_rate
             target["min_heart_rate"] = row.min_heart_rate
@@ -186,6 +214,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.hydration_date):
+                continue
             target = ensure_row(row.hydration_date)
             target["hydration_consumed_ml"] = row.consumed_ml
             target["hydration_goal_ml"] = row.goal_ml
@@ -199,6 +229,8 @@ def export_csv(
             .all()
         )
         for row in rows:
+            if not date_allowed(row.steps_date):
+                continue
             target = ensure_row(row.steps_date)
             target["steps_total"] = row.total_steps
             target["steps_distance_meters"] = row.distance_meters
@@ -220,6 +252,8 @@ def export_csv(
         )
         grouped: dict[dt.date, list[models.GarminActivity]] = defaultdict(list)
         for row in rows:
+            if not date_allowed(row.activity_date):
+                continue
             grouped[row.activity_date].append(row)
 
         for activity_date, date_rows in grouped.items():
@@ -260,6 +294,8 @@ def export_csv(
 
         for row in rows:
             row_date = row.timestamp.date()
+            if not date_allowed(row_date):
+                continue
             grouped_entries[row_date] += 1
             if row.mood_score is not None:
                 grouped_scores[row_date].append(int(row.mood_score))
@@ -268,8 +304,6 @@ def export_csv(
                 if text:
                     grouped_notes[row_date].append(text)
             for activity in row.activities:
-                if selected_activity_ids and activity.id not in selected_activity_ids:
-                    continue
                 if activity.name and activity.name.strip():
                     grouped_activities[row_date].add(activity.name.strip())
 

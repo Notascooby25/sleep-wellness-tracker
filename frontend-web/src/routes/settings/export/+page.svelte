@@ -61,6 +61,14 @@
     selectedActivityIds = new Set(selectedActivityIds);
   };
 
+  const clearActivities = () => {
+    selectedActivityIds = new Set<number>();
+  };
+
+  const selectAllActivities = () => {
+    selectedActivityIds = new Set(activities.map((activity) => activity.id));
+  };
+
   const groupedActivities = () => {
     const categoryMap = new Map<number, string>(categories.map((c) => [c.id, c.name]));
     const groups = new Map<string, Activity[]>();
@@ -161,8 +169,13 @@
     {/each}
   </div>
 
-  <div class="label block-gap">Filter Mood Export by Activities (optional)</div>
-  <p class="hint">If selected, only mood entries with these activities are included, and mood activity names are limited to this selection.</p>
+  <div class="label block-gap">Filter Export by Activities (optional)</div>
+  <p class="hint">If selected, the export includes only dates where at least one selected activity was tagged in Mood Log.</p>
+  <div class="activity-actions">
+    <button type="button" class="btn-subtle" on:click={selectAllActivities}>Select all</button>
+    <button type="button" class="btn-subtle" on:click={clearActivities}>Clear</button>
+    <span class="selected-count">{selectedActivityIds.size} selected</span>
+  </div>
   <div class="activity-groups">
     {#each groupedActivities() as [groupName, groupActivities]}
       <section class="activity-group">
@@ -245,6 +258,25 @@
     max-height: 340px;
     overflow: auto;
     padding-right: 0.25rem;
+  }
+  .activity-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .btn-subtle {
+    background: #edf4fd;
+    border-color: #c7d9ef;
+    color: #355f89;
+    font-size: 0.82rem;
+    padding: 0.24rem 0.55rem;
+  }
+  .selected-count {
+    color: #486888;
+    font-size: 0.82rem;
+    margin-left: 0.25rem;
   }
   .activity-group {
     border: 1px solid #d7e6f7;
