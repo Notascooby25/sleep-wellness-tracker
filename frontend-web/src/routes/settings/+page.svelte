@@ -18,6 +18,11 @@
     <h3>Mood Log Tools</h3>
     <p>Import backups, bulk delete entries, and run rating cleanup tools.</p>
   </a>
+
+  <a class="settings-link" href="/settings/export">
+    <h3>Export Data</h3>
+    <p>Download mood logs and Garmin data as a CSV for any date range.</p>
+  </a>
 </section>
 
 <style>

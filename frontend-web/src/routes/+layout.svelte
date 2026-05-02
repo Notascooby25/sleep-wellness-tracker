@@ -6,6 +6,7 @@
     { href: '/mood-entry', label: 'Mood Entry' },
     { href: '/mood-log', label: 'Mood Log' },
     { href: '/garmin-log', label: 'Garmin Log' },
+    { href: '/garmin-lifestyle-impact', label: 'Lifestyle Impact' },
     { href: '/analytics', label: 'Analytics' },
     { href: '/settings', label: 'Settings' }
   ];

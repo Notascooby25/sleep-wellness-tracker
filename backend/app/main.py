@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 
 from .database import SessionLocal
-from .routes import mood, categories, activities, garmin
+from .routes import mood, categories, activities, garmin, export, lifestyle_impact
 from .services.garmin_sync import (
     sync_activities_if_due,
     sync_sleep_if_due,
@@ -16,6 +16,7 @@ from .services.garmin_sync import (
     sync_resting_heart_rate_if_due,
     sync_stress_if_due,
     sync_hydration_if_due,
+    sync_steps_if_due,
 )
 
 app = FastAPI()
@@ -97,6 +98,7 @@ def _garmin_sleep_autosync_loop() -> None:
                     (sync_body_battery_if_due, "body_battery"),
                     (sync_hydration_if_due, "hydration"),
                     (sync_stress_if_due, "stress"),
+                    (sync_steps_if_due, "steps"),
                     (sync_activities_if_due, "activities"),
                 ]:
                     try:
@@ -140,6 +142,8 @@ app.include_router(mood.router)
 app.include_router(categories.router)
 app.include_router(activities.router)
 app.include_router(garmin.router)
+app.include_router(export.router)
+app.include_router(lifestyle_impact.router)
 
 @app.get("/health")
 def health_check():
