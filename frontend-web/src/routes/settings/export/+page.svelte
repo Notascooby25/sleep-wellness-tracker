@@ -69,20 +69,9 @@
     selectedActivityIds = new Set(activities.map((activity) => activity.id));
   };
 
-  const groupedActivities = () => {
-    const categoryMap = new Map<number, string>(categories.map((c) => [c.id, c.name]));
-    const groups = new Map<string, Activity[]>();
-    for (const activity of activities) {
-      const groupName = categoryMap.get(activity.category_id ?? -1) || 'Uncategorised';
-      if (!groups.has(groupName)) {
-        groups.set(groupName, []);
-      }
-      groups.get(groupName)!.push(activity);
-    }
-    return Array.from(groups.entries())
-      .map(([name, items]) => [name, items.slice().sort((a, b) => a.name.localeCompare(b.name))] as const)
-      .sort((a, b) => a[0].localeCompare(b[0]));
-  };
+  let activeCategory = 0;
+
+  const byCategory = (catId: number) => activities.filter((a) => a.category_id === catId);
 
   const exportCsv = async () => {
     status = '';
@@ -169,32 +158,68 @@
     {/each}
   </div>
 
-  <div class="label block-gap">Filter Export by Activities (optional)</div>
+  <div class="label block-gap">Filter Export by Activities <span class="hint-inline">(optional)</span></div>
   <p class="hint">If selected, the export includes only dates where at least one selected activity was tagged in Mood Log.</p>
-  <div class="activity-actions">
-    <button type="button" class="btn-subtle" on:click={selectAllActivities}>Select all</button>
-    <button type="button" class="btn-subtle" on:click={clearActivities}>Clear</button>
-    <span class="selected-count">{selectedActivityIds.size} selected</span>
-  </div>
-  <div class="activity-groups">
-    {#each groupedActivities() as [groupName, groupActivities]}
-      <section class="activity-group">
-        <h4>{groupName}</h4>
-        <div class="activity-grid">
-          {#each groupActivities as activity}
-            <label class="activity-item">
-              <input
-                type="checkbox"
-                checked={selectedActivityIds.has(activity.id)}
-                on:change={() => toggleActivity(activity.id)}
-              />
-              <span>{activity.name}</span>
-            </label>
+
+  <section class="card acts-card">
+    <div class="acts-header">
+      <h3 style="margin:0;">Activities</h3>
+      <span class="label" style="flex:1;margin:0;">Tap chips to toggle, then switch categories using tabs.</span>
+      <button type="button" class="btn-clear" on:click={clearActivities}>Clear</button>
+    </div>
+
+    {#if selectedActivityIds.size > 0}
+      <div class="selected-summary">
+        {#each Array.from(selectedActivityIds) as id}
+          {@const act = activities.find(a => a.id === id)}
+          {#if act}
+            <button class="chip chip-selected" on:click={() => toggleActivity(id)}>{act.name} ×</button>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+
+    {#if categories.length === 0}
+      <p class="hint">Loading categories…</p>
+    {:else}
+      <div class="cat-tabs">
+        {#each categories as cat, i}
+          <button
+            type="button"
+            class="cat-tab"
+            class:cat-tab-active={activeCategory === i}
+            on:click={() => (activeCategory = i)}
+          >
+            {cat.name}
+            {#if byCategory(cat.id).some(a => selectedActivityIds.has(a.id))}
+              <span class="cat-dot"></span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+
+      {#if categories[activeCategory]}
+        {@const catActivities = byCategory(categories[activeCategory].id)}
+        <div class="chips">
+          {#each catActivities as activity}
+            <button
+              type="button"
+              class="chip"
+              class:chip-selected={selectedActivityIds.has(activity.id)}
+              on:click={() => toggleActivity(activity.id)}
+            >{activity.name}</button>
+          {:else}
+            <p class="hint">No activities in this category.</p>
           {/each}
         </div>
-      </section>
-    {/each}
-  </div>
+      {/if}
+    {/if}
+
+    <div class="acts-footer">
+      <button type="button" class="btn-subtle" on:click={selectAllActivities}>Select all</button>
+      <span class="selected-count">{selectedActivityIds.size} selected</span>
+    </div>
+  </section>
 
   <div class="actions">
     <button class="btn-primary" disabled={busy} on:click={exportCsv}>
@@ -210,6 +235,7 @@
 <style>
   .export-card { padding: 1rem; }
   .block-gap { margin-top: 0.9rem; }
+  .hint-inline { font-size: 0.82rem; color: #496685; font-weight: 400; }
   .source-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -252,69 +278,26 @@
     color: #486888;
     font-size: 0.85rem;
   }
-  .activity-groups {
-    display: grid;
-    gap: 0.7rem;
-    max-height: 340px;
-    overflow: auto;
-    padding-right: 0.25rem;
-  }
-  .activity-actions {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    margin-bottom: 0.6rem;
-    flex-wrap: wrap;
-  }
-  .btn-subtle {
-    background: #edf4fd;
-    border-color: #c7d9ef;
-    color: #355f89;
-    font-size: 0.82rem;
-    padding: 0.24rem 0.55rem;
-  }
-  .selected-count {
-    color: #486888;
-    font-size: 0.82rem;
-    margin-left: 0.25rem;
-  }
-  .activity-group {
-    border: 1px solid #d7e6f7;
-    border-radius: 10px;
-    background: #f8fbff;
-    padding: 0.55rem 0.65rem;
-  }
-  .activity-group h4 {
-    margin: 0 0 0.45rem;
-    color: #163c61;
-    font-size: 0.9rem;
-  }
-  .activity-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.35rem;
-  }
-  .activity-item {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: #1e4b76;
-    font-size: 0.86rem;
-  }
-  .activity-item input { width: auto; }
+  /* Activity picker — matches mood-entry style */
+  .acts-card { margin-top: 0.1rem; padding: 0.75rem 0.9rem; }
+  .acts-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
+  .acts-footer { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.75rem; border-top: 1px solid #e8f0f9; padding-top: 0.55rem; }
+  .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8f0f9; }
+  .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid #e2eaf4; margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
+  .cat-tab { position: relative; background: transparent; border: 1px solid #d7e6f7; border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: #1e4b76; cursor: pointer; }
+  .cat-tab-active { background: #d4e9ff; border-color: #a9c9ea; font-weight: 700; }
+  .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3c79c5; margin-left: 4px; vertical-align: middle; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+  .chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
+  .chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
+  .btn-clear { background: transparent; border-color: #c7d9ef; color: #496685; font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
+  .btn-subtle { background: #edf4fd; border-color: #c7d9ef; color: #355f89; font-size: 0.82rem; padding: 0.24rem 0.55rem; }
+  .selected-count { color: #486888; font-size: 0.82rem; }
 
   @media (max-width: 860px) {
-    .source-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .activity-grid {
-      grid-template-columns: 1fr;
-    }
+    .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-
   @media (max-width: 540px) {
-    .source-grid {
-      grid-template-columns: 1fr;
-    }
+    .source-grid { grid-template-columns: 1fr; }
   }
 </style>
