@@ -12,9 +12,7 @@
   let toDate = today;
   let quickRange = 'Last 30 days';
   let sleepGoalMinutes = 420;
-  let mode: 'Core' | 'Core + one extra' = 'Core';
-  let extraSection: 'Recovery Metrics' | 'Mood Distribution' | 'Activity Log' | 'Correlations & Insights' = 'Recovery Metrics';
-  
+
   let selectedMood: 1 | 2 | 3 | 4 | 5 = 3;
   let selectedCategory: number | null = null;
 
@@ -102,23 +100,6 @@
     }
   };
 
-  const getSeriesPath = (values: Array<number | null>, width: number, height: number): string => {
-    const pts = values
-      .map((v, i) => ({ i, v }))
-      .filter((p) => p.v !== null) as Array<{ i: number; v: number }>;
-    if (pts.length < 2) return '';
-    const ys = pts.map((p) => p.v);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const span = Math.max(1e-6, maxY - minY);
-    return pts
-      .map((p, idx) => {
-        const x = (p.i / Math.max(1, values.length - 1)) * width;
-        const y = height - ((p.v - minY) / span) * height;
-        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-      })
-      .join(' ');
-  };
 
   $: sleepByDateMap = new Map(sleepRows.map((r) => [String(r.date), r]));
   $: bodyByDateMap = new Map(bodyRows.map((r) => [String(r.date), r]));
@@ -161,28 +142,6 @@
     }
     return new Map(Array.from(map.entries()).map(([k, arr]) => [k, arr.reduce((a, b) => a + b, 0) / arr.length]));
   })();
-
-  $: moodTrendValues = dayList.map((d) => dailyMoodMap.get(d) ?? null);
-
-  $: bestDay = (() => {
-    const pairs = Array.from(dailyMoodMap.entries());
-    if (!pairs.length) return null;
-    return pairs.reduce((best, p) => (p[1] < best[1] ? p : best), pairs[0]);
-  })();
-
-  $: worstDay = (() => {
-    const pairs = Array.from(dailyMoodMap.entries());
-    if (!pairs.length) return null;
-    return pairs.reduce((worst, p) => (p[1] > worst[1] ? p : worst), pairs[0]);
-  })();
-
-  $: sleepMoodDates = dayList.filter((d) => sleepByDateMap.has(d) && dailyMoodMap.has(d));
-  $: sleepScoreSeries = sleepMoodDates.map((d) => Number(sleepByDateMap.get(d)?.sleep_score ?? null));
-  $: sleepDurationSeries = sleepMoodDates.map((d) => {
-    const m = Number(sleepByDateMap.get(d)?.total_sleep_minutes);
-    return Number.isFinite(m) ? m / 60 : null;
-  });
-  $: moodOnSleepDates = sleepMoodDates.map((d) => dailyMoodMap.get(d) ?? null);
 
   $: recoveryDates = dayList;
   $: hrvSeries = recoveryDates.map((d) => {
@@ -663,22 +622,6 @@
 
   <div class="controls" style="margin-top:0.7rem;">
     <label>
-      <div class="label">Display</div>
-      <select bind:value={mode}>
-        <option>Core</option>
-        <option>Core + one extra</option>
-      </select>
-    </label>
-    <label>
-      <div class="label">Extra section</div>
-      <select bind:value={extraSection} disabled={mode !== 'Core + one extra'}>
-        <option>Recovery Metrics</option>
-        <option>Mood Distribution</option>
-        <option>Activity Log</option>
-        <option>Correlations & Insights</option>
-      </select>
-    </label>
-    <label>
       <div class="label">Sleep goal (minutes)</div>
       <input type="number" min="300" max="720" step="15" bind:value={sleepGoalMinutes} />
     </label>
@@ -766,37 +709,6 @@
   </div>
 </section>
 
-<section class="grid two">
-  <article class="card">
-    <h3>Mood Trend</h3>
-    <svg class="chart" viewBox="0 0 640 220" preserveAspectRatio="none">
-      <path class="line main" d={getSeriesPath(moodTrendValues, 640, 220)}></path>
-    </svg>
-    <div class="chart-meta">
-      <span>Best day: {bestDay ? `${bestDay[0]} (${bestDay[1].toFixed(1)})` : '-'}</span>
-      <span>Toughest day: {worstDay ? `${worstDay[0]} (${worstDay[1].toFixed(1)})` : '-'}</span>
-    </div>
-  </article>
-  <article class="card">
-    <h3>Sleep vs Mood</h3>
-    <div class="mini-charts">
-      <div>
-        <div class="label">Sleep score vs mood</div>
-        <svg class="chart" viewBox="0 0 640 160" preserveAspectRatio="none">
-          <path class="line sleep" d={getSeriesPath(sleepScoreSeries, 640, 160)}></path>
-          <path class="line mood" d={getSeriesPath(moodOnSleepDates, 640, 160)}></path>
-        </svg>
-      </div>
-      <div>
-        <div class="label">Sleep duration (h) vs mood</div>
-        <svg class="chart" viewBox="0 0 640 160" preserveAspectRatio="none">
-          <path class="line sleep" d={getSeriesPath(sleepDurationSeries, 640, 160)}></path>
-          <path class="line mood" d={getSeriesPath(moodOnSleepDates, 640, 160)}></path>
-        </svg>
-      </div>
-    </div>
-  </article>
-</section>
 
 {#if mode === 'Core + one extra' && extraSection === 'Recovery Metrics'}
   <section class="grid two">
@@ -922,12 +834,11 @@
   </section>
 {/if}
 
-{#if mode === 'Core + one extra' && extraSection === 'Correlations & Insights'}
-  <section class="card">
-    <h3>Correlations & Insights</h3>
-    <p style="color: #5f6f84; font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
-    
-    <div class="insights-grid">
+<section class="card">
+  <h3>Correlations & Insights</h3>
+  <p style="color: #5f6f84; font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
+  
+  <div class="insights-grid">
       <!-- Influence on Mood -->
       <article class="insight-card">
         <h4>Influence on Mood</h4>
@@ -1052,9 +963,8 @@
           {/each}
         </div>
       </article>
-    </div>
-  </section>
-{/if}
+  </div>
+</section>
 
 <style>
   .controls { display: grid; gap: 0.7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
