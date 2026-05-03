@@ -2,7 +2,6 @@ import datetime as dt
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
-from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models, schemas
@@ -20,9 +19,11 @@ def list_mood_entries(
 ):
     rows_query = db.query(models.Mood).options(selectinload(models.Mood.activities))
     if from_date is not None:
-        rows_query = rows_query.filter(func.date(models.Mood.timestamp) >= from_date)
+        from_dt = dt.datetime(from_date.year, from_date.month, from_date.day, tzinfo=dt.timezone.utc)
+        rows_query = rows_query.filter(models.Mood.timestamp >= from_dt)
     if to_date is not None:
-        rows_query = rows_query.filter(func.date(models.Mood.timestamp) <= to_date)
+        to_dt = dt.datetime(to_date.year, to_date.month, to_date.day, tzinfo=dt.timezone.utc) + dt.timedelta(days=1)
+        rows_query = rows_query.filter(models.Mood.timestamp < to_dt)
     rows_query = rows_query.order_by(models.Mood.timestamp.desc())
     if offset:
         rows_query = rows_query.offset(offset)

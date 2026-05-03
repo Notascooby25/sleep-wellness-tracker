@@ -49,7 +49,7 @@ class Mood(Base):
     id = Column(Integer, primary_key=True, index=True)
     mood_score = Column(Integer, nullable=True)  # Nullable to support optional ratings
     notes = Column(Text, nullable=True)
-    timestamp = Column(DateTime(timezone=True), nullable=False)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     activities = relationship("Activity", secondary=mood_activities, back_populates="moods")

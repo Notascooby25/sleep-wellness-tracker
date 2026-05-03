@@ -420,10 +420,8 @@ def _upsert_sleep_daily(db: Session, sleep_date: dt.date, payload: Dict[str, Any
     row.body_battery_bedtime = _get_int(dto, "bodyBatteryBedtime")
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin sleep row; date=%s total_sleep_minutes=%s sleep_score=%s dto_keys=%s",
+        "Staged Garmin sleep row; date=%s total_sleep_minutes=%s sleep_score=%s dto_keys=%s",
         sleep_date.isoformat(),
         row.total_sleep_minutes,
         row.sleep_score,
@@ -444,10 +442,8 @@ def _upsert_body_daily(db: Session, battery_date: dt.date, payload: Dict[str, An
     row.low_value = _get_int(payload, "lowValue", "minValue", "bodyBatteryLowestValue")
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin body battery row; date=%s morning=%s end_of_day=%s payload_keys=%s",
+        "Staged Garmin body battery row; date=%s morning=%s end_of_day=%s payload_keys=%s",
         battery_date.isoformat(),
         row.morning_value,
         row.end_of_day_value,
@@ -469,10 +465,8 @@ def _upsert_hrv_daily(db: Session, hrv_date: dt.date, payload: Dict[str, Any]) -
     row.status = _get_text(dto, "status", "status.value", "hrvStatus")
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin HRV row; date=%s weekly_avg=%s status=%s payload_keys=%s",
+        "Staged Garmin HRV row; date=%s weekly_avg=%s status=%s payload_keys=%s",
         hrv_date.isoformat(),
         row.weekly_avg,
         row.status,
@@ -496,10 +490,8 @@ def _upsert_rhr_daily(db: Session, heart_rate_date: dt.date, payload: Dict[str, 
     row.max_heart_rate = _get_int(payload, "maxHeartRate", "heartRateValues.maxHeartRate")
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin resting heart rate row; date=%s resting=%s payload_keys=%s",
+        "Staged Garmin resting heart rate row; date=%s resting=%s payload_keys=%s",
         heart_rate_date.isoformat(),
         row.resting_heart_rate,
         sorted(payload.keys()),
@@ -584,10 +576,8 @@ def _upsert_stress_daily(db: Session, stress_date: dt.date, payload: Dict[str, A
 
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin stress row; date=%s overall=%s payload_keys=%s",
+        "Staged Garmin stress row; date=%s overall=%s payload_keys=%s",
         stress_date.isoformat(),
         row.overall_stress_level,
         sorted(payload.keys()),
@@ -696,10 +686,8 @@ def _upsert_hydration_daily(db: Session, hydration_date: dt.date, payload: Dict[
     row.goal_ml = _get_int(payload, "goalMilliliters", "goalML", "dailyGoalInML", "goalInML")
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin hydration row; date=%s consumed_ml=%s goal_ml=%s payload_keys=%s",
+        "Staged Garmin hydration row; date=%s consumed_ml=%s goal_ml=%s payload_keys=%s",
         hydration_date.isoformat(),
         row.consumed_ml,
         row.goal_ml,
@@ -741,10 +729,8 @@ def _upsert_steps_daily(db: Session, steps_date: dt.date, payload: Dict[str, Any
     )
     row.payload = payload
 
-    db.commit()
-    db.refresh(row)
     logger.info(
-        "Upserted Garmin steps row; date=%s total_steps=%s payload_keys=%s",
+        "Staged Garmin steps row; date=%s total_steps=%s payload_keys=%s",
         steps_date.isoformat(),
         row.total_steps,
         sorted(payload.keys()),
@@ -878,6 +864,10 @@ def _sync_metric_dates(
         except Exception as exc:
             logger.exception("Failed syncing Garmin %s data; date=%s", metric_name, date_str)
             failed_dates.append({"date": date_str, "error": str(exc)})
+
+    if synced_dates:
+        db.commit()
+        logger.info("Committed %s Garmin %s rows in single batch", len(synced_dates), metric_name)
 
     return synced_dates, failed_dates
 

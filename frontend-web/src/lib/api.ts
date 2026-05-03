@@ -87,9 +87,16 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
 
-  // For writes, clear cached GET results to avoid stale reads.
+  // For writes, invalidate only GET cache entries for the same resource group.
+  // activities and categories are treated as one group since they are related.
+  const firstSegment = path.split('/').filter(Boolean)[0] || '';
+  const invalidatePrefixes =
+    firstSegment === 'activities' || firstSegment === 'categories'
+      ? ['GET:/activities', 'GET:/categories']
+      : [`GET:/${firstSegment}`];
+
   for (const key of getCache.keys()) {
-    if (key.startsWith('GET:')) {
+    if (invalidatePrefixes.some((p) => key.startsWith(p))) {
       getCache.delete(key);
     }
   }

@@ -4,7 +4,6 @@ import statistics
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
@@ -106,11 +105,13 @@ def get_lifestyle_impact(
     std_dev = statistics.pstdev(metric_values) if len(metric_values) > 1 else 0.0
     threshold = std_dev * 0.05
 
+    mood_from_dt = dt.datetime(start_date.year, start_date.month, start_date.day, tzinfo=dt.timezone.utc)
+    mood_to_dt = dt.datetime(end_date.year, end_date.month, end_date.day, tzinfo=dt.timezone.utc) + dt.timedelta(days=1)
     mood_rows = (
         db.query(models.Mood)
         .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
-        .filter(func.date(models.Mood.timestamp) >= start_date)
-        .filter(func.date(models.Mood.timestamp) <= end_date)
+        .filter(models.Mood.timestamp >= mood_from_dt)
+        .filter(models.Mood.timestamp < mood_to_dt)
         .all()
     )
 
