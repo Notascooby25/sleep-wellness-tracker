@@ -233,7 +233,7 @@
                 <td style="white-space:nowrap;">
                   {#if entry.id !== undefined}
                     <button class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
-                    <button class="btn-sm btn-danger" on:click={() => remove(entry.id)}>Delete</button>
+                    <button class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
                   {/if}
                 </td>
               </tr>
