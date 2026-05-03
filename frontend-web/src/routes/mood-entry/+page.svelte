@@ -30,6 +30,7 @@
   let latestSleep: SleepLatest | null = null;
   let latestBattery: BatteryLatest | null = null;
   let activeCategory = 0;
+  let currentStreakDays = 0;
 
   const fmtMinutes = (value?: number) => {
     if (value === undefined || value === null) return '-';
@@ -37,6 +38,31 @@
   };
 
   const byCategory = (catId: number) => activities.filter((a) => a.category_id === catId);
+
+  const toLocalDateKey = (isoTs: string) => {
+    const d = new Date(isoTs);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  };
+
+  const shiftDate = (isoDate: string, delta: number) => {
+    const d = new Date(isoDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const computeMoodStreak = (rows: MoodEntry[]) => {
+    const uniqueDays = new Set(rows.map((r) => toLocalDateKey(r.timestamp)));
+    const todayKey = toLocalDateKey(new Date().toISOString());
+    let cursor = uniqueDays.has(todayKey) ? todayKey : shiftDate(todayKey, -1);
+    if (!uniqueDays.has(cursor)) return 0;
+
+    let streak = 0;
+    while (uniqueDays.has(cursor)) {
+      streak += 1;
+      cursor = shiftDate(cursor, -1);
+    }
+    return streak;
+  };
 
   const ratingRequired = () => {
     for (const id of selected) {
@@ -69,16 +95,18 @@
 
   const load = async () => {
     try {
-      const [cats, acts, sleepWrap, batteryWrap] = await Promise.all([
+      const [cats, acts, sleepWrap, batteryWrap, moodRows] = await Promise.all([
         getJson<Category[]>('/categories/'),
         getJson<Activity[]>('/activities/'),
         getJson<GarminLatestWrap<SleepLatest>>('/garmin/sleep/latest'),
-        getJson<GarminLatestWrap<BatteryLatest>>('/garmin/body-battery/latest')
+        getJson<GarminLatestWrap<BatteryLatest>>('/garmin/body-battery/latest'),
+        getJson<MoodEntry[]>('/mood/?limit=365&offset=0')
       ]);
       categories = cats;
       activities = acts;
       latestSleep = sleepWrap?.data || null;
       latestBattery = batteryWrap?.data || null;
+      currentStreakDays = computeMoodStreak(moodRows);
     } catch (error) {
       status = `Load error: ${error}`;
     }
@@ -114,15 +142,16 @@
   <p>Log your mood and activity context.</p>
 </section>
 
-{#if latestSleep || latestBattery}
+{#if latestSleep || latestBattery || currentStreakDays >= 0}
 <section class="card garmin-snap">
-  <span class="snap-label">Last night</span>
+  <span class="snap-label">Quick snapshot</span>
   {#if latestSleep}
     <span class="snap-pill">Sleep {fmtMinutes(latestSleep.total_sleep_minutes)} · score {latestSleep.sleep_score ?? '-'}/100</span>
   {/if}
   {#if latestBattery}
     <span class="snap-pill">Body battery AM {latestBattery.morning_value ?? '-'} · EOD {latestBattery.end_of_day_value ?? '-'}</span>
   {/if}
+  <span class="snap-pill streak-pill">Mood streak {currentStreakDays} {currentStreakDays === 1 ? 'day' : 'days'}</span>
 </section>
 {/if}
 
@@ -226,6 +255,7 @@
   .garmin-snap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .snap-label { font-size: 0.78rem; font-weight: 700; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; }
   .snap-pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: #1e4b76; }
+  .streak-pill { background: #fff3c4; border-color: #f4d47a; color: #6b4c03; font-weight: 700; }
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
     flex: 1 1 0; min-width: 52px; max-width: 100px;
