@@ -30,6 +30,7 @@
 
   let startDate = thirtyDaysAgo;
   let endDate = today;
+  let sleepGoalMinutes = 480;
   let status = '';
   let busy = false;
 
@@ -93,6 +94,32 @@
     const rem = mins % 60;
     if (hrs > 0) return `${hrs}h ${String(rem).padStart(2, '0')}m`;
     return `${mins}m`;
+  };
+
+  const shiftDate = (isoDate: string, delta: number) => {
+    const d = new Date(isoDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const sum = (nums: number[]) => nums.reduce((a, b) => a + b, 0);
+
+  const trendBadge = (current: unknown, previous: unknown, higherIsBetter = true) => {
+    const curr = Number(current);
+    const prev = Number(previous);
+    if (!Number.isFinite(curr) || !Number.isFinite(prev)) return null;
+    const delta = curr - prev;
+    if (Math.abs(delta) < 0.0001) {
+      return { icon: '→', className: 'flat', delta: '0' };
+    }
+    const improved = higherIsBetter ? delta > 0 : delta < 0;
+    const abs = Math.abs(delta);
+    const rounded = abs >= 10 ? abs.toFixed(0) : abs.toFixed(1);
+    return {
+      icon: improved ? '↑' : '↓',
+      className: improved ? 'up' : 'down',
+      delta: `${delta > 0 ? '+' : '-'}${rounded}`
+    };
   };
 
   const keyActivity = (type: string | null | undefined) => {
@@ -180,6 +207,16 @@
     activities: Object.values(activitiesByDate).reduce((sum, rows) => sum + rows.length, 0),
   };
 
+  $: sleepDatesDesc = Object.keys(sleepByDate).sort().reverse();
+  $: recentSleepMinutes = sleepDatesDesc
+    .map((d) => Number(sleepByDate[d]?.total_sleep_minutes))
+    .filter((n) => Number.isFinite(n))
+    .slice(0, 7);
+  $: rollingSleepAvgMinutes = recentSleepMinutes.length ? sum(recentSleepMinutes) / recentSleepMinutes.length : null;
+  $: sleepDebtMinutes = recentSleepMinutes.length
+    ? sleepGoalMinutes * recentSleepMinutes.length - sum(recentSleepMinutes)
+    : null;
+
   const fmtDay = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -202,6 +239,10 @@
     <label style="flex:1 1 140px">
       <div class="label">End date</div>
       <input type="date" bind:value={endDate} />
+    </label>
+    <label style="flex:1 1 140px">
+      <div class="label">Sleep goal (min)</div>
+      <input type="number" min="300" max="720" step="15" bind:value={sleepGoalMinutes} />
     </label>
     <div style="display:flex;align-items:flex-end;gap:0.4rem;flex-shrink:0;">
       <button on:click={load}>Refresh</button>
@@ -246,6 +287,20 @@
   {#if status}<p class="status-msg">{status}</p>{/if}
 </section>
 
+<section class="summary-grid quick-grid">
+  <div class="summary-card">
+    <div class="sum-label">Sleep debt (recent 7 days)</div>
+    <div class="sum-value" style="font-size:1.2rem;">
+      {#if sleepDebtMinutes === null}
+        -
+      {:else}
+        {sleepDebtMinutes > 0 ? 'Deficit' : 'Surplus'} {fmtMinutes(Math.abs(sleepDebtMinutes))}
+      {/if}
+    </div>
+    <div class="sum-sub">Goal: {Math.floor(sleepGoalMinutes / 60)}h {String(sleepGoalMinutes % 60).padStart(2, '0')}m/night · Avg: {fmtMinutes(rollingSleepAvgMinutes)}</div>
+  </div>
+</section>
+
 <div class="summary-grid">
   {#each [['SLEEP DAYS', counts.sleep], ['BODY BATTERY DAYS', counts.body], ['HRV DAYS', counts.hrv], ['RESTING HR DAYS', counts.rhr], ['STRESS DAYS', counts.stress], ['HYDRATION DAYS', counts.hydration], ['STEPS DAYS', counts.steps], ['ACTIVITIES', counts.activities]] as [label, count]}
     <div class="summary-card">
@@ -266,6 +321,19 @@
     {@const stress = stressByDate[dateStr]}
     {@const hydration = hydrationByDate[dateStr]}
     {@const steps = stepsByDate[dateStr]}
+    {@const prevDate = shiftDate(dateStr, -7)}
+    {@const prevSleep = sleepByDate[prevDate]}
+    {@const prevBody = bodyByDate[prevDate]}
+    {@const prevHrv = hrvByDate[prevDate]}
+    {@const prevRhr = rhrByDate[prevDate]}
+    {@const prevStress = stressByDate[prevDate]}
+    {@const prevSteps = stepsByDate[prevDate]}
+    {@const sleepTrend = trendBadge(sleep?.sleep_score, prevSleep?.sleep_score, true)}
+    {@const bodyTrend = trendBadge(body?.end_of_day_value, prevBody?.end_of_day_value, true)}
+    {@const hrvTrend = trendBadge(hrv?.weekly_avg, prevHrv?.weekly_avg, true)}
+    {@const rhrTrend = trendBadge(rhr?.resting_heart_rate, prevRhr?.resting_heart_rate, false)}
+    {@const stressTrend = trendBadge(stress?.overall_stress_level, prevStress?.overall_stress_level, false)}
+    {@const stepsTrend = trendBadge(steps?.total_steps, prevSteps?.total_steps, true)}
     {@const activities = activitiesByDate[dateStr] || []}
     {@const keyActivities = activities.filter((a) => keyActivity(a.activity_type))}
     {@const hasAny = !!(sleep || body || hrv || rhr || stress || hydration || steps || activities.length)}
@@ -285,7 +353,7 @@
         </summary>
         <div class="day-metrics">
           <div class="mc">
-            <div class="mc-name">Sleep</div>
+            <div class="mc-name">Sleep {#if sleepTrend}<span class={`trend-badge ${sleepTrend.className}`}>{sleepTrend.icon} {sleepTrend.delta}</span>{/if}</div>
             {#if sleep}
               <div class="mr"><span>Total</span><span>{fmtMinutes(sleep.total_sleep_minutes)}</span></div>
               <div class="mr"><span>Deep</span><span>{fmtMinutes(sleep.deep_sleep_minutes)}</span></div>
@@ -295,7 +363,7 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
-            <div class="mc-name">Body Battery</div>
+            <div class="mc-name">Body Battery {#if bodyTrend}<span class={`trend-badge ${bodyTrend.className}`}>{bodyTrend.icon} {bodyTrend.delta}</span>{/if}</div>
             {#if body}
               <div class="mr"><span>Morning</span><span>{fmt(body.morning_value)}</span></div>
               <div class="mr"><span>End of day</span><span>{fmt(body.end_of_day_value)}</span></div>
@@ -304,7 +372,7 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
-            <div class="mc-name">HRV</div>
+            <div class="mc-name">HRV {#if hrvTrend}<span class={`trend-badge ${hrvTrend.className}`}>{hrvTrend.icon} {hrvTrend.delta}</span>{/if}</div>
             {#if hrv}
               <div class="mr"><span>Weekly avg</span><span>{fmt(hrv.weekly_avg)}</span></div>
               <div class="mr"><span>Baseline low</span><span>{fmt(hrv.baseline_low)}</span></div>
@@ -313,7 +381,7 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
-            <div class="mc-name">Resting HR</div>
+            <div class="mc-name">Resting HR {#if rhrTrend}<span class={`trend-badge ${rhrTrend.className}`}>{rhrTrend.icon} {rhrTrend.delta}</span>{/if}</div>
             {#if rhr}
               <div class="mr"><span>Resting</span><span>{fmt(rhr.resting_heart_rate, ' bpm')}</span></div>
               <div class="mr"><span>Min</span><span>{fmt(rhr.min_heart_rate, ' bpm')}</span></div>
@@ -321,7 +389,7 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
-            <div class="mc-name">Stress</div>
+            <div class="mc-name">Stress {#if stressTrend}<span class={`trend-badge ${stressTrend.className}`}>{stressTrend.icon} {stressTrend.delta}</span>{/if}</div>
             {#if stress}
               <div class="mr"><span>Overall</span><span>{fmt(stress.overall_stress_level)}</span></div>
             {:else}<p class="no-data">No data</p>{/if}
@@ -335,7 +403,7 @@
             {:else}<p class="no-data">No data</p>{/if}
           </div>
           <div class="mc">
-            <div class="mc-name">Steps</div>
+            <div class="mc-name">Steps {#if stepsTrend}<span class={`trend-badge ${stepsTrend.className}`}>{stepsTrend.icon} {stepsTrend.delta}</span>{/if}</div>
             {#if steps}
               <div class="mr"><span>Total</span><span>{fmt(steps.total_steps)}</span></div>
               <div class="mr"><span>Distance</span><span>{fmtKm(steps.distance_meters)}</span></div>
@@ -378,10 +446,12 @@
   .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: #d7e6f7; color: #496685; font-size: 0.68rem; font-weight: 700; cursor: help; margin-left: 2px; }
   .status-msg { font-size: 0.88rem; background: #d4edda; color: #22543d; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.5rem; }
   .summary-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.75rem; }
+  .quick-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
   @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .summary-card { background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; padding: 0.75rem; }
   .sum-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #496685; }
   .sum-value { font-size: 1.6rem; font-weight: 800; color: #132238; margin-top: 0.15rem; }
+  .sum-sub { margin-top: 0.25rem; font-size: 0.82rem; color: #5f6f84; }
   .day-card { background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
   .day-summary { cursor: pointer; padding: 0.65rem 0.9rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; user-select: none; list-style: none; }
   .day-title { font-size: 1rem; font-weight: 700; color: #132238; flex-shrink: 0; }
@@ -390,7 +460,11 @@
   .day-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; border-top: 1px solid #e8f0f9; padding: 0.6rem 0.9rem; }
   @media (max-width: 600px) { .day-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .mc { background: #f8fbff; border: 1px solid #e2eaf4; border-radius: 8px; padding: 0.5rem 0.65rem; }
-  .mc-name { font-size: 0.78rem; font-weight: 700; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
+  .mc-name { display: flex; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.78rem; font-weight: 700; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
+  .trend-badge { font-size: 0.72rem; font-weight: 700; border-radius: 999px; padding: 0.08rem 0.45rem; border: 1px solid #d9e2ef; text-transform: none; letter-spacing: 0; }
+  .trend-badge.up { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
+  .trend-badge.down { color: #b42318; background: #fee4e2; border-color: #fecdca; }
+  .trend-badge.flat { color: #3b5b7a; background: #e8f1fb; border-color: #ccddf4; }
   .mr { display: flex; justify-content: space-between; font-size: 0.82rem; color: #132238; padding: 0.08rem 0; }
   .mr span:first-child { color: #496685; }
   .no-data { font-size: 0.82rem; color: #8091a7; margin: 0; }

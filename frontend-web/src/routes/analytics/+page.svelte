@@ -11,6 +11,7 @@
   let fromDate = monthAgo;
   let toDate = today;
   let quickRange = 'Last 30 days';
+  let sleepGoalMinutes = 480;
   let mode: 'Core' | 'Core + one extra' = 'Core';
   let extraSection: 'Recovery Metrics' | 'Mood Distribution' | 'Activity Log' | 'Correlations & Insights' = 'Recovery Metrics';
   
@@ -40,6 +41,7 @@
   };
 
   const avg = (numbers: number[]) => (numbers.length ? numbers.reduce((a, b) => a + b, 0) / numbers.length : null);
+  const sum = (numbers: number[]) => numbers.reduce((a, b) => a + b, 0);
   const avgOfNullable = (numbers: Array<number | null>) => {
     const clean = numbers.filter((n): n is number => n !== null && Number.isFinite(n));
     return clean.length ? clean.reduce((a, b) => a + b, 0) / clean.length : null;
@@ -357,6 +359,19 @@
     return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`;
   };
 
+  const dayOffset = (isoDate: string, offsetDays: number) => {
+    const d = new Date(isoDate + 'T12:00:00');
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const avgForDates = (dates: string[], pick: (d: string) => number | null) => {
+    const vals = dates
+      .map((d) => pick(d))
+      .filter((n): n is number => n !== null && Number.isFinite(n));
+    return avg(vals);
+  };
+
   // ── Correlations & Insights Computed Properties ───────────────────────────
 
   $: moodCountByCategory = (() => {
@@ -492,6 +507,46 @@
       .slice(0, 8);
   })();
 
+  $: recent7Dates = dayList.slice(-7);
+  $: prior7Dates = dayList.slice(-14, -7);
+
+  $: recentSleepMinutes = recent7Dates
+    .map((d) => Number(sleepByDateMap.get(d)?.total_sleep_minutes))
+    .filter((n) => Number.isFinite(n));
+
+  $: rollingSleepAvgMinutes = avg(recentSleepMinutes);
+  $: sleepGoalTotalMinutes = recent7Dates.length * sleepGoalMinutes;
+  $: sleepDebtMinutes = sleepGoalTotalMinutes - sum(recentSleepMinutes);
+
+  $: weekSleepScore = avgForDates(recent7Dates, (d) => {
+    const n = Number(sleepByDateMap.get(d)?.sleep_score);
+    return Number.isFinite(n) ? n : null;
+  });
+  $: weekMood = avgForDates(recent7Dates, (d) => dailyMoodMap.get(d) ?? null);
+  $: weekHrv = avgForDates(recent7Dates, (d) => {
+    const n = Number(hrvByDateMap.get(d)?.weekly_avg);
+    return Number.isFinite(n) ? n : null;
+  });
+  $: weekBodyBattery = avgForDates(recent7Dates, (d) => {
+    const n = Number(bodyByDateMap.get(d)?.end_of_day_value);
+    return Number.isFinite(n) ? n : null;
+  });
+
+  $: priorSleepScore = avgForDates(prior7Dates, (d) => {
+    const n = Number(sleepByDateMap.get(d)?.sleep_score);
+    return Number.isFinite(n) ? n : null;
+  });
+
+  $: weeklySummaryLine = (() => {
+    if (weekSleepScore === null || priorSleepScore === null) {
+      return 'Keep logging to unlock stronger weekly comparisons.';
+    }
+    const delta = weekSleepScore - priorSleepScore;
+    if (delta >= 5) return 'Your sleep trend is stronger than the previous week.';
+    if (delta <= -5) return 'Sleep score dipped vs last week, likely affecting recovery.';
+    return 'Sleep score is broadly stable week over week.';
+  })();
+
   onMount(load);
 </script>
 
@@ -541,6 +596,10 @@
         <option>Correlations & Insights</option>
       </select>
     </label>
+    <label>
+      <div class="label">Sleep goal (minutes)</div>
+      <input type="number" min="300" max="720" step="15" bind:value={sleepGoalMinutes} />
+    </label>
   </div>
   {#if status}<p class="status">{status}</p>{/if}
 
@@ -562,6 +621,30 @@
   <article class="stat-card"><div class="sl">Avg sleep</div><div class="sv">{hoursMins(avgSleepMins)}</div></article>
   <article class="stat-card"><div class="sl">Avg sleep score</div><div class="sv">{avgSleepScore === null ? '-' : `${avgSleepScore.toFixed(0)}/100`}</div></article>
   <article class="stat-card"><div class="sl">Avg HRV</div><div class="sv">{avgHrv === null ? '-' : avgHrv.toFixed(0)}</div></article>
+</section>
+
+<section class="grid two">
+  <article class="card">
+    <h3>Sleep Debt (Last 7 Days)</h3>
+    <div class="week-kpis">
+      <div class="stat-card"><div class="sl">Goal total</div><div class="sv">{hoursMins(sleepGoalTotalMinutes)}</div></div>
+      <div class="stat-card"><div class="sl">Actual total</div><div class="sv">{hoursMins(sum(recentSleepMinutes))}</div></div>
+      <div class="stat-card"><div class="sl">Avg per night</div><div class="sv">{hoursMins(rollingSleepAvgMinutes)}</div></div>
+      <div class={`sleep-debt-badge ${sleepDebtMinutes > 0 ? 'debt' : 'surplus'}`}>
+        {sleepDebtMinutes > 0 ? 'Deficit' : 'Surplus'} {hoursMins(Math.abs(sleepDebtMinutes))}
+      </div>
+    </div>
+  </article>
+  <article class="card">
+    <h3>Week In Review</h3>
+    <div class="week-kpis">
+      <div class="stat-card"><div class="sl">Sleep score</div><div class="sv">{weekSleepScore === null ? '-' : `${weekSleepScore.toFixed(0)}/100`}</div></div>
+      <div class="stat-card"><div class="sl">HRV</div><div class="sv">{weekHrv === null ? '-' : weekHrv.toFixed(0)}</div></div>
+      <div class="stat-card"><div class="sl">Mood</div><div class="sv">{weekMood === null ? '-' : weekMood.toFixed(1)}</div></div>
+      <div class="stat-card"><div class="sl">Body battery</div><div class="sv">{weekBodyBattery === null ? '-' : weekBodyBattery.toFixed(0)}</div></div>
+    </div>
+    <p class="week-summary">{weeklySummaryLine}</p>
+  </article>
 </section>
 
 <section class="grid two">
@@ -876,6 +959,20 @@
   .legend-box { margin-top: 0.7rem; border: 1px solid #d7e6f7; border-radius: 10px; background: #f7fbff; padding: 0.55rem 0.7rem; }
   .legend-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #496685; margin-bottom: 0.3rem; }
   .legend-grid { display: grid; gap: 0.2rem; color: #2a3f58; font-size: 0.82rem; }
+  .week-kpis { display: grid; gap: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sleep-debt-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 0.6rem;
+    border: 1px solid #cfe0f3;
+  }
+  .sleep-debt-badge.debt { color: #b42318; background: #fee4e2; border-color: #fecdca; }
+  .sleep-debt-badge.surplus { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
+  .week-summary { margin: 0.75rem 0 0; color: #2a3f58; font-size: 0.9rem; }
 
   /* Correlations & Insights Styles */
   .insights-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
@@ -936,6 +1033,7 @@
     .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .insights-grid { grid-template-columns: 1fr; }
     .consequence-grid { grid-template-columns: repeat(3, 1fr); }
+    .week-kpis { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 600px) {
