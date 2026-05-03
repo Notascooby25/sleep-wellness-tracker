@@ -810,7 +810,7 @@
               <button 
                 class={`mood-btn ${selectedMood === mood ? 'active' : ''}`}
                 style={`--mood-color: ${moodColors[mood]}`}
-                on:click={() => selectedMood = mood}
+                on:click={() => selectedMood = mood as 1|2|3|4|5}
                 title="{moodLabels[mood]}"
               >
                 {mood}
@@ -839,11 +839,11 @@
           {#each influenceMoodScores.filter(x => x.influence !== null).slice(0, 6) as item}
             <div class="consequence-block">
               <div class="consequence-label">{item.name}</div>
-              <div class="consequence-arrow" style={`color: ${item.influence > 0 ? '#10b981' : '#ef4444'}`}>
-                {item.influence > 0 ? '✓' : item.influence < 0 ? '✗' : '−'}
+              <div class="consequence-arrow" style={`color: ${(item.influence ?? 0) > 0 ? '#10b981' : '#ef4444'}`}>
+                {(item.influence ?? 0) > 0 ? '✓' : (item.influence ?? 0) < 0 ? '✗' : '−'}
               </div>
-              <div class="consequence-outcome" style={`background: ${item.influence > 0 ? '#d1fae5' : '#fee2e2'}`}>
-                {item.influence > 0 ? 'Better Mood' : 'Lower Mood'}
+              <div class="consequence-outcome" style={`background: ${(item.influence ?? 0) > 0 ? '#d1fae5' : '#fee2e2'}`}>
+                {(item.influence ?? 0) > 0 ? 'Better Mood' : 'Lower Mood'}
               </div>
               <div class="consequence-strength">{Math.abs(item.influence || 0).toFixed(2)} pts</div>
             </div>

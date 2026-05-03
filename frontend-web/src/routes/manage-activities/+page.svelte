@@ -40,7 +40,7 @@
     status = '';
     try {
       const normalizedCategoryId =
-        activity.category_id === null || activity.category_id === undefined || activity.category_id === ''
+        activity.category_id === null || activity.category_id === undefined
           ? null
           : Number(activity.category_id);
 
