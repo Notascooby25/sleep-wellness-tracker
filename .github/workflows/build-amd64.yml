@@ -32,6 +32,10 @@ jobs:
         working-directory: frontend-web
         run: npm install
 
+      - name: Generate SvelteKit types
+        working-directory: frontend-web
+        run: npx svelte-kit sync
+
       - name: Type-check frontend (svelte-check)
         working-directory: frontend-web
         run: npm run check
