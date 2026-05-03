@@ -1,12 +1,56 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { version } from '$app/environment';
   // BUILD_DATE is injected by vite.config.ts
   const buildDate = __BUILD_DATE__;
+
+  let reminderEnabled = false;
+  let reminderTime = '21:00';
+  let notifPermission = 'default';
+  let savedMsg = '';
+
+  onMount(() => {
+    reminderEnabled = localStorage.getItem('moodReminderEnabled') === 'true';
+    reminderTime = localStorage.getItem('moodReminderTime') || '21:00';
+    notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+  });
+
+  const saveReminder = async () => {
+    if (reminderEnabled && notifPermission !== 'granted' && typeof Notification !== 'undefined') {
+      notifPermission = await Notification.requestPermission();
+    }
+    localStorage.setItem('moodReminderEnabled', String(reminderEnabled));
+    localStorage.setItem('moodReminderTime', reminderTime);
+    savedMsg = 'Saved!';
+    setTimeout(() => (savedMsg = ''), 2000);
+  };
 </script>
 
 <section class="hero">
   <h2>Settings</h2>
   <p>Configure advanced pages and management tools from one place.</p>
+</section>
+
+<section class="card reminder-card">
+  <h3 style="margin:0 0 0.5rem;">Mood Reminder</h3>
+  <p style="margin:0 0 0.75rem;color:#5f6f84;font-size:0.88rem;">Receive a browser notification at a set time each day to log your mood. Saved per device in this browser only.</p>
+  <div class="reminder-row">
+    <label class="chk">
+      <input type="checkbox" bind:checked={reminderEnabled} />
+      Enable daily reminder
+    </label>
+    <label style="display:flex;align-items:center;gap:0.5rem;">
+      <span class="label" style="margin:0;">Time</span>
+      <input type="time" bind:value={reminderTime} style="width:auto;" />
+    </label>
+    <button on:click={saveReminder}>Save</button>
+    {#if savedMsg}<span class="saved-msg">{savedMsg}</span>{/if}
+  </div>
+  {#if notifPermission === 'denied'}
+    <p class="notif-warn">Browser notifications are blocked — allow them in your browser's site settings.</p>
+  {:else if notifPermission === 'unsupported'}
+    <p class="notif-warn">Your browser does not support notifications.</p>
+  {/if}
 </section>
 
 <section class="card grid two">
@@ -49,6 +93,13 @@
   .sep {
     margin: 0 0.4em;
   }
+
+  .reminder-card { margin-bottom: 0.75rem; }
+  .reminder-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .chk { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+  .chk input { width: auto; }
+  .saved-msg { font-size: 0.85rem; color: #086c3a; font-weight: 600; }
+  .notif-warn { margin: 0.6rem 0 0; font-size: 0.84rem; color: #b42318; background: #fee4e2; border-radius: 8px; padding: 0.3rem 0.6rem; }
 
   .settings-link {
     display: block;

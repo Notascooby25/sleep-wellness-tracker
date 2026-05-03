@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
 
   const links = [
@@ -10,6 +11,26 @@
     { href: '/analytics', label: 'Analytics' },
     { href: '/settings', label: 'Settings' }
   ];
+
+  onMount(() => {
+    if (typeof Notification === 'undefined') return;
+    const check = () => {
+      if (localStorage.getItem('moodReminderEnabled') !== 'true') return;
+      if (Notification.permission !== 'granted') return;
+      const reminderTime = localStorage.getItem('moodReminderTime') || '21:00';
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const today = now.toISOString().slice(0, 10);
+      if (`${hh}:${mm}` === reminderTime && localStorage.getItem('moodReminderLastFired') !== today) {
+        localStorage.setItem('moodReminderLastFired', today);
+        new Notification('Sleep Wellness Tracker', { body: "Time to log today's mood 🌙" });
+      }
+    };
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  });
 </script>
 
 <header class="topbar">

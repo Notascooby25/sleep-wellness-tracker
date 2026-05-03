@@ -11,7 +11,7 @@
   let fromDate = monthAgo;
   let toDate = today;
   let quickRange = 'Last 30 days';
-  let sleepGoalMinutes = 480;
+  let sleepGoalMinutes = 420;
   let mode: 'Core' | 'Core + one extra' = 'Core';
   let extraSection: 'Recovery Metrics' | 'Mood Distribution' | 'Activity Log' | 'Correlations & Insights' = 'Recovery Metrics';
   
@@ -27,6 +27,9 @@
   let status = '';
 
   let selectedActivity = '';
+  let heatmapType: 'mood' | 'sleep' = 'mood';
+  let heatmapMoodRows: MoodEntry[] = [];
+  let heatmapSleepRows: Array<Record<string, unknown>> = [];
   
   const moodColors: Record<number, string> = {
     1: '#10b981', // green - great
@@ -372,6 +375,19 @@
     return avg(vals);
   };
 
+  const heatmap84From = new Date(Date.now() - 83 * 86400000).toISOString().slice(0, 10);
+
+  const loadHeatmap = async () => {
+    try {
+      const [hMood, hSleep] = await Promise.all([
+        getJson<MoodEntry[]>(`/mood/?from_date=${heatmap84From}&to_date=${today}`),
+        getJson<GarminRows>(`/garmin/sleep/range?start_date=${heatmap84From}&end_date=${today}`),
+      ]);
+      heatmapMoodRows = hMood;
+      heatmapSleepRows = hSleep?.data || [];
+    } catch { /* fail silently */ }
+  };
+
   // ── Correlations & Insights Computed Properties ───────────────────────────
 
   $: moodCountByCategory = (() => {
@@ -547,7 +563,73 @@
     return 'Sleep score is broadly stable week over week.';
   })();
 
-  onMount(load);
+  onMount(() => { load(); loadHeatmap(); });
+
+  // ── 12-week heatmap ───────────────────────────────────────────────────────
+  $: heatmapDailyMood = (() => {
+    const byDay = new Map<string, number[]>();
+    for (const e of heatmapMoodRows) {
+      if (e.mood_score == null) continue;
+      const d = ukDate(e.timestamp);
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d)!.push(Number(e.mood_score));
+    }
+    const out = new Map<string, number>();
+    for (const [d, arr] of byDay) out.set(d, arr.reduce((a, b) => a + b) / arr.length);
+    return out;
+  })();
+
+  $: heatmapSleepScore = new Map(
+    heatmapSleepRows.map(r => [String(r.date), Number(r.sleep_score)])
+  );
+
+  const heatmapCellColor = (value: number | null, type: 'mood' | 'sleep') => {
+    if (value === null) return '#e2eaf4';
+    if (type === 'mood') {
+      const v = Math.round(value);
+      if (v <= 1) return '#22c55e';
+      if (v === 2) return '#84cc16';
+      if (v === 3) return '#f59e0b';
+      if (v === 4) return '#ef4444';
+      return '#7c3aed';
+    }
+    if (value >= 80) return '#22c55e';
+    if (value >= 65) return '#84cc16';
+    if (value >= 50) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const heatmapTitle = (date: string, value: number | null, type: 'mood' | 'sleep') => {
+    if (value === null) return `${date}: No data`;
+    if (type === 'mood') {
+      const label = moodLabels[Math.round(value)] ?? value.toFixed(1);
+      return `${date}: ${label} (${value.toFixed(1)})`;
+    }
+    return `${date}: ${value.toFixed(0)}/100`;
+  };
+
+  $: heatmapCells = (() => {
+    // Align start to nearest Monday (Mon = 0)
+    const startD = new Date(today + 'T12:00:00');
+    startD.setDate(startD.getDate() - 83);
+    const padCount = (startD.getDay() + 6) % 7; // Mon-based
+    const cells: Array<{ date: string | null; value: number | null }> = [];
+    for (let p = 0; p < padCount; p++) cells.push({ date: null, value: null });
+    for (let i = 83; i >= 0; i--) {
+      const d = new Date(today + 'T12:00:00');
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      let value: number | null = null;
+      if (heatmapType === 'mood') {
+        value = heatmapDailyMood.get(dateStr) ?? null;
+      } else {
+        const n = heatmapSleepScore.get(dateStr);
+        value = n != null && Number.isFinite(n) ? n : null;
+      }
+      cells.push({ date: dateStr, value });
+    }
+    return cells;
+  })();
 </script>
 
 <section class="hero">
@@ -625,13 +707,13 @@
 
 <section class="grid two">
   <article class="card">
-    <h3>Sleep Debt (Last 7 Days)</h3>
+    <h3>Sleep vs Goal (Last 7 Days)</h3>
     <div class="week-kpis">
       <div class="stat-card"><div class="sl">Goal total</div><div class="sv">{hoursMins(sleepGoalTotalMinutes)}</div></div>
       <div class="stat-card"><div class="sl">Actual total</div><div class="sv">{hoursMins(sum(recentSleepMinutes))}</div></div>
       <div class="stat-card"><div class="sl">Avg per night</div><div class="sv">{hoursMins(rollingSleepAvgMinutes)}</div></div>
       <div class={`sleep-debt-badge ${sleepDebtMinutes > 0 ? 'debt' : 'surplus'}`}>
-        {sleepDebtMinutes > 0 ? 'Deficit' : 'Surplus'} {hoursMins(Math.abs(sleepDebtMinutes))}
+        {sleepDebtMinutes > 0 ? '−' : '+'}{hoursMins(Math.abs(sleepDebtMinutes))}
       </div>
     </div>
   </article>
@@ -645,6 +727,43 @@
     </div>
     <p class="week-summary">{weeklySummaryLine}</p>
   </article>
+</section>
+
+<section class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+    <h3 style="margin:0;">12-Week Heatmap</h3>
+    <div class="heatmap-toggle">
+      <button class:active={heatmapType === 'mood'} on:click={() => (heatmapType = 'mood')}>Mood</button>
+      <button class:active={heatmapType === 'sleep'} on:click={() => (heatmapType = 'sleep')}>Sleep score</button>
+    </div>
+  </div>
+  <div class="heatmap-wrap">
+    <div class="heatmap-days">
+      {#each ['M','T','W','T','F','S','S'] as d}<span>{d}</span>{/each}
+    </div>
+    <div class="heatmap-grid">
+      {#each heatmapCells as cell}
+        <div
+          class="heatmap-cell"
+          class:heatmap-pad={cell.date === null}
+          style={cell.date !== null ? `background:${heatmapCellColor(cell.value, heatmapType)}` : ''}
+          title={cell.date !== null ? heatmapTitle(cell.date, cell.value, heatmapType) : ''}
+        ></div>
+      {/each}
+    </div>
+  </div>
+  <div class="heatmap-legend">
+    {#if heatmapType === 'mood'}
+      {#each [[1,'#22c55e','Great'],[2,'#84cc16','Good'],[3,'#f59e0b','Okay'],[4,'#ef4444','Struggling'],[5,'#7c3aed','Crisis']] as [, c, l]}
+        <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:{c}"></span>{l}</span>
+      {/each}
+    {:else}
+      {#each [['80+','#22c55e'],['65–79','#84cc16'],['50–64','#f59e0b'],['< 50','#ef4444']] as [l, c]}
+        <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:{c}"></span>{l}</span>
+      {/each}
+    {/if}
+    <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:#e2eaf4"></span>No data</span>
+  </div>
 </section>
 
 <section class="grid two">
@@ -973,6 +1092,20 @@
   .sleep-debt-badge.debt { color: #b42318; background: #fee4e2; border-color: #fecdca; }
   .sleep-debt-badge.surplus { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
   .week-summary { margin: 0.75rem 0 0; color: #2a3f58; font-size: 0.9rem; }
+  /* 12-week heatmap */
+  .heatmap-wrap { display: flex; gap: 5px; align-items: flex-start; overflow-x: auto; padding-bottom: 2px; }
+  .heatmap-days { display: grid; grid-template-rows: repeat(7, 14px); gap: 3px; }
+  .heatmap-days span { font-size: 0.65rem; color: #8091a7; line-height: 14px; width: 10px; text-align: right; }
+  .heatmap-grid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; gap: 3px; }
+  .heatmap-cell { width: 14px; height: 14px; border-radius: 2px; background: #e2eaf4; cursor: default; transition: opacity 0.1s; }
+  .heatmap-cell:hover { opacity: 0.75; }
+  .heatmap-pad { background: transparent !important; pointer-events: none; }
+  .heatmap-toggle { display: flex; border: 1px solid #d9e2ef; border-radius: 8px; overflow: hidden; }
+  .heatmap-toggle button { border: none; background: #f5faff; padding: 0.3rem 0.7rem; font-size: 0.82rem; cursor: pointer; color: #496685; }
+  .heatmap-toggle button.active { background: #3c79c5; color: #fff; font-weight: 600; }
+  .heatmap-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.65rem; }
+  .heatmap-leg-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: #496685; }
+  .heatmap-leg-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 
   /* Correlations & Insights Styles */
   .insights-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
