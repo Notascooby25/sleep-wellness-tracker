@@ -26,7 +26,7 @@ def wait_for_db(max_retries: int = 20, delay_seconds: int = 2):
     last_exc = None
     for attempt in range(1, max_retries + 1):
         try:
-            with engine.connect() as conn:
+            with engine.connect():
                 return True
         except OperationalError as exc:
             last_exc = exc
