@@ -710,130 +710,6 @@
 </section>
 
 
-{#if mode === 'Core + one extra' && extraSection === 'Recovery Metrics'}
-  <section class="grid two">
-    <article class="card">
-      <h3>HRV Trend</h3>
-      <svg class="chart" viewBox="0 0 640 220" preserveAspectRatio="none">
-        <path class="line sleep" d={getSeriesPath(hrvSeries, 640, 220)}></path>
-      </svg>
-    </article>
-    <article class="card">
-      <h3>End-of-day Body Battery Trend</h3>
-      <svg class="chart" viewBox="0 0 640 220" preserveAspectRatio="none">
-        <path class="line main" d={getSeriesPath(batterySeries, 640, 220)}></path>
-      </svg>
-    </article>
-  </section>
-{/if}
-
-{#if mode === 'Core + one extra' && extraSection === 'Mood Distribution'}
-  <section class="grid two">
-    <article class="card">
-      <h3>Mood Distribution</h3>
-      {#each [1,2,3,4,5] as score, idx}
-        <div class="bar-row">
-          <span class="bar-label">{score}</span>
-          <div class="bar-bg"><div class="bar-fill" style={`width:${Math.min(100, rated.length ? (moodCountByScore[idx] / rated.length) * 100 : 0)}%`}></div></div>
-          <span class="bar-val">{moodCountByScore[idx]}</span>
-        </div>
-      {/each}
-    </article>
-    <article class="card">
-      <h3>Average Mood by Hour</h3>
-      <table class="table">
-        <thead><tr><th>Hour</th><th>Avg mood</th></tr></thead>
-        <tbody>
-          {#each moodByHour as row}
-            <tr><td>{row.hour}:00</td><td>{row.avg.toFixed(2)}</td></tr>
-          {/each}
-        </tbody>
-      </table>
-    </article>
-  </section>
-{/if}
-
-{#if mode === 'Core + one extra' && extraSection === 'Activity Log'}
-  <section class="grid two">
-    <article class="card">
-      <h3>Top Activities</h3>
-      <table class="table">
-        <thead><tr><th>Activity</th><th>Count</th><th>Avg mood when logged</th></tr></thead>
-        <tbody>
-          {#each activityStats as row}
-            <tr>
-              <td>{row.name}</td>
-              <td>{row.count}</td>
-              <td>{row.avgMood === null ? '-' : row.avgMood.toFixed(2)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </article>
-    <article class="card">
-      <h3>Selected Activity Trend</h3>
-      <label>
-        <div class="label">Select activity</div>
-        <select bind:value={selectedActivity}>
-          {#each Array.from(new Set(activities.map(a => a.name))).sort() as name}
-            <option value={name}>{name}</option>
-          {/each}
-        </select>
-      </label>
-      {#if selectedActivityStats}
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Nights with selected activity</div><div class="sv">{selectedActivityStats.withCount}</div></div>
-          <div class="stat-card"><div class="sl">Other nights</div><div class="sv">{selectedActivityStats.otherCount}</div></div>
-        </div>
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Confidence</div><div class="sv">{selectedActivityStats.confidence}</div></div>
-          <div class="stat-card"><div class="sl">Longest streak with activity</div><div class="sv">{selectedActivityStats.longestWith} days</div></div>
-        </div>
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Longest streak without activity</div><div class="sv">{selectedActivityStats.longestWithout} days</div></div>
-          <div class="stat-card"><div class="sl">Sleep score avg (with vs other)</div><div class="sv">{selectedActivityStats.avgScoreWith === null ? '-' : selectedActivityStats.avgScoreWith.toFixed(0)} / {selectedActivityStats.avgScoreOther === null ? '-' : selectedActivityStats.avgScoreOther.toFixed(0)}</div></div>
-        </div>
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Sleep hours avg (with vs other)</div><div class="sv">{selectedActivityStats.avgTotalWith === null ? '-' : selectedActivityStats.avgTotalWith.toFixed(1)}h / {selectedActivityStats.avgTotalOther === null ? '-' : selectedActivityStats.avgTotalOther.toFixed(1)}h</div></div>
-          <div class="stat-card"><div class="sl">Influence on mood (with/without)</div><div class="sv">{selectedActivityStats.withWithoutPct === null ? '-' : `${selectedActivityStats.withWithoutPct >= 0 ? '+' : ''}${selectedActivityStats.withWithoutPct.toFixed(1)}%`}</div></div>
-        </div>
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Previous day effect</div><div class="sv">{selectedActivityStats.previousDayPct === null ? '-' : `${selectedActivityStats.previousDayPct >= 0 ? '+' : ''}${selectedActivityStats.previousDayPct.toFixed(1)}%`}</div></div>
-          <div class="stat-card"><div class="sl">Same day effect</div><div class="sv">{selectedActivityStats.sameDayPct === null ? '-' : `${selectedActivityStats.sameDayPct >= 0 ? '+' : ''}${selectedActivityStats.sameDayPct.toFixed(1)}%`}</div></div>
-        </div>
-        <div class="grid two" style="margin-top:0.6rem;">
-          <div class="stat-card"><div class="sl">Next day effect</div><div class="sv">{selectedActivityStats.nextDayPct === null ? '-' : `${selectedActivityStats.nextDayPct >= 0 ? '+' : ''}${selectedActivityStats.nextDayPct.toFixed(1)}%`}</div></div>
-          <div class="stat-card"><div class="sl">Interpretation</div><div class="sv" style="font-size:0.95rem;line-height:1.2;">Positive % means better mood (lower mood score).</div></div>
-        </div>
-        <div style="margin-top:0.6rem;">
-          <div class="label">Sleep score over time</div>
-          <svg class="chart" viewBox="0 0 640 160" preserveAspectRatio="none">
-            <path class="line main" d={getSeriesPath(selectedActivityStats.scoreWith, 640, 160)}></path>
-            <path class="line sleep" d={getSeriesPath(selectedActivityStats.scoreOther, 640, 160)}></path>
-          </svg>
-        </div>
-        <div>
-          <div class="label">Sleep duration (h) over time</div>
-          <svg class="chart" viewBox="0 0 640 160" preserveAspectRatio="none">
-            <path class="line main" d={getSeriesPath(selectedActivityStats.totalWith, 640, 160)}></path>
-            <path class="line sleep" d={getSeriesPath(selectedActivityStats.totalOther, 640, 160)}></path>
-          </svg>
-        </div>
-        <div style="margin-top:0.6rem;">
-          <div class="label">Occurrence during week</div>
-          {#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day, idx}
-            <div class="bar-row">
-              <span class="bar-label">{day}</span>
-              <div class="bar-bg"><div class="bar-fill" style={`width:${Math.min(100, Math.max(...selectedActivityStats.weekdayCounts, 1) ? (selectedActivityStats.weekdayCounts[idx] / Math.max(...selectedActivityStats.weekdayCounts, 1)) * 100 : 0)}%`}></div></div>
-              <span class="bar-val">{selectedActivityStats.weekdayCounts[idx]}</span>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </article>
-  </section>
-{/if}
-
 <section class="card">
   <h3>Correlations & Insights</h3>
   <p style="color: #5f6f84; font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
@@ -975,7 +851,6 @@
   .sl { color:#5f6f84; font-size:0.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
   .sv { color:#132238; font-size:1.45rem; font-weight:800; margin-top:0.1rem; }
   .chart { width: 100%; height: 220px; background: #f9fcff; border: 1px solid #d9e2ef; border-radius: 10px; }
-  .mini-charts .chart { height: 160px; }
   .line { fill: none; stroke-width: 2.5; }
   .line.main { stroke: #1f78d1; }
   .line.sleep { stroke: #74b9ff; }
