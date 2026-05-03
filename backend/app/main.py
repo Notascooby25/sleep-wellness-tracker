@@ -76,16 +76,24 @@ def _garmin_sleep_autosync_loop() -> None:
             db = SessionLocal()
             try:
                 logger.info("Garmin morning sync starting (sleep + HRV + resting HR); date=%s", today)
+                rate_limited = False
                 for fn, label in [
                     (sync_sleep_if_due, "sleep"),
                     (sync_hrv_if_due, "hrv"),
                     (sync_resting_heart_rate_if_due, "rhr"),
                 ]:
+                    if rate_limited:
+                        logger.warning("Garmin morning sync skipping %s due to earlier rate limit", label)
+                        continue
                     try:
                         result = fn(db, force=False)
                         logger.info("Garmin morning sync %s result: %s", label, result)
-                    except Exception:
-                        logger.exception("Garmin morning sync failed for %s", label)
+                    except Exception as exc:
+                        if "rate" in type(exc).__name__.lower() or "ratelimit" in type(exc).__name__.lower():
+                            logger.warning("Garmin rate limit hit during morning sync for %s; skipping remaining", label)
+                            rate_limited = True
+                        else:
+                            logger.exception("Garmin morning sync failed for %s", label)
                 _morning_synced_date = today
             finally:
                 db.close()
@@ -94,6 +102,7 @@ def _garmin_sleep_autosync_loop() -> None:
             db = SessionLocal()
             try:
                 logger.info("Garmin evening sync starting (body battery + hydration + stress + activities); date=%s", today)
+                rate_limited = False
                 for fn, label in [
                     (sync_body_battery_if_due, "body_battery"),
                     (sync_hydration_if_due, "hydration"),
@@ -101,11 +110,18 @@ def _garmin_sleep_autosync_loop() -> None:
                     (sync_steps_if_due, "steps"),
                     (sync_activities_if_due, "activities"),
                 ]:
+                    if rate_limited:
+                        logger.warning("Garmin evening sync skipping %s due to earlier rate limit", label)
+                        continue
                     try:
                         result = fn(db, force=False)
                         logger.info("Garmin evening sync %s result: %s", label, result)
-                    except Exception:
-                        logger.exception("Garmin evening sync failed for %s", label)
+                    except Exception as exc:
+                        if "rate" in type(exc).__name__.lower() or "ratelimit" in type(exc).__name__.lower():
+                            logger.warning("Garmin rate limit hit during evening sync for %s; skipping remaining", label)
+                            rate_limited = True
+                        else:
+                            logger.exception("Garmin evening sync failed for %s", label)
                 _evening_synced_date = today
             finally:
                 db.close()
@@ -132,11 +148,9 @@ def _start_background_workers() -> None:
 @app.on_event("shutdown")
 def _stop_background_workers() -> None:
     _autosync_stop.set()
-    if _autosync_thread and _autosync_thread.is_alive():
-        _autosync_thread.join(timeout=2)
+    if _autosync_thread:
+        _autosync_thread.join(timeout=5)
 
-# Routers ALREADY have prefixes inside their files.
-# Do NOT add prefixes here.
 
 app.include_router(mood.router)
 app.include_router(categories.router)
@@ -144,6 +158,7 @@ app.include_router(activities.router)
 app.include_router(garmin.router)
 app.include_router(export.router)
 app.include_router(lifestyle_impact.router)
+
 
 @app.get("/health")
 def health_check():

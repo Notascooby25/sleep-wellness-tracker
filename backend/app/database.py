@@ -77,6 +77,13 @@ def _ensure_legacy_schema_compatibility() -> None:
                     dialect,
                 )
 
+    if inspector.has_table("moods"):
+        existing_indexes = {idx["name"] for idx in inspector.get_indexes("moods")}
+        if "ix_moods_timestamp" not in existing_indexes:
+            logger.warning("Adding missing moods.timestamp index for query performance")
+            with engine.begin() as conn:
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_moods_timestamp ON moods (timestamp)"))
+
 
 _ensure_legacy_schema_compatibility()
 logger.info("Database tables verified.")

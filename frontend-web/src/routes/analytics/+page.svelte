@@ -417,21 +417,21 @@
 
   $: frequencyComparison = (() => {
     const mid = Math.floor(dayList.length / 2);
-    const periodFirst = dayList.slice(0, mid);
-    const periodSecond = dayList.slice(mid);
+    const periodFirstSet = new Set(dayList.slice(0, mid));
+    const periodSecondSet = new Set(dayList.slice(mid));
     
     const countFirst: Record<string, number> = {};
     const countSecond: Record<string, number> = {};
     
     for (const e of entries) {
       const d = ukDate(e.timestamp);
-      if (periodFirst.includes(d)) {
+      if (periodFirstSet.has(d)) {
         for (const aid of e.activity_ids || []) {
           const name = activityById.get(aid)?.name || `#${aid}`;
           countFirst[name] = (countFirst[name] || 0) + 1;
         }
       }
-      if (periodSecond.includes(d)) {
+      if (periodSecondSet.has(d)) {
         for (const aid of e.activity_ids || []) {
           const name = activityById.get(aid)?.name || `#${aid}`;
           countSecond[name] = (countSecond[name] || 0) + 1;

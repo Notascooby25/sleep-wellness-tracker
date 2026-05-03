@@ -1,50 +1,6 @@
-name: Build ARM64 Images
+# This workflow is retired. ARM64 builds are no longer required.
+# The active CI/CD pipeline is in build-amd64.yml.
+#
+# on:
+#   workflow_dispatch:
 
-on:
-  workflow_dispatch:
-
-jobs:
-  build-arm64:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build backend (ARM64)
-        run: |
-          docker buildx build \
-            --platform linux/arm64 \
-            -t sleep-wellness-tracker-backend:latest \
-            -f backend/Dockerfile \
-            backend \
-            --output type=docker,dest=backend-arm64.tar
-
-      - name: Build frontend-web (ARM64)
-        run: |
-          docker buildx build \
-            --platform linux/arm64 \
-            -t sleep-wellness-tracker-frontend-web:latest \
-            -f frontend-web/Dockerfile \
-            frontend-web \
-            --output type=docker,dest=frontend-web-arm64.tar
-
-      - name: Upload backend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-arm64
-          path: backend-arm64.tar
-
-      - name: Upload frontend-web artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-web-arm64
-          path: frontend-web-arm64.tar
