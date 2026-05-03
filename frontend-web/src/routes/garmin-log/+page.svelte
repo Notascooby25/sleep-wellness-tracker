@@ -30,7 +30,7 @@
 
   let startDate = thirtyDaysAgo;
   let endDate = today;
-  let sleepGoalMinutes = 480;
+  let sleepGoalMinutes = 420;
   let status = '';
   let busy = false;
 
