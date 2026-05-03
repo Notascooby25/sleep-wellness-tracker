@@ -1,3 +1,9 @@
+<script lang="ts">
+  import { version } from '$app/environment';
+  // BUILD_DATE is injected by vite.config.ts
+  const buildDate = __BUILD_DATE__;
+</script>
+
 <section class="hero">
   <h2>Settings</h2>
   <p>Configure advanced pages and management tools from one place.</p>
@@ -25,7 +31,25 @@
   </a>
 </section>
 
+<footer class="version-footer">
+  <span>v{version}</span>
+  <span class="sep">·</span>
+  <span>Built {buildDate}</span>
+</footer>
+
 <style>
+  .version-footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #9ab6cc;
+    letter-spacing: 0.03em;
+  }
+
+  .sep {
+    margin: 0 0.4em;
+  }
+
   .settings-link {
     display: block;
     border: 1px solid #cfe0f3;
