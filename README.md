@@ -236,6 +236,34 @@ docker exec -i sleep_db psql -U sleepuser sleepdb < backup_YYYYMMDD_HHMMSS.sql
 
 The database schema is managed with **Alembic** migrations (located in `db/`).
 
+### Automated Backups (Every 12 Hours, Keep Latest 4)
+
+Use the included scripts to run a backup every 12 hours and keep only the latest 4 backup snapshots.
+
+```bash
+# Install/update cron entry for the current user
+./scripts/setup_db_backup_cron.sh
+
+# Verify
+crontab -l | grep run_db_backup_rotation.sh
+```
+
+What gets installed:
+
+```cron
+0 */12 * * * MAX_BACKUPS=4 BACKUP_DIR=/srv/shared/backups /home/andyl/sleep-wellness-tracker/scripts/run_db_backup_rotation.sh >> /srv/shared/backups/db_backup_cron.log 2>&1
+```
+
+Manual run (same logic as cron):
+
+```bash
+./scripts/run_db_backup_rotation.sh
+```
+
+Retention behavior:
+- A snapshot is all files that share one timestamp stem (for example `.dump` + `.sql.gz`).
+- Cleanup keeps the newest 4 snapshots and removes older ones.
+
 ### Data Models
 
 | Table | Description |
