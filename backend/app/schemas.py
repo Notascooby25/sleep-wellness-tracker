@@ -65,6 +65,7 @@ class CategoryResponse(CategoryBase):
 class ActivityBase(BaseModel):
     name: str
     category_id: Optional[int] = None
+    is_archived: Optional[bool] = False  # New field to indicate if the activity is archived
 
 class ActivityCreate(ActivityBase):
     pass
@@ -73,6 +74,7 @@ class ActivityCreate(ActivityBase):
 class ActivityUpdate(BaseModel):
     name: Optional[str] = None
     category_id: Optional[int] = None
+    is_archived: Optional[bool] = None  # Allow updating the archived status
 
 class ActivityResponse(ActivityBase):
     id: int
