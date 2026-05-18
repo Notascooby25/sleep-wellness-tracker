@@ -56,3 +56,24 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     db.delete(cat)
     db.commit()
     return
+
+@router.put("/activities/{activity_id}/archive", response_model=schemas.ActivityResponse)
+def archive_activity(activity_id: int, db: Session = Depends(get_db)):
+    activity = db.query(models.Activity).filter(models.Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    activity.is_archived = True
+    db.commit()
+    db.refresh(activity)
+    return activity
+
+
+@router.put("/activities/{activity_id}/unarchive", response_model=schemas.ActivityResponse)
+def unarchive_activity(activity_id: int, db: Session = Depends(get_db)):
+    activity = db.query(models.Activity).filter(models.Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    activity.is_archived = False
+    db.commit()
+    db.refresh(activity)
+    return activity

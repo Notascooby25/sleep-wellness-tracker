@@ -39,6 +39,7 @@ class Activity(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    is_archived = Column(Boolean, default=False, nullable=False)  # New column to mark activities as archived
 
     category = relationship("Category", back_populates="activities")
     moods = relationship("Mood", secondary=mood_activities, back_populates="activities")

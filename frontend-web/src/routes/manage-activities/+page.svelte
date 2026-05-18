@@ -65,12 +65,35 @@
     }
   };
 
+  const archive = async (id: number) => {
+    status = '';
+    try {
+      await putJson(`/activities/${id}/archive`);
+      await load();
+    } catch (error) {
+      status = `Archive failed: ${error}`;
+    }
+  };
+
+  const unarchive = async (id: number) => {
+    status = '';
+    try {
+      await putJson(`/activities/${id}/unarchive`);
+      await load();
+    } catch (error) {
+      status = `Unarchive failed: ${error}`;
+    }
+  };
+
   const categoryName = (id: number | null | undefined) =>
     categories.find((c) => c.id === id)?.name || '(uncategorized)';
 
   $: filtered = filterCategoryId
     ? activities.filter((a) => String(a.category_id ?? '') === filterCategoryId)
     : activities;
+
+  $: activeActivities = filtered.filter((a) => !a.is_archived);
+  $: archivedActivities = filtered.filter((a) => a.is_archived);
 
   onMount(load);
 </script>
@@ -146,4 +169,28 @@
       </div>
     {/each}
   {/if}
+</section>
+
+<section>
+  <h3>Active Activities</h3>
+  <ul>
+    {#each activeActivities as activity}
+      <li>
+        {activity.name} ({categoryName(activity.category_id)})
+        <button on:click={() => archive(activity.id)}>Archive</button>
+      </li>
+    {/each}
+  </ul>
+</section>
+
+<section>
+  <h3>Archived Activities</h3>
+  <ul>
+    {#each archivedActivities as activity}
+      <li>
+        {activity.name} ({categoryName(activity.category_id)})
+        <button on:click={() => unarchive(activity.id)}>Unarchive</button>
+      </li>
+    {/each}
+  </ul>
 </section>
