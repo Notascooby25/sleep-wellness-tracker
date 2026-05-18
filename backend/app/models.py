@@ -1,6 +1,7 @@
 # File: backend/app/models.py
 from sqlalchemy import (
     Column,
+    Boolean,
     Integer,
     String,
     Text,
