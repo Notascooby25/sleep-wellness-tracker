@@ -68,7 +68,7 @@
   const archive = async (id: number) => {
     status = '';
     try {
-      await putJson(`/activities/${id}/archive`);
+      await putJson(`/activities/${id}/archive`, {}); // Provide second argument
       await load();
     } catch (error) {
       status = `Archive failed: ${error}`;
@@ -78,7 +78,7 @@
   const unarchive = async (id: number) => {
     status = '';
     try {
-      await putJson(`/activities/${id}/unarchive`);
+      await putJson(`/activities/${id}/unarchive`, {}); // Provide second argument
       await load();
     } catch (error) {
       status = `Unarchive failed: ${error}`;
@@ -92,7 +92,7 @@
     ? activities.filter((a) => String(a.category_id ?? '') === filterCategoryId)
     : activities;
 
-  $: activeActivities = filtered.filter((a) => !a.is_archived);
+  $: activeActivities = filtered.filter((a) => !a.is_archived); // Ensure 'is_archived' is used correctly
   $: archivedActivities = filtered.filter((a) => a.is_archived);
 
   onMount(load);

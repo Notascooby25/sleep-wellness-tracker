@@ -9,6 +9,7 @@ export type Activity = {
   id: number;
   name: string;
   category_id?: number | null;
+  is_archived?: boolean; // Indicates if the activity is archived
 };
 
 export type MoodEntry = {
