@@ -82,7 +82,7 @@
         getJson<GarminRows>(`/garmin/sleep/range?start_date=${fromDate}&end_date=${toDate}`),
         getJson<GarminRows>(`/garmin/body-battery/range?start_date=${fromDate}&end_date=${toDate}`),
         getJson<GarminRows>(`/garmin/hrv/range?start_date=${fromDate}&end_date=${toDate}`),
-        getJson<Activity[]>('/activities/'),
+        getJson<Activity[]>('/activities/?include_archived=true'),
         getJson<Category[]>('/categories/'),
       ]);
       entries = moodData;
