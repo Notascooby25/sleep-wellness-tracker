@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from sqlalchemy.orm import Session
 
@@ -8,8 +8,14 @@ from ..database import get_db
 router = APIRouter(prefix="/activities", tags=["activities"])
 
 @router.get("/", response_model=List[schemas.ActivityResponse])
-def list_activities(db: Session = Depends(get_db)):
-    return db.query(models.Activity).all()
+def list_activities(
+    include_archived: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Activity)
+    if not include_archived:
+        query = query.filter(models.Activity.is_archived.is_(False))
+    return query.all()
 
 @router.get("/{activity_id}", response_model=schemas.ActivityResponse)
 def get_activity(activity_id: int, db: Session = Depends(get_db)):

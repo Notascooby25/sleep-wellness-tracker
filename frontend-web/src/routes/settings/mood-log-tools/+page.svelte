@@ -166,7 +166,7 @@
     try {
       const [rows, acts, cats] = await Promise.all([
         getJson<MoodEntry[]>('/mood/'),
-        getJson<Activity[]>('/activities/'),
+        getJson<Activity[]>('/activities/?include_archived=true'),
         getJson<Category[]>('/categories/')
       ]);
       entries = rows;

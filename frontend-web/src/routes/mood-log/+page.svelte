@@ -41,7 +41,7 @@
     try {
       const [firstPage, acts] = await Promise.all([
         loadPage(0),
-        getJson<Activity[]>('/activities/')
+        getJson<Activity[]>('/activities/?include_archived=true')
       ]);
       entries = firstPage;
       activities = acts;

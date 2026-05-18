@@ -14,7 +14,7 @@
     try {
       [categories, activities] = await Promise.all([
         getJson<Category[]>('/categories/'),
-        getJson<Activity[]>('/activities/')
+        getJson<Activity[]>('/activities/?include_archived=true')
       ]);
     } catch (error) {
       status = `Load failed: ${error}`;
