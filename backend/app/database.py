@@ -51,9 +51,16 @@ def _ensure_legacy_schema_compatibility() -> None:
         return
 
     category_columns = {col["name"] for col in inspector.get_columns("categories")}
+    activity_columns = {col["name"] for col in inspector.get_columns("activities")} if inspector.has_table("activities") else {}
     mood_columns = {col["name"]: col for col in inspector.get_columns("moods")} if inspector.has_table("moods") else {}
 
     with engine.begin() as conn:
+        if "is_archived" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.is_archived column for legacy database")
+            conn.execute(
+                text("ALTER TABLE activities ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE")
+            )
+
         if "require_rating" not in category_columns:
             logger.warning("Adding missing categories.require_rating column for legacy database")
             conn.execute(
