@@ -160,7 +160,7 @@
     const sourceHeight = image.naturalHeight || image.height;
     const longestSide = Math.max(sourceWidth, sourceHeight);
     const baseScale = longestSide > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / longestSide : 1;
-    let bestCandidate: File | null = null;
+    let bestCandidate = file;
 
     for (const resizeStep of RESIZE_STEPS) {
       const scale = Math.min(1, baseScale * resizeStep);
@@ -183,7 +183,7 @@
           lastModified: file.lastModified
         });
 
-        if (!bestCandidate || candidate.size < bestCandidate.size) {
+        if (candidate.size < bestCandidate.size) {
           bestCandidate = candidate;
         }
 
@@ -193,16 +193,13 @@
       }
     }
 
-    return bestCandidate ?? file;
+    return bestCandidate;
   };
 
   const prepareUploadFile = async (file: File) => {
     try {
       const compressed = await compressImageFile(file);
-      if (file.size > MAX_UPLOAD_BYTES) {
-        return compressed;
-      }
-      if (compressed.size < file.size) {
+      if (file.size > MAX_UPLOAD_BYTES || compressed.size < file.size) {
         return compressed;
       }
     } catch (error) {
@@ -238,8 +235,9 @@
     if (!file) return;
 
     imageUploadBusy = true;
-    status = 'Preparing image...';
+    status = '';
     try {
+      status = 'Preparing image...';
       const uploadFile = await prepareUploadFile(file);
       if (uploadFile.size > MAX_UPLOAD_BYTES) {
         status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
