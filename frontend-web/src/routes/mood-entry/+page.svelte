@@ -118,12 +118,13 @@
   };
 
   const fileToImageUrl = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
     const response = await fetch('/api/mood/upload-image', {
       method: 'POST',
-      body: formData
+      headers: {
+        'content-type': file.type || 'application/octet-stream',
+        'x-upload-filename': encodeURIComponent(file.name || 'upload.jpg')
+      },
+      body: file
     });
 
     if (!response.ok) {
