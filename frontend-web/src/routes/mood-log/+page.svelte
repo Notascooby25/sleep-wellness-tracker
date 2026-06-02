@@ -178,6 +178,7 @@
           <tr>
             <th>Date</th>
             <th>Mood</th>
+            <th>Photo</th>
             <th>Notes</th>
             <th>Activities</th>
             <th></th>
@@ -193,6 +194,7 @@
                 <td>
                   <input type="number" min="1" max="5" bind:value={editScore} style="width:4rem;" />
                 </td>
+                <td>-</td>
                 <td>
                   <input type="text" bind:value={editNotes} placeholder="Notes…" />
                 </td>
@@ -222,6 +224,15 @@
               <tr>
                 <td style="white-space:nowrap;">{fmtDate(entry.timestamp)}</td>
                 <td>{entry.mood_score ?? 'n/a'}</td>
+                <td>
+                  {#if entry.image_url}
+                    <a href={`/api${entry.image_url}`} target="_blank" rel="noreferrer">
+                      <img src={`/api${entry.image_url}`} alt="Mood attachment" class="entry-photo" loading="lazy" />
+                    </a>
+                  {:else}
+                    -
+                  {/if}
+                </td>
                 <td>{entry.notes || '-'}</td>
                 <td>
                   {#if entry.activity_ids?.length}
@@ -264,6 +275,7 @@
   .act-chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
   .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
   .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: #1e4b76; margin: 0.1rem 0.15rem 0.1rem 0; }
+  .entry-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid #ccddf4; display: block; }
   .btn-sm { padding: 0.3rem 0.55rem; font-size: 0.8rem; margin-right: 0.2rem; }
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
   .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }

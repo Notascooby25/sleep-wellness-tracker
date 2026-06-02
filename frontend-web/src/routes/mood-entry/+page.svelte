@@ -27,6 +27,10 @@
     overall_stress_level?: number;
   };
 
+  type ImageUploadResponse = {
+    image_url: string;
+  };
+
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let selected = new Set<number>();
@@ -45,6 +49,10 @@
   let latestStress: StressLatest | null = null;
   let activeCategory = 0;
   let currentStreakDays = 0;
+  let imageUrl: string | null = null;
+  let imageUploadBusy = false;
+  let galleryInputEl: HTMLInputElement | null = null;
+  let cameraInputEl: HTMLInputElement | null = null;
 
   const fmtMinutes = (value?: number) => {
     if (value === undefined || value === null) return '-';
@@ -99,6 +107,54 @@
     selected = new Set<number>();
   };
 
+  const openGalleryPicker = () => {
+    galleryInputEl?.click();
+  };
+
+  const openCameraPicker = () => {
+    cameraInputEl?.click();
+  };
+
+  const fileToImageUrl = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/mood/upload-image', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Upload failed with ${response.status}`);
+    }
+
+    const data = (await response.json()) as ImageUploadResponse;
+    return data.image_url;
+  };
+
+  const uploadFromInput = async (event: Event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    imageUploadBusy = true;
+    status = '';
+    try {
+      imageUrl = await fileToImageUrl(file);
+      status = 'Image attached.';
+    } catch (error) {
+      status = `Image upload failed: ${error}`;
+    } finally {
+      imageUploadBusy = false;
+      input.value = '';
+    }
+  };
+
+  const clearImage = () => {
+    imageUrl = null;
+  };
+
   const moodColors: Record<number, { bg: string; active: string; label: string }> = {
     1: { bg: '#c8f3d6', active: '#1f9d53', label: 'Green' },
     2: { bg: '#e6f5a7', active: '#8fae14', label: 'Green-yellow' },
@@ -138,12 +194,14 @@
       const payload: MoodEntry = {
         mood_score: ratingRequired() ? moodScore : null,
         notes: notes.trim() || null,
+        image_url: imageUrl,
         timestamp,
         activity_ids: Array.from(selected)
       };
       await postJson('/mood/', payload);
       status = 'Entry saved.';
       notes = '';
+      imageUrl = null;
       selected = new Set<number>();
     } catch (error) {
       status = `Save failed: ${error}`;
@@ -250,6 +308,40 @@
     <textarea rows="3" bind:value={notes}></textarea>
   </label>
 
+  <div class="image-upload-wrap">
+    <div class="label">Photo <small style="color:#8091a7;">(optional)</small></div>
+    <div class="image-upload-actions">
+      <button on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
+      <button on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
+      {#if imageUploadBusy}
+        <span class="label" style="margin:0;">Uploading...</span>
+      {/if}
+    </div>
+
+    <input
+      type="file"
+      accept="image/*"
+      capture="environment"
+      bind:this={cameraInputEl}
+      on:change={uploadFromInput}
+      class="hidden-file-input"
+    />
+    <input
+      type="file"
+      accept="image/*"
+      bind:this={galleryInputEl}
+      on:change={uploadFromInput}
+      class="hidden-file-input"
+    />
+
+    {#if imageUrl}
+      <div class="image-preview-wrap">
+        <img src={`/api${imageUrl}`} alt="Mood attachment preview" class="image-preview" />
+        <button class="btn-clear" on:click={clearImage} disabled={busy || imageUploadBusy}>Remove</button>
+      </div>
+    {/if}
+  </div>
+
   <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
     <button class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
     <button disabled={busy} on:click={load}>Refresh</button>
@@ -331,6 +423,18 @@
   }
   .mood-pill-active small { opacity: 1; }
   .badge-info { font-size: 0.84rem; color: #496685; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
+  .image-upload-wrap { margin-top: 0.9rem; }
+  .image-upload-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
+  .hidden-file-input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+  .image-preview-wrap { margin-top: 0.55rem; display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
+  .image-preview {
+    width: min(260px, 100%);
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid #ccddf4;
+    box-shadow: 0 4px 14px rgba(12, 33, 62, 0.08);
+  }
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
   .btn-clear { background: transparent; border-color: #c7d9ef; color: #496685; font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
   .status-msg { font-size: 0.88rem; color: #22543d; background: #d4edda; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
