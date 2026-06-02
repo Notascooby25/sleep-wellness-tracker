@@ -31,6 +31,8 @@
     image_url: string;
   };
 
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let selected = new Set<number>();
@@ -138,13 +140,26 @@
     const file = input.files?.[0];
     if (!file) return;
 
+    if (file.size > MAX_UPLOAD_BYTES) {
+      status = 'Image upload failed: File is too large (max 10 MB).';
+      input.value = '';
+      return;
+    }
+
     imageUploadBusy = true;
     status = '';
     try {
       imageUrl = await fileToImageUrl(file);
       status = 'Image attached.';
     } catch (error) {
-      status = `Image upload failed: ${error}`;
+      const message = String(error);
+      if (message.includes('Content-length of') && message.includes('exceeds limit')) {
+        status = 'Image upload failed: Upload payload exceeded server limit.';
+      } else if (message.includes('Upstream backend unavailable')) {
+        status = 'Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.';
+      } else {
+        status = `Image upload failed: ${error}`;
+      }
     } finally {
       imageUploadBusy = false;
       input.value = '';

@@ -6,6 +6,8 @@ export const trailingSlash = 'ignore';
 const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
 const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const proxy: RequestHandler = async ({ request, url, fetch }) => {
   // Strip any trailing slash from the path before checking SLASH_BASE_PATHS,
   // so requests like /api/categories/ are normalised to 'categories' for the set lookup.
@@ -24,11 +26,30 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
       outgoingHeaders['content-type'] = incomingContentType;
     }
 
-    const upstream = await fetch(targetUrl, {
-      method: request.method,
-      headers: outgoingHeaders,
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer()
-    });
+    const requestBody = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
+
+    let upstream: Response | null = null;
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        upstream = await fetch(targetUrl, {
+          method: request.method,
+          headers: outgoingHeaders,
+          body: requestBody
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await sleep(300);
+          continue;
+        }
+      }
+    }
+
+    if (!upstream) {
+      throw lastError ?? new Error('Unable to reach backend');
+    }
 
     const body = await upstream.arrayBuffer();
     const responseHeaders = new Headers();
