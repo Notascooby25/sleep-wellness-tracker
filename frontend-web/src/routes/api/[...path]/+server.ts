@@ -69,21 +69,30 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
 
     const uploadFilename = normalizeUploadFilename(request.headers.get('x-upload-filename'));
 
+    const isUpload =
+      targetPath === UPLOAD_PATH &&
+      request.method === 'POST' &&
+      incomingContentType &&
+      !incomingContentType.toLowerCase().startsWith('multipart/form-data');
+
+    const isMultipart =
+      incomingContentType?.toLowerCase().startsWith('multipart/form-data') ?? false;
+
     let requestBody: BodyInit | undefined;
     if (!['GET', 'HEAD'].includes(request.method)) {
-      const rawBody = await request.arrayBuffer();
-      if (
-        targetPath === UPLOAD_PATH &&
-        request.method === 'POST' &&
-        incomingContentType &&
-        !incomingContentType.toLowerCase().startsWith('multipart/form-data')
-      ) {
+      if (isUpload) {
+        // Binary upload sent as raw content-type (e.g. image/jpeg) — wrap in FormData
+        const rawBody = await request.arrayBuffer();
         const formData = new FormData();
-        formData.append('file', new Blob([rawBody], { type: incomingContentType }), uploadFilename);
+        formData.append('file', new Blob([rawBody], { type: incomingContentType! }), uploadFilename);
         requestBody = formData;
         delete outgoingHeaders['content-type'];
+      } else if (isMultipart) {
+        // Already multipart (e.g. camera upload from browser) — pass through as binary
+        requestBody = await request.arrayBuffer();
       } else {
-        requestBody = rawBody;
+        // Regular JSON or other text body — use text to avoid Node fetch/undici issues
+        requestBody = await request.text();
       }
     }
 
