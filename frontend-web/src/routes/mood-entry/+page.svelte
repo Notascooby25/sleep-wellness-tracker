@@ -241,6 +241,7 @@
       const uploadFile = await prepareUploadFile(file);
       if (uploadFile.size > MAX_UPLOAD_BYTES) {
         status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
+        input.value = '';
         return;
       }
 
