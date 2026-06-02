@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { version } from '$app/environment';
+  const appVersion = __APP_VERSION__;
   // BUILD_DATE is injected by vite.config.ts
   const buildDate = __BUILD_DATE__;
 
@@ -76,7 +76,7 @@
 </section>
 
 <footer class="version-footer">
-  <span>v{version}</span>
+  <span>v{appVersion}</span>
   <span class="sep">·</span>
   <span>Built {buildDate}</span>
 </footer>
