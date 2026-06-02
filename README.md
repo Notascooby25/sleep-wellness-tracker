@@ -222,6 +222,13 @@ The production NUC runs the AMD64 images. Watchtower polls GHCR every 5 minutes 
 
 ---
 
+## 🔖 Versioning
+
+- Any code change should include a version bump in `frontend-web/package.json`.
+- Share the updated version number when delivering the change.
+
+---
+
 ## 🗄️ Database
 
 > **⚠️ Important:** Always take a database backup before making any schema changes or running migrations.
