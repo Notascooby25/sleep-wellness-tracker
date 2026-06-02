@@ -121,7 +121,9 @@
   };
 
   const normalizeUploadName = (fileName: string) => {
-    const baseName = fileName.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    const withoutExtension = fileName.replace(/\.[^.]+$/, '');
+    const safeCharactersOnly = withoutExtension.replace(/[^A-Za-z0-9._-]+/g, '-');
+    const baseName = safeCharactersOnly.replace(/^-+|-+$/g, '');
     return baseName || 'upload';
   };
 
@@ -195,9 +197,18 @@
   };
 
   const prepareUploadFile = async (file: File) => {
-    const compressed = await compressImageFile(file);
-    if (compressed.size < file.size) {
-      return compressed;
+    try {
+      const compressed = await compressImageFile(file);
+      if (file.size > MAX_UPLOAD_BYTES) {
+        return compressed;
+      }
+      if (compressed.size < file.size) {
+        return compressed;
+      }
+    } catch (error) {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        throw error;
+      }
     }
     return file;
   };
