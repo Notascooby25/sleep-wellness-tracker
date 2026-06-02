@@ -32,6 +32,9 @@
   };
 
   const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+  const MAX_IMAGE_DIMENSION = 1920;
+  const JPEG_QUALITY_STEPS = [0.82, 0.74, 0.66, 0.58];
+  const RESIZE_STEPS = [1, 0.85, 0.7];
 
   let categories: Category[] = [];
   let activities: Activity[] = [];
@@ -117,6 +120,88 @@
     cameraInputEl?.click();
   };
 
+  const normalizeUploadName = (fileName: string) => {
+    const baseName = fileName.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    return baseName || 'upload';
+  };
+
+  const canvasToBlob = (canvas: HTMLCanvasElement, quality: number) =>
+    new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Unable to compress the selected image.'));
+        },
+        'image/jpeg',
+        quality
+      );
+    });
+
+  const loadImageElement = (file: File) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Unable to read the selected image.'));
+      };
+      image.src = objectUrl;
+    });
+
+  const compressImageFile = async (file: File) => {
+    const image = await loadImageElement(file);
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const longestSide = Math.max(sourceWidth, sourceHeight);
+    const baseScale = longestSide > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / longestSide : 1;
+    let bestCandidate: File | null = null;
+
+    for (const resizeStep of RESIZE_STEPS) {
+      const scale = Math.min(1, baseScale * resizeStep);
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Image compression is not supported on this device.');
+
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+
+      for (const quality of JPEG_QUALITY_STEPS) {
+        const blob = await canvasToBlob(canvas, quality);
+        const candidate = new File([blob], `${normalizeUploadName(file.name)}.jpg`, {
+          type: 'image/jpeg',
+          lastModified: file.lastModified
+        });
+
+        if (!bestCandidate || candidate.size < bestCandidate.size) {
+          bestCandidate = candidate;
+        }
+
+        if (candidate.size <= MAX_UPLOAD_BYTES) {
+          return candidate;
+        }
+      }
+    }
+
+    return bestCandidate ?? file;
+  };
+
+  const prepareUploadFile = async (file: File) => {
+    const compressed = await compressImageFile(file);
+    if (compressed.size < file.size) {
+      return compressed;
+    }
+    return file;
+  };
+
   const fileToImageUrl = async (file: File) => {
     const response = await fetch('/api/mood/upload-image', {
       method: 'POST',
@@ -141,16 +226,16 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-      status = 'Image upload failed: File is too large (max 10 MB).';
-      input.value = '';
-      return;
-    }
-
     imageUploadBusy = true;
-    status = '';
+    status = 'Preparing image...';
     try {
-      imageUrl = await fileToImageUrl(file);
+      const uploadFile = await prepareUploadFile(file);
+      if (uploadFile.size > MAX_UPLOAD_BYTES) {
+        status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
+        return;
+      }
+
+      imageUrl = await fileToImageUrl(uploadFile);
       status = 'Image attached.';
     } catch (error) {
       const message = String(error);
@@ -158,6 +243,8 @@
         status = 'Image upload failed: Upload payload exceeded server limit.';
       } else if (message.includes('Upstream backend unavailable')) {
         status = 'Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.';
+      } else if (message.includes('Failed to fetch')) {
+        status = 'Image upload failed: Network error while uploading. Please retry with a smaller photo.';
       } else {
         status = `Image upload failed: ${error}`;
       }
