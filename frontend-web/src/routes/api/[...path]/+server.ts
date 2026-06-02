@@ -4,6 +4,17 @@ import type { RequestHandler } from './$types';
 export const trailingSlash = 'ignore';
 
 const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
+const BACKENDS = Array.from(
+  new Set(
+    [
+      BACKEND,
+      ...(env.API_BASE_FALLBACKS || '').split(',').map((base) => base.trim()).filter(Boolean),
+      'http://sleep_backend:8000',
+      'http://127.0.0.1:8000',
+      'http://localhost:8000'
+    ].map((base) => base.replace(/\/$/, ''))
+  )
+);
 const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,7 +29,6 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
     targetPath = `${targetPath}/`;
   }
 
-  const targetUrl = `${BACKEND}/${targetPath}${url.search}`;
   try {
     const incomingContentType = request.headers.get('content-type');
     const outgoingHeaders: Record<string, string> = {};
@@ -30,21 +40,25 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
 
     let upstream: Response | null = null;
     let lastError: unknown = null;
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        upstream = await fetch(targetUrl, {
-          method: request.method,
-          headers: outgoingHeaders,
-          body: requestBody
-        });
-        break;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 2) {
-          await sleep(300);
-          continue;
+    for (const backend of BACKENDS) {
+      const targetUrl = `${backend}/${targetPath}${url.search}`;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          upstream = await fetch(targetUrl, {
+            method: request.method,
+            headers: outgoingHeaders,
+            body: requestBody
+          });
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt < 2) {
+            await sleep(300);
+            continue;
+          }
         }
       }
+      if (upstream) break;
     }
 
     if (!upstream) {
