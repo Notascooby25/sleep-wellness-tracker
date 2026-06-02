@@ -132,7 +132,7 @@
       canvas.toBlob(
         (blob) => {
           if (blob) resolve(blob);
-          else reject(new Error('Unable to compress the selected image.'));
+          else reject(new Error('Failed to convert the selected image to JPEG.'));
         },
         'image/jpeg',
         quality
@@ -149,7 +149,7 @@
       };
       image.onerror = () => {
         URL.revokeObjectURL(objectUrl);
-        reject(new Error('Unable to read the selected image.'));
+        reject(new Error('Failed to load the selected image. The file may be unsupported or corrupted.'));
       };
       image.src = objectUrl;
     });
@@ -170,7 +170,7 @@
       canvas.width = width;
       canvas.height = height;
       const context = canvas.getContext('2d');
-      if (!context) throw new Error('Image compression is not supported on this device.');
+      if (!context) throw new Error('Failed to initialize image processing.');
 
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, width, height);
@@ -255,7 +255,7 @@
       } else if (message.includes('Upstream backend unavailable')) {
         status = 'Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.';
       } else if (message.includes('Failed to fetch')) {
-        status = 'Image upload failed: Network error while uploading. Please retry with a smaller photo.';
+        status = 'Image upload failed: Network error while uploading. Please check your connection and retry.';
       } else {
         status = `Image upload failed: ${error}`;
       }
