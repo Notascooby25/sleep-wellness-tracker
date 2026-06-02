@@ -51,6 +51,7 @@ class Mood(Base):
     id = Column(Integer, primary_key=True, index=True)
     mood_score = Column(Integer, nullable=True)  # Nullable to support optional ratings
     notes = Column(Text, nullable=True)
+    image_url = Column(String(1024), nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

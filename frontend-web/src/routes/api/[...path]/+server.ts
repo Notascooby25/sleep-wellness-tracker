@@ -18,20 +18,27 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
 
   const targetUrl = `${BACKEND}/${targetPath}${url.search}`;
   try {
+    const incomingContentType = request.headers.get('content-type');
+    const outgoingHeaders: Record<string, string> = {};
+    if (incomingContentType) {
+      outgoingHeaders['content-type'] = incomingContentType;
+    }
+
     const upstream = await fetch(targetUrl, {
       method: request.method,
-      headers: {
-        'content-type': request.headers.get('content-type') || 'application/json'
-      },
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.text()
+      headers: outgoingHeaders,
+      body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer()
     });
 
-    const body = await upstream.text();
+    const body = await upstream.arrayBuffer();
+    const responseHeaders = new Headers();
+    const upstreamContentType = upstream.headers.get('content-type');
+    if (upstreamContentType) {
+      responseHeaders.set('content-type', upstreamContentType);
+    }
     return new Response(body, {
       status: upstream.status,
-      headers: {
-        'content-type': upstream.headers.get('content-type') || 'application/json'
-      }
+      headers: responseHeaders
     });
   } catch (error) {
     return new Response(

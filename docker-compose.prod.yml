@@ -42,6 +42,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /srv/shared/garmin-tokens:/app/garmin_tokens:Z
+      - /srv/shared/mood-images:/app/uploads:Z
       - /srv/shared/logs/backend:/var/log/app/backend:Z
     logging:
       driver: json-file

@@ -73,6 +73,12 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE categories ADD COLUMN rating_label VARCHAR(80)")
             )
 
+        if "image_url" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.image_url column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN image_url VARCHAR(1024)")
+            )
+
         mood_score_col = mood_columns.get("mood_score")
         if mood_score_col and mood_score_col.get("nullable") is False:
             if dialect == "postgresql":

@@ -9,6 +9,7 @@ from datetime import datetime
 class MoodBase(BaseModel):
     mood_score: Optional[int] = None  # Optional to support categories that don't require rating
     notes: Optional[str] = None
+    image_url: Optional[str] = None
     timestamp: datetime
     activity_ids: Optional[List[int]] = Field(default_factory=list)
 

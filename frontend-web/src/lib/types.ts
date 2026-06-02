@@ -16,6 +16,7 @@ export type MoodEntry = {
   id?: number;
   mood_score: number | null;
   notes?: string | null;
+  image_url?: string | null;
   timestamp: string;
   activity_ids: number[];
   created_at?: string;
