@@ -4,20 +4,51 @@ import type { RequestHandler } from './$types';
 export const trailingSlash = 'ignore';
 
 const BACKEND = (env.API_BASE || 'http://backend:8000').replace(/\/$/, '');
+const fallbackBackends = (env.API_BASE_FALLBACKS || '')
+  .split(',')
+  .map((base) => base.trim())
+  .filter(Boolean);
 const BACKENDS = Array.from(
-  new Set(
-    [
-      BACKEND,
-      ...(env.API_BASE_FALLBACKS || '').split(',').map((base) => base.trim()).filter(Boolean),
-      'http://sleep_backend:8000',
-      'http://127.0.0.1:8000',
-      'http://localhost:8000'
-    ].map((base) => base.replace(/\/$/, ''))
-  )
+  new Set([BACKEND, ...fallbackBackends].map((base) => base.replace(/\/$/, '')))
 );
 const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
+const UPLOAD_PATH = 'mood/upload-image';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const DEFAULT_UPLOAD_FILENAME = 'upload.jpg';
+
+const normalizeUploadFilename = (rawName: string | null) => {
+  if (!rawName) return DEFAULT_UPLOAD_FILENAME;
+  try {
+    const decoded = decodeURIComponent(rawName).trim();
+    if (!decoded || decoded.length > 120 || decoded.includes('..') || decoded.startsWith('.')) {
+      return DEFAULT_UPLOAD_FILENAME;
+    }
+    return /^[A-Za-z0-9._-]+$/.test(decoded) ? decoded : DEFAULT_UPLOAD_FILENAME;
+  } catch {
+    return DEFAULT_UPLOAD_FILENAME;
+  }
+};
+
+const fetchWithRetry = async (
+  targetUrl: string,
+  init: RequestInit,
+  fetchFn: typeof fetch,
+  retries = 2
+) => {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      return await fetchFn(targetUrl, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await sleep(300);
+      }
+    }
+  }
+  throw lastError ?? new Error(`Unable to reach backend at ${targetUrl}`);
+};
 
 const proxy: RequestHandler = async ({ request, url, fetch }) => {
   // Strip any trailing slash from the path before checking SLASH_BASE_PATHS,
@@ -36,27 +67,42 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
       outgoingHeaders['content-type'] = incomingContentType;
     }
 
-    const requestBody = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
+    const uploadFilename = normalizeUploadFilename(request.headers.get('x-upload-filename'));
+
+    let requestBody: BodyInit | undefined;
+    if (!['GET', 'HEAD'].includes(request.method)) {
+      const rawBody = await request.arrayBuffer();
+      if (
+        targetPath === UPLOAD_PATH &&
+        request.method === 'POST' &&
+        incomingContentType &&
+        !incomingContentType.toLowerCase().startsWith('multipart/form-data')
+      ) {
+        const formData = new FormData();
+        formData.append('file', new Blob([rawBody], { type: incomingContentType }), uploadFilename);
+        requestBody = formData;
+        delete outgoingHeaders['content-type'];
+      } else {
+        requestBody = rawBody;
+      }
+    }
 
     let upstream: Response | null = null;
     let lastError: unknown = null;
     for (const backend of BACKENDS) {
       const targetUrl = `${backend}/${targetPath}${url.search}`;
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        try {
-          upstream = await fetch(targetUrl, {
+      try {
+        upstream = await fetchWithRetry(
+          targetUrl,
+          {
             method: request.method,
             headers: outgoingHeaders,
             body: requestBody
-          });
-          break;
-        } catch (error) {
-          lastError = error;
-          if (attempt < 2) {
-            await sleep(300);
-            continue;
-          }
-        }
+          },
+          fetch
+        );
+      } catch (error) {
+        lastError = error;
       }
       if (upstream) break;
     }
