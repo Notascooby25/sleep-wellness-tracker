@@ -57,6 +57,7 @@ services:
     env_file: .env
     environment:
       - API_BASE=http://backend:8000
+      - API_BASE_FALLBACKS=${API_BASE_FALLBACKS:-}
       - BODY_SIZE_LIMIT=15M
       - HOST=0.0.0.0
       - PORT=3000
