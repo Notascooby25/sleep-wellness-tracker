@@ -50,6 +50,46 @@ def _delete_mood_image_file(image_url: str | None) -> None:
         path.unlink()
 
 
+def _normalize_image_urls(
+    image_url: str | None = None,
+    image_urls: list[str] | None = None,
+) -> list[str]:
+    candidates = image_urls if image_urls is not None else ([image_url] if image_url else [])
+    normalized: list[str] = []
+    for candidate in candidates:
+        cleaned = str(candidate or "").strip()
+        if cleaned and cleaned not in normalized:
+            normalized.append(cleaned)
+    return normalized
+
+
+def _primary_image_url(image_urls: list[str]) -> str | None:
+    return image_urls[0] if image_urls else None
+
+
+def _get_mood_image_urls(mood: models.Mood) -> list[str]:
+    return _normalize_image_urls(image_url=mood.image_url, image_urls=mood.image_urls)
+
+
+def _delete_mood_image_files(image_urls: list[str]) -> None:
+    for image_url in image_urls:
+        _delete_mood_image_file(image_url)
+
+
+def _serialize_mood(mood: models.Mood) -> dict:
+    image_urls = _get_mood_image_urls(mood)
+    return {
+        "id": mood.id,
+        "mood_score": mood.mood_score,
+        "notes": mood.notes,
+        "image_url": _primary_image_url(image_urls),
+        "image_urls": image_urls,
+        "timestamp": mood.timestamp,
+        "created_at": mood.created_at,
+        "activity_ids": [a.id for a in mood.activities],
+    }
+
+
 @router.post("/upload-image")
 async def upload_mood_image(file: UploadFile = File(...)):
     content_type = (file.content_type or "").lower()
@@ -119,28 +159,17 @@ def list_mood_entries(
         rows_query = rows_query.limit(limit)
 
     rows = rows_query.all()
-    result = []
-    for r in rows:
-        activity_ids = [a.id for a in r.activities]
-        result.append({
-            "id": r.id,
-            "mood_score": r.mood_score,
-            # API now returns `notes`, still reading DB column `note`
-            "notes": r.notes,
-            "image_url": r.image_url,
-            "timestamp": r.timestamp,
-            "created_at": r.created_at,
-            "activity_ids": activity_ids,
-        })
-    return result
+    return [_serialize_mood(row) for row in rows]
 
 @router.post("", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
     # payload.notes is populated whether client sent "note" or "notes"
+    image_urls = _normalize_image_urls(payload.image_url, payload.image_urls)
     db_mood = models.Mood(
         mood_score=payload.mood_score,
         notes=payload.notes,
-        image_url=payload.image_url,
+        image_url=_primary_image_url(image_urls),
+        image_urls=image_urls or None,
         timestamp=payload.timestamp,
     )
     db.add(db_mood)
@@ -155,17 +184,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     db.commit()
 
     db.refresh(db_mood)
-    activity_ids = [a.id for a in db_mood.activities]
-
-    return {
-        "id": db_mood.id,
-        "mood_score": db_mood.mood_score,
-        "notes": db_mood.notes,
-        "image_url": db_mood.image_url,
-        "timestamp": db_mood.timestamp,
-        "created_at": db_mood.created_at,
-        "activity_ids": activity_ids,
-    }
+    return _serialize_mood(db_mood)
 
 @router.get("/{entry_id}", response_model=schemas.MoodRead)
 def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
@@ -173,17 +192,7 @@ def get_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     if not m:
         raise HTTPException(status_code=404, detail="Mood entry not found")
 
-    activity_ids = [a.id for a in m.activities]
-
-    return {
-        "id": m.id,
-        "mood_score": m.mood_score,
-        "notes": m.notes,
-        "image_url": m.image_url,
-        "timestamp": m.timestamp,
-        "created_at": m.created_at,
-        "activity_ids": activity_ids,
-    }
+    return _serialize_mood(m)
 
 
 @router.put("/{entry_id}", response_model=schemas.MoodRead)
@@ -192,10 +201,12 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     if not m:
         raise HTTPException(status_code=404, detail="Mood entry not found")
 
-    previous_image_url = m.image_url
+    previous_image_urls = set(_get_mood_image_urls(m))
+    image_urls = _normalize_image_urls(payload.image_url, payload.image_urls)
     m.mood_score = payload.mood_score
     m.notes = payload.notes
-    m.image_url = payload.image_url
+    m.image_url = _primary_image_url(image_urls)
+    m.image_urls = image_urls or None
     m.timestamp = payload.timestamp
 
     activities = []
@@ -208,19 +219,10 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     db.commit()
     db.refresh(m)
 
-    if previous_image_url != m.image_url:
-        _delete_mood_image_file(previous_image_url)
+    current_image_urls = set(_get_mood_image_urls(m))
+    _delete_mood_image_files(sorted(previous_image_urls - current_image_urls))
 
-    activity_ids = [a.id for a in m.activities]
-    return {
-        "id": m.id,
-        "mood_score": m.mood_score,
-        "notes": m.notes,
-        "image_url": m.image_url,
-        "timestamp": m.timestamp,
-        "created_at": m.created_at,
-        "activity_ids": activity_ids,
-    }
+    return _serialize_mood(m)
 
 
 @router.delete("/{entry_id}")
@@ -229,8 +231,8 @@ def delete_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     if not m:
         raise HTTPException(status_code=404, detail="Mood entry not found")
 
-    old_image_url = m.image_url
+    old_image_urls = _get_mood_image_urls(m)
     db.delete(m)
     db.commit()
-    _delete_mood_image_file(old_image_url)
+    _delete_mood_image_files(old_image_urls)
     return {"ok": True, "id": entry_id}
