@@ -43,6 +43,7 @@ Autosync can be enabled/disabled via the `GARMIN_AUTOSYNC_ENABLED` environment v
 ### 😊 Mood & Wellbeing Journal
 - Log a daily mood entry with a numeric score
 - Add free-text notes to each entry
+- Attach one or more photos to each entry
 - Tag entries with one or more **activities** to record what you did that day
 - Full mood history log to review past entries
 
