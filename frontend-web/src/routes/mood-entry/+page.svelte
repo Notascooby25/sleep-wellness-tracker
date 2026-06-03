@@ -236,6 +236,7 @@
 
     imageUploadBusy = true;
     status = '';
+    let uploadedCount = 0;
     try {
       const uploadedUrls: string[] = [];
       for (const file of files) {
@@ -247,19 +248,21 @@
           return;
         }
         uploadedUrls.push(await fileToImageUrl(uploadFile));
+        uploadedCount = uploadedUrls.length;
       }
       imageUrls = [...imageUrls, ...uploadedUrls];
       status = `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'photo' : 'photos'} attached.`;
     } catch (error) {
       const message = String(error);
+      const partialUploadSuffix = uploadedCount > 0 ? ` ${uploadedCount} ${uploadedCount === 1 ? 'photo was' : 'photos were'} attached before the failure.` : '';
       if (message.includes('Content-length of') && message.includes('exceeds limit')) {
-        status = 'Image upload failed: Upload payload exceeded server limit.';
+        status = `Image upload failed: Upload payload exceeded server limit.${partialUploadSuffix}`;
       } else if (message.includes('Upstream backend unavailable')) {
-        status = 'Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.';
+        status = `Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.${partialUploadSuffix}`;
       } else if (message.includes('Failed to fetch')) {
-        status = 'Image upload failed: Network error while uploading. Please check your connection and retry.';
+        status = `Image upload failed: Network error while uploading. Please check your connection and retry.${partialUploadSuffix}`;
       } else {
-        status = `Image upload failed: ${error}`;
+        status = `Image upload failed: ${error}.${partialUploadSuffix}`;
       }
     } finally {
       imageUploadBusy = false;

@@ -117,7 +117,11 @@ def _backfill_mood_image_urls() -> None:
         changed = False
         rows = db.query(models.Mood).all()
         for mood in rows:
-            urls = [str(url).strip() for url in (mood.image_urls or []) if str(url).strip()]
+            urls = []
+            for url in mood.image_urls or []:
+                cleaned = str(url).strip()
+                if cleaned:
+                    urls.append(cleaned)
             if not urls and mood.image_url:
                 urls = [mood.image_url.strip()]
             primary = urls[0] if urls else None

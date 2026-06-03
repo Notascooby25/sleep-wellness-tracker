@@ -246,12 +246,12 @@
   };
 
   const exportCsv = (): string => {
-    const header = ['timestamp', 'mood_score', 'notes', 'image_urls', 'activity_ids'];
+    const header = ['timestamp', 'mood_score', 'notes', 'activity_ids', 'image_urls'];
     const body = entries.map((e) => {
       const notes = e.notes || '';
       const imageUrls = JSON.stringify(e.image_urls?.length ? e.image_urls : e.image_url ? [e.image_url] : []);
       const activityIds = JSON.stringify(e.activity_ids || []);
-      return [e.timestamp, e.mood_score === null ? '' : String(e.mood_score), notes, imageUrls, activityIds]
+      return [e.timestamp, e.mood_score === null ? '' : String(e.mood_score), notes, activityIds, imageUrls]
         .map(csvEscape)
         .join(',');
     });
