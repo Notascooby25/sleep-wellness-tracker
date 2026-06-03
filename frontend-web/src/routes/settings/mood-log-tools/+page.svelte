@@ -6,6 +6,8 @@
   type ImportRow = {
     mood_score: number | null;
     notes: string | null;
+    image_url?: string | null;
+    image_urls: string[];
     timestamp: string;
     activity_ids: number[];
   };
@@ -71,7 +73,15 @@
       .join(',');
     const mood = row.mood_score === null || row.mood_score === undefined ? '' : String(row.mood_score);
     const notes = (row.notes || '').trim();
-    return `${row.timestamp}|${mood}|${notes}|${activityIds}`;
+    const imageUrls = ((row.image_urls && row.image_urls.length > 0)
+      ? row.image_urls
+      : row.image_url
+        ? [row.image_url]
+        : [])
+      .map((value) => String(value).trim())
+      .filter((value) => value.length > 0)
+      .join(',');
+    return `${row.timestamp}|${mood}|${notes}|${activityIds}|${imageUrls}`;
   };
 
   const parseActivityIds = (value: unknown): number[] => {
@@ -97,6 +107,26 @@
       .filter((n) => Number.isFinite(n));
   };
 
+  const parseImageUrls = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item).trim()).filter((item) => item.length > 0);
+    }
+    if (typeof value !== 'string') return [];
+    const text = value.trim();
+    if (!text) return [];
+
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter((item) => item.length > 0);
+      }
+    } catch {
+      // Not JSON array, continue with single string fallback.
+    }
+
+    return [text];
+  };
+
   const normalizeImportRow = (row: Record<string, unknown>): ImportRow => {
     const moodRaw = row.mood_score ?? row.rating ?? null;
     const moodNum = moodRaw === null || moodRaw === '' ? null : Number(moodRaw);
@@ -104,6 +134,7 @@
     return {
       mood_score: Number.isFinite(moodNum as number) ? (moodNum as number) : null,
       notes: (row.notes ?? row.note ?? null) as string | null,
+      image_urls: parseImageUrls(row.image_urls ?? row.image_url ?? []),
       timestamp: String(row.timestamp ?? ''),
       activity_ids: parseActivityIds(row.activity_ids ?? row.activities ?? [])
     };
@@ -215,11 +246,12 @@
   };
 
   const exportCsv = (): string => {
-    const header = ['timestamp', 'mood_score', 'notes', 'activity_ids'];
+    const header = ['timestamp', 'mood_score', 'notes', 'image_urls', 'activity_ids'];
     const body = entries.map((e) => {
       const notes = e.notes || '';
+      const imageUrls = JSON.stringify(e.image_urls?.length ? e.image_urls : e.image_url ? [e.image_url] : []);
       const activityIds = JSON.stringify(e.activity_ids || []);
-      return [e.timestamp, e.mood_score === null ? '' : String(e.mood_score), notes, activityIds]
+      return [e.timestamp, e.mood_score === null ? '' : String(e.mood_score), notes, imageUrls, activityIds]
         .map(csvEscape)
         .join(',');
     });
@@ -307,6 +339,7 @@
           return {
             ...row,
             timestamp: ts,
+            image_url: row.image_urls[0] ?? null,
             activity_ids: Array.from(new Set(mappedIds))
           };
         })
@@ -453,6 +486,8 @@
         await putJson(`/mood/${row.id}`, {
           mood_score: null,
           notes: row.notes || null,
+          image_url: row.image_urls?.[0] ?? row.image_url ?? null,
+          image_urls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [],
           timestamp: row.timestamp,
           activity_ids: row.activity_ids || []
         });

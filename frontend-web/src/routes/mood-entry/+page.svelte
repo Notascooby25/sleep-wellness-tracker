@@ -54,7 +54,7 @@
   let latestStress: StressLatest | null = null;
   let activeCategory = 0;
   let currentStreakDays = 0;
-  let imageUrl: string | null = null;
+  let imageUrls: string[] = [];
   let imageUploadBusy = false;
   let galleryInputEl: HTMLInputElement | null = null;
   let cameraInputEl: HTMLInputElement | null = null;
@@ -231,22 +231,25 @@
 
   const uploadFromInput = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
+    const files = Array.from(input.files || []);
+    if (files.length === 0) return;
 
     imageUploadBusy = true;
     status = '';
     try {
-      status = 'Preparing image...';
-      const uploadFile = await prepareUploadFile(file);
-      if (uploadFile.size > MAX_UPLOAD_BYTES) {
-        status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
-        input.value = '';
-        return;
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        status = files.length > 1 ? `Preparing image ${uploadedUrls.length + 1} of ${files.length}...` : 'Preparing image...';
+        const uploadFile = await prepareUploadFile(file);
+        if (uploadFile.size > MAX_UPLOAD_BYTES) {
+          status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
+          input.value = '';
+          return;
+        }
+        uploadedUrls.push(await fileToImageUrl(uploadFile));
       }
-
-      imageUrl = await fileToImageUrl(uploadFile);
-      status = 'Image attached.';
+      imageUrls = [...imageUrls, ...uploadedUrls];
+      status = `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'photo' : 'photos'} attached.`;
     } catch (error) {
       const message = String(error);
       if (message.includes('Content-length of') && message.includes('exceeds limit')) {
@@ -264,8 +267,8 @@
     }
   };
 
-  const clearImage = () => {
-    imageUrl = null;
+  const removeImage = (index: number) => {
+    imageUrls = imageUrls.filter((_, i) => i !== index);
   };
 
   const moodColors: Record<number, { bg: string; active: string; label: string }> = {
@@ -307,14 +310,15 @@
       const payload: MoodEntry = {
         mood_score: ratingRequired() ? moodScore : null,
         notes: notes.trim() || null,
-        image_url: imageUrl,
+        image_url: imageUrls[0] ?? null,
+        image_urls: imageUrls,
         timestamp,
         activity_ids: Array.from(selected)
       };
       await postJson('/mood/', payload);
       status = 'Entry saved.';
       notes = '';
-      imageUrl = null;
+      imageUrls = [];
       selected = new Set<number>();
     } catch (error) {
       status = `Save failed: ${error}`;
@@ -422,7 +426,7 @@
   </label>
 
   <div class="image-upload-wrap">
-    <div class="label">Photo <small style="color:#8091a7;">(optional)</small></div>
+    <div class="label">Photos <small style="color:#8091a7;">(optional)</small></div>
     <div class="image-upload-actions">
       <button on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
       <button on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
@@ -435,6 +439,7 @@
       type="file"
       accept="image/*"
       capture="environment"
+      multiple
       bind:this={cameraInputEl}
       on:change={uploadFromInput}
       class="hidden-file-input"
@@ -442,15 +447,20 @@
     <input
       type="file"
       accept="image/*"
+      multiple
       bind:this={galleryInputEl}
       on:change={uploadFromInput}
       class="hidden-file-input"
     />
 
-    {#if imageUrl}
+    {#if imageUrls.length}
       <div class="image-preview-wrap">
-        <img src={`/api${imageUrl}`} alt="Mood attachment preview" class="image-preview" />
-        <button class="btn-clear" on:click={clearImage} disabled={busy || imageUploadBusy}>Remove</button>
+        {#each imageUrls as imageUrl, index}
+          <div class="image-preview-card">
+            <img src={`/api${imageUrl}`} alt={`Mood attachment preview ${index + 1}`} class="image-preview" />
+            <button class="btn-clear" on:click={() => removeImage(index)} disabled={busy || imageUploadBusy}>Remove</button>
+          </div>
+        {/each}
       </div>
     {/if}
   </div>
@@ -540,6 +550,7 @@
   .image-upload-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
   .hidden-file-input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
   .image-preview-wrap { margin-top: 0.55rem; display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
+  .image-preview-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
   .image-preview {
     width: min(260px, 100%);
     max-height: 260px;

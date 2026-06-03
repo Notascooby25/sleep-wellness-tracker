@@ -17,6 +17,7 @@
   let editNotes = '';
   let editTimestamp = '';
   let editActivityIds = new Set<number>();
+  let editImageUrls: string[] = [];
   let editActivityFilter = '';
   let editBusy = false;
 
@@ -30,6 +31,7 @@
   };
 
   const activityName = (id: number) => activities.find((a) => a.id === id)?.name || `#${id}`;
+  const entryImages = (entry: MoodEntry) => entry.image_urls?.length ? entry.image_urls : entry.image_url ? [entry.image_url] : [];
 
   const loadPage = async (offset: number) => {
     return getJson<MoodEntry[]>(`/mood/?limit=${PAGE_SIZE}&offset=${offset}`);
@@ -84,12 +86,14 @@
     editNotes = entry.notes ?? '';
     editTimestamp = toLocalInput(entry.timestamp);
     editActivityIds = new Set(entry.activity_ids || []);
+    editImageUrls = entryImages(entry);
     editActivityFilter = '';
   };
 
   const cancelEdit = () => {
     editId = null;
     editActivityIds = new Set<number>();
+    editImageUrls = [];
     editActivityFilter = '';
   };
 
@@ -123,11 +127,14 @@
       await putJson(`/mood/${editId}`, {
         mood_score: editScore,
         notes: editNotes.trim() || null,
+        image_url: editImageUrls[0] ?? null,
+        image_urls: editImageUrls,
         timestamp: ts,
         activity_ids: Array.from(editActivityIds)
       });
       editId = null;
       editActivityIds = new Set<number>();
+      editImageUrls = [];
       editActivityFilter = '';
       await load();
     } catch (error) {
@@ -178,7 +185,7 @@
           <tr>
             <th>Date</th>
             <th>Mood</th>
-            <th>Photo</th>
+            <th>Photos</th>
             <th>Notes</th>
             <th>Activities</th>
             <th></th>
@@ -225,10 +232,14 @@
                 <td style="white-space:nowrap;">{fmtDate(entry.timestamp)}</td>
                 <td>{entry.mood_score ?? 'n/a'}</td>
                 <td>
-                  {#if entry.image_url}
-                    <a href={`/api${entry.image_url}`} target="_blank" rel="noreferrer">
-                      <img src={`/api${entry.image_url}`} alt="Mood attachment" class="entry-photo" loading="lazy" />
-                    </a>
+                  {#if entryImages(entry).length}
+                    <div class="entry-photo-list">
+                      {#each entryImages(entry) as imageUrl, index}
+                        <a href={`/api${imageUrl}`} target="_blank" rel="noreferrer" aria-label={`Open mood photo ${index + 1}`}>
+                          <img src={`/api${imageUrl}`} alt={`Mood attachment ${index + 1}`} class="entry-photo" loading="lazy" />
+                        </a>
+                      {/each}
+                    </div>
                   {:else}
                     -
                   {/if}
@@ -275,6 +286,7 @@
   .act-chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
   .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
   .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: #1e4b76; margin: 0.1rem 0.15rem 0.1rem 0; }
+  .entry-photo-list { display: flex; gap: 0.35rem; flex-wrap: wrap; }
   .entry-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid #ccddf4; display: block; }
   .btn-sm { padding: 0.3rem 0.55rem; font-size: 0.8rem; margin-right: 0.2rem; }
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }

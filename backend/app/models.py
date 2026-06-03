@@ -52,6 +52,7 @@ class Mood(Base):
     mood_score = Column(Integer, nullable=True)  # Nullable to support optional ratings
     notes = Column(Text, nullable=True)
     image_url = Column(String(1024), nullable=True)
+    image_urls = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

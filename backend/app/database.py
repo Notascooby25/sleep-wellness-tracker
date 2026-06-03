@@ -5,6 +5,7 @@ import time
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
+from . import models
 from .models import Base
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,12 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE moods ADD COLUMN image_url VARCHAR(1024)")
             )
 
+        if "image_urls" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.image_urls column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN image_urls JSON")
+            )
+
         mood_score_col = mood_columns.get("mood_score")
         if mood_score_col and mood_score_col.get("nullable") is False:
             if dialect == "postgresql":
@@ -102,6 +109,33 @@ _ensure_legacy_schema_compatibility()
 logger.info("Database tables verified.")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def _backfill_mood_image_urls() -> None:
+    db = SessionLocal()
+    try:
+        changed = False
+        rows = db.query(models.Mood).all()
+        for mood in rows:
+            urls = [str(url).strip() for url in (mood.image_urls or []) if str(url).strip()]
+            if not urls and mood.image_url:
+                urls = [mood.image_url.strip()]
+            primary = urls[0] if urls else None
+
+            if mood.image_urls != (urls or None):
+                mood.image_urls = urls or None
+                changed = True
+            if mood.image_url != primary:
+                mood.image_url = primary
+                changed = True
+
+        if changed:
+            db.commit()
+    finally:
+        db.close()
+
+
+_backfill_mood_image_urls()
 
 # FastAPI dependency
 def get_db():
