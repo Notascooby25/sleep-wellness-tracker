@@ -31,6 +31,8 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+      - MOOD_IMAGE_DIR=/app/uploads/mood_images
+      - MOOD_IMAGE_REQUIRE_MOUNT=1
     depends_on:
       db:
         condition: service_healthy
@@ -42,7 +44,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /srv/shared/garmin-tokens:/app/garmin_tokens:Z
-      - /srv/shared/mood-images:/app/uploads:Z
+      - ${MOOD_IMAGE_STORAGE_PATH:-/srv/shared/mood-images/mood_images}:/app/uploads/mood_images:Z
       - /srv/shared/logs/backend:/var/log/app/backend:Z
     logging:
       driver: json-file

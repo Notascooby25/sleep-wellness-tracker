@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 import os
 import re
 from pathlib import Path
@@ -13,11 +14,13 @@ from .. import models, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/mood", tags=["mood"])
+logger = logging.getLogger("app.mood")
 
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 CHUNK_SIZE_BYTES = 1024 * 1024
 IMAGE_URL_PREFIX = "/mood/image/"
 MOOD_IMAGE_DIR = Path(os.getenv("MOOD_IMAGE_DIR", "/app/uploads/mood_images"))
+MOOD_IMAGE_REQUIRE_MOUNT = os.getenv("MOOD_IMAGE_REQUIRE_MOUNT", "1").strip().lower() in {"1", "true", "yes", "on"}
 ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -28,8 +31,30 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
 SAFE_IMAGE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
+def _has_non_root_mount(path: Path) -> bool:
+    current = path.resolve()
+    while True:
+        if current == Path("/"):
+            return False
+        if current.is_mount():
+            return True
+        parent = current.parent
+        if parent == current:
+            return False
+        current = parent
+
+
 def _ensure_mood_image_dir() -> None:
     MOOD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    if MOOD_IMAGE_REQUIRE_MOUNT and not _has_non_root_mount(MOOD_IMAGE_DIR):
+        logger.error(
+            "Refusing image write/read: %s is not mounted persistent storage",
+            MOOD_IMAGE_DIR,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Image storage is not mounted. Configure a persistent mount for MOOD_IMAGE_DIR.",
+        )
 
 
 def _delete_mood_image_file(image_url: str | None) -> None:
