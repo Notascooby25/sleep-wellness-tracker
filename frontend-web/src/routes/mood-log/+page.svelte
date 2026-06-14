@@ -195,17 +195,17 @@
           {#each filteredEntries as entry (entry.id)}
             {#if editId === entry.id}
               <tr class="edit-row">
-                <td>
+                <td data-label="Date">
                   <input type="datetime-local" bind:value={editTimestamp} style="font-size:0.82rem;" />
                 </td>
-                <td>
+                <td data-label="Mood">
                   <input type="number" min="1" max="5" bind:value={editScore} style="width:4rem;" />
                 </td>
-                <td>-</td>
-                <td>
+                <td data-label="Photos">-</td>
+                <td data-label="Notes">
                   <input type="text" bind:value={editNotes} placeholder="Notes…" />
                 </td>
-                <td>
+                <td data-label="Activities">
                   <div class="edit-acts">
                     <input type="text" bind:value={editActivityFilter} placeholder="Filter activities..." />
                     <div class="edit-acts-chips">
@@ -222,16 +222,16 @@
                     </div>
                   </div>
                 </td>
-                <td style="white-space:nowrap;">
+                <td data-label="Actions" style="white-space:nowrap;">
                   <button class="btn-primary btn-sm" disabled={editBusy} on:click={saveEdit}>Save</button>
                   <button class="btn-sm" on:click={cancelEdit}>Cancel</button>
                 </td>
               </tr>
             {:else}
               <tr>
-                <td style="white-space:nowrap;">{fmtDate(entry.timestamp)}</td>
-                <td>{entry.mood_score ?? 'n/a'}</td>
-                <td>
+                <td data-label="Date" style="white-space:nowrap;">{fmtDate(entry.timestamp)}</td>
+                <td data-label="Mood">{entry.mood_score ?? 'n/a'}</td>
+                <td data-label="Photos">
                   {#if entryImages(entry).length}
                     <div class="entry-photo-list">
                       {#each entryImages(entry) as imageUrl, index}
@@ -244,15 +244,15 @@
                     -
                   {/if}
                 </td>
-                <td>{entry.notes || '-'}</td>
-                <td>
+                <td data-label="Notes">{entry.notes || '-'}</td>
+                <td data-label="Activities">
                   {#if entry.activity_ids?.length}
                     {#each entry.activity_ids as aid}
                       <span class="act-badge">{activityName(aid)}</span>
                     {/each}
                   {:else}-{/if}
                 </td>
-                <td style="white-space:nowrap;">
+                <td data-label="Actions" style="white-space:nowrap;">
                   {#if entry.id !== undefined}
                     <button class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
                     <button class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
@@ -296,4 +296,40 @@
   .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid #ccddf4; border-radius: 6px; background: #f5f9ff; color: #1f4066; }
   .filter-input:focus { outline: none; border-color: #3c79c5; background: #fff; }
   .clear-btn { background: #ecf2fb; border-color: #ccddf4; color: #496685; }
+  @media (max-width: 760px) {
+    .table-wrap { overflow-x: visible; }
+    .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+    .table thead { display: none; }
+    .table tr {
+      border: 1px solid #dbe8f8;
+      border-radius: 10px;
+      margin-bottom: 0.65rem;
+      padding: 0.4rem 0.55rem;
+      background: #fff;
+    }
+    .table td {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.65rem;
+      border-bottom: none;
+      padding: 0.28rem 0;
+      white-space: normal !important;
+      word-break: break-word;
+    }
+    .table td::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      color: #496685;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      min-width: 4.8rem;
+    }
+    .table td[data-label='Actions'] { flex-wrap: wrap; }
+    .table td[data-label='Actions']::before { margin-right: auto; }
+    .edit-acts { min-width: 0; width: 100%; }
+    .btn-sm { margin-bottom: 0.2rem; }
+  }
 </style>
