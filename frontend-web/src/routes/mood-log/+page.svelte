@@ -309,26 +309,44 @@
     }
     .table td {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
       align-items: flex-start;
       gap: 0.65rem;
       border-bottom: none;
       padding: 0.28rem 0;
       white-space: normal !important;
-      word-break: break-word;
+      word-break: normal;
+      overflow-wrap: anywhere;
     }
     .table td::before {
       content: attr(data-label);
-      flex-shrink: 0;
+      flex: 0 0 5.2rem;
       color: #496685;
       font-size: 0.72rem;
       font-weight: 600;
       letter-spacing: 0.03em;
       text-transform: uppercase;
-      min-width: 4.8rem;
+      min-width: 5.2rem;
+    }
+    .table td[data-label='Photos'],
+    .table td[data-label='Activities'],
+    .table td[data-label='Actions'] {
+      display: block;
+    }
+    .table td[data-label='Photos']::before,
+    .table td[data-label='Activities']::before,
+    .table td[data-label='Actions']::before {
+      display: block;
+      margin-bottom: 0.28rem;
     }
     .table td[data-label='Actions'] { flex-wrap: wrap; }
     .table td[data-label='Actions']::before { margin-right: auto; }
+    .act-badge {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
     .edit-acts { min-width: 0; width: 100%; }
     .btn-sm { margin-bottom: 0.2rem; }
   }
