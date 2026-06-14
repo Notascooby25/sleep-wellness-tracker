@@ -27,6 +27,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL
+      - MOOD_IMAGE_DIR=/app/uploads/mood_images
+      - MOOD_IMAGE_REQUIRE_MOUNT=1
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
@@ -35,7 +37,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./backend/app:/app/app:Z
-      - backend_uploads:/app/uploads:Z
+      - ${MOOD_IMAGE_STORAGE_PATH:-mood_images_data}:/app/uploads/mood_images:Z
 
   frontend_web:
     build:
@@ -55,4 +57,4 @@ services:
 
 volumes:
   db_data:
-  backend_uploads:
+  mood_images_data:

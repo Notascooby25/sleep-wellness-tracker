@@ -187,6 +187,13 @@ GARMIN_HYDRATION_BACKFILL_DAYS=30
 # Enable/disable the background autosync loop
 GARMIN_AUTOSYNC_ENABLED=true
 
+# Mood image storage
+# Production default: /srv/shared/mood-images/mood_images
+# Local default: named Docker volume mood_images_data
+MOOD_IMAGE_STORAGE_PATH=
+MOOD_IMAGE_DIR=/app/uploads/mood_images
+MOOD_IMAGE_REQUIRE_MOUNT=1
+
 # Production image references (GHCR)
 BACKEND_IMAGE=ghcr.io/notascooby25/sleep-wellness-tracker-backend:latest
 FRONTEND_WEB_IMAGE=ghcr.io/notascooby25/sleep-wellness-tracker-frontend-web:latest
@@ -220,6 +227,28 @@ Two GitHub Actions workflows build Docker images and push them to GHCR:
 | `main.yml` | Manual (`workflow_dispatch`) | ARM64 images (build artefacts) |
 
 The production NUC runs the AMD64 images. Watchtower polls GHCR every 5 minutes and automatically pulls & restarts updated containers.
+
+### Mood Image Storage Safety
+
+Mood attachments are now protected against silent data loss if backend storage is not mounted.
+
+- Backend writes to `MOOD_IMAGE_DIR` (default `/app/uploads/mood_images`).
+- Uploads are rejected with HTTP 503 when `MOOD_IMAGE_REQUIRE_MOUNT=1` and no non-root mount is detected.
+- Production defaults to host path `${MOOD_IMAGE_STORAGE_PATH:-/srv/shared/mood-images/mood_images}`.
+- Local development defaults to a persistent named volume `mood_images_data`.
+
+Create the production folder once:
+
+```bash
+sudo mkdir -p /srv/shared/mood-images/mood_images
+sudo chown -R $USER:$USER /srv/shared/mood-images
+```
+
+Then redeploy:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d backend frontend_web
+```
 
 ---
 
