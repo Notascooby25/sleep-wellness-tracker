@@ -24,6 +24,7 @@
   let startDate = thirtyDaysAgo;
   let endDate = today;
   let selected = new Set<string>(['sleep', 'hrv', 'stress', 'body_battery', 'steps']);
+  let includeNotes = true;
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let selectedActivityIds = new Set<number>();
@@ -93,7 +94,8 @@
       const params = new URLSearchParams({
         sources: Array.from(selected).join(','),
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        include_notes: includeNotes ? 'true' : 'false'
       });
 
       if (selectedActivityIds.size > 0) {
@@ -129,7 +131,7 @@
 
 <section class="hero">
   <h2>Export Data to CSV</h2>
-  <p>Select a date range and one or more data sources to download a merged CSV export.</p>
+  <p>Select a date range and one or more data sources to download a readable CSV export. Activity names, types, and notes are included using plain language column headers. Note: attached images cannot be embedded in a CSV file — they remain viewable in the app.</p>
 </section>
 
 <section class="card export-card">
@@ -157,6 +159,15 @@
       </label>
     {/each}
   </div>
+
+  {#if selected.has('mood')}
+    <div class="notes-toggle block-gap">
+      <label class="source-item">
+        <input type="checkbox" bind:checked={includeNotes} />
+        <span>Include Mood Notes in export</span>
+      </label>
+    </div>
+  {/if}
 
   <div class="label block-gap">Filter Export by Activities <span class="hint-inline">(optional)</span></div>
   <p class="hint">If selected, the export includes only dates where at least one selected activity was tagged in Mood Log.</p>
@@ -236,6 +247,7 @@
   .export-card { padding: 1rem; }
   .block-gap { margin-top: 0.9rem; }
   .hint-inline { font-size: 0.82rem; color: #496685; font-weight: 400; }
+  .notes-toggle { display: flex; }
   .source-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
