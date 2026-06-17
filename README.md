@@ -301,6 +301,42 @@ Retention behavior:
 - A snapshot is all files that share one timestamp stem (for example `.dump` + `.sql.gz`).
 - Cleanup keeps the newest 4 snapshots and removes older ones.
 
+### Mood Image Backups (Recommended)
+
+Mood photos are file-based data and are not included in DB dumps. Enable dedicated file backups and verification:
+
+```bash
+# Install/update cron jobs (backup every 6h, verify every hour)
+./scripts/setup_mood_image_backup_cron.sh
+
+# Run once immediately
+./scripts/mood_images_backup.sh
+./scripts/mood_images_verify.sh
+
+# Verify cron
+crontab -l | grep -E 'mood_images_backup|mood_images_verify'
+```
+
+Default paths:
+- Source images: `/srv/shared/mood-images/mood_images`
+- Backup archives: `/srv/shared/backups/mood-images`
+
+What is installed:
+
+```cron
+15 */6 * * * SOURCE_DIR=/srv/shared/mood-images/mood_images BACKUP_DIR=/srv/shared/backups/mood-images MAX_BACKUPS=14 /home/andyl/sleep-wellness-tracker/scripts/mood_images_backup.sh >> /srv/shared/backups/mood_images_backup_cron.log 2>&1
+45 * * * * SOURCE_DIR=/srv/shared/mood-images/mood_images /home/andyl/sleep-wellness-tracker/scripts/mood_images_verify.sh >> /srv/shared/backups/mood_images_verify_cron.log 2>&1
+```
+
+Backup behavior:
+- Creates timestamped `mood_images_*.tar.gz` plus `.sha256` checksum.
+- Verifies archive readability before finalizing.
+- Keeps latest 14 archives by default.
+
+Verification behavior:
+- Reads DB-referenced image filenames and checks they exist on disk.
+- Exits non-zero if files are missing (strict mode), so cron logs expose drift early.
+
 ### Data Models
 
 | Table | Description |
