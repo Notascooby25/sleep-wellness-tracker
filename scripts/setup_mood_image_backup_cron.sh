@@ -12,15 +12,16 @@ MAX_BACKUPS="${MAX_BACKUPS:-14}"
 BACKUP_SCHEDULE="${BACKUP_SCHEDULE:-15 */6 * * *}"
 VERIFY_SCHEDULE="${VERIFY_SCHEDULE:-45 * * * *}"
 BACKUP_JOB="$ROOT_DIR/scripts/mood_images_backup.sh"
-VERIFY_JOB="$ROOT_DIR/scripts/mood_images_verify.sh"
+VERIFY_JOB="$ROOT_DIR/scripts/mood_images_verify_hook.sh"
 BACKUP_LOG="${BACKUP_LOG:-/srv/shared/backups/mood_images_backup_cron.log}"
 VERIFY_LOG="${VERIFY_LOG:-/srv/shared/backups/mood_images_verify_cron.log}"
+HOOK_LOG="${HOOK_LOG:-/srv/shared/backups/mood_images_hook.log}"
 
 mkdir -p "$BACKUP_DIR" >/dev/null 2>&1 || true
 mkdir -p "$(dirname "$BACKUP_LOG")" >/dev/null 2>&1 || true
 
 backup_line="$BACKUP_SCHEDULE SOURCE_DIR=$SOURCE_DIR BACKUP_DIR=$BACKUP_DIR MAX_BACKUPS=$MAX_BACKUPS $BACKUP_JOB >> $BACKUP_LOG 2>&1"
-verify_line="$VERIFY_SCHEDULE SOURCE_DIR=$SOURCE_DIR $VERIFY_JOB >> $VERIFY_LOG 2>&1"
+verify_line="$VERIFY_SCHEDULE SOURCE_DIR=$SOURCE_DIR HOOK_LOG=$HOOK_LOG $VERIFY_JOB >> $VERIFY_LOG 2>&1"
 
 tmpfile="$(mktemp)"
 trap 'rm -f "$tmpfile"' EXIT

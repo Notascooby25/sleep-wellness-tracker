@@ -311,7 +311,7 @@ Mood photos are file-based data and are not included in DB dumps. Enable dedicat
 
 # Run once immediately
 ./scripts/mood_images_backup.sh
-./scripts/mood_images_verify.sh
+./scripts/mood_images_verify_hook.sh
 
 # Verify cron
 crontab -l | grep -E 'mood_images_backup|mood_images_verify'
@@ -325,7 +325,7 @@ What is installed:
 
 ```cron
 15 */6 * * * SOURCE_DIR=/srv/shared/mood-images/mood_images BACKUP_DIR=/srv/shared/backups/mood-images MAX_BACKUPS=14 /home/andyl/sleep-wellness-tracker/scripts/mood_images_backup.sh >> /srv/shared/backups/mood_images_backup_cron.log 2>&1
-45 * * * * SOURCE_DIR=/srv/shared/mood-images/mood_images /home/andyl/sleep-wellness-tracker/scripts/mood_images_verify.sh >> /srv/shared/backups/mood_images_verify_cron.log 2>&1
+45 * * * * SOURCE_DIR=/srv/shared/mood-images/mood_images HOOK_LOG=/srv/shared/backups/mood_images_hook.log /home/andyl/sleep-wellness-tracker/scripts/mood_images_verify_hook.sh >> /srv/shared/backups/mood_images_verify_cron.log 2>&1
 ```
 
 Backup behavior:
@@ -336,6 +336,11 @@ Backup behavior:
 Verification behavior:
 - Reads DB-referenced image filenames and checks they exist on disk.
 - Exits non-zero if files are missing (strict mode), so cron logs expose drift early.
+
+Hook log behavior:
+- Appends structured events to `/srv/shared/backups/mood_images_hook.log`.
+- Event types: `OK`, `ALERT` (missing files), `ERROR` (verification failure).
+- Missing-file runs also write snapshot reports under `/srv/shared/backups/mood-images/missing-reports/`.
 
 ### Data Models
 
