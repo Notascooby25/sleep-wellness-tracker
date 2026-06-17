@@ -1,7 +1,11 @@
 import csv
 import datetime as dt
 import io
+import os
+import re
 from collections import defaultdict
+from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -12,6 +16,11 @@ from .. import models
 from ..database import get_db
 
 router = APIRouter(prefix="/export", tags=["export"])
+
+MOOD_IMAGE_DIR = Path(os.getenv("MOOD_IMAGE_DIR", "/app/uploads/mood_images"))
+MOOD_IMAGE_REQUIRE_MOUNT = os.getenv("MOOD_IMAGE_REQUIRE_MOUNT", "1").strip().lower() in {"1", "true", "yes", "on"}
+IMAGE_URL_PREFIX = "/mood/image/"
+SAFE_IMAGE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 _ALLOWED_SOURCES = {
     "mood",
@@ -69,6 +78,50 @@ def _parse_mood_row_mode(raw_mode: str | None) -> str:
     return mode
 
 
+def _has_non_root_mount(path: Path) -> bool:
+    current = path.resolve()
+    while True:
+        if current == Path("/"):
+            return False
+        if current.is_mount():
+            return True
+        parent = current.parent
+        if parent == current:
+            return False
+        current = parent
+
+
+def _ensure_mood_image_dir() -> None:
+    MOOD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    if MOOD_IMAGE_REQUIRE_MOUNT and not _has_non_root_mount(MOOD_IMAGE_DIR):
+        raise HTTPException(
+            status_code=503,
+            detail="Image storage is not mounted. Configure a persistent mount for MOOD_IMAGE_DIR.",
+        )
+
+
+def _normalize_image_urls(image_url: str | None = None, image_urls: list[str] | None = None) -> list[str]:
+    candidates = image_urls if image_urls is not None else ([image_url] if image_url else [])
+    normalized: list[str] = []
+    for candidate in candidates:
+        cleaned = str(candidate or "").strip()
+        if cleaned and cleaned not in normalized:
+            normalized.append(cleaned)
+    return normalized
+
+
+def _mood_image_names_from_row(mood: models.Mood) -> list[str]:
+    image_urls = _normalize_image_urls(image_url=mood.image_url, image_urls=mood.image_urls)
+    image_names: list[str] = []
+    for image_url in image_urls:
+        if not image_url.startswith(IMAGE_URL_PREFIX):
+            continue
+        image_name = image_url[len(IMAGE_URL_PREFIX):]
+        if image_name and SAFE_IMAGE_NAME_RE.fullmatch(image_name):
+            image_names.append(image_name)
+    return image_names
+
+
 @router.get("/csv")
 def export_csv(
     sources: str = Query(..., description="Comma-separated sources"),
@@ -76,6 +129,7 @@ def export_csv(
     end_date: dt.date = Query(...),
     activity_ids: str | None = Query(default=None, description="Optional comma-separated mood activity IDs"),
     include_notes: bool = Query(default=True, description="Include mood notes in the export"),
+    include_images: bool = Query(default=False, description="Include attached mood images in a ZIP export"),
     mood_row_mode: str = Query(default="entry", description="Mood row format: entry or daily"),
     db: Session = Depends(get_db),
 ):
@@ -86,6 +140,8 @@ def export_csv(
     selected_activity_ids = _parse_activity_ids(activity_ids)
     selected_mood_row_mode = _parse_mood_row_mode(mood_row_mode)
     use_mood_entry_rows = "mood" in selected_sources and selected_mood_row_mode == "entry"
+    if include_images and "mood" not in selected_sources:
+        raise HTTPException(status_code=400, detail="include_images requires mood to be selected")
 
     allowed_dates: set[dt.date] = set()
     if selected_activity_ids:
@@ -103,6 +159,7 @@ def export_csv(
     by_date: dict[str, dict[str, object]] = {}
     mood_entry_rows: list[dict[str, object]] = []
     mood_entry_rows_by_date: dict[dt.date, list[dict[str, object]]] = defaultdict(list)
+    export_image_names: set[str] = set()
     column_order: list[str] = []
 
     def ensure_row(date_value: dt.date) -> dict[str, object]:
@@ -141,11 +198,16 @@ def export_csv(
             .filter(func.date(models.Mood.timestamp) <= end_date)
         )
         if selected_activity_ids:
-            query = (
-                query.join(models.Mood.activities)
+            matching_mood_ids = (
+                db.query(models.Mood.id)
+                .join(models.Mood.activities)
+                .filter(func.date(models.Mood.timestamp) >= start_date)
+                .filter(func.date(models.Mood.timestamp) <= end_date)
                 .filter(models.Activity.id.in_(selected_activity_ids))
                 .distinct()
+                .subquery()
             )
+            query = query.filter(models.Mood.id.in_(matching_mood_ids))
 
         rows = query.order_by(models.Mood.timestamp.asc(), models.Mood.id.asc()).all()
         for row in rows:
@@ -168,6 +230,8 @@ def export_csv(
                 export_row["Mood Notes"] = (row.notes or "").strip() or None
             mood_entry_rows.append(export_row)
             mood_entry_rows_by_date[row_date].append(export_row)
+            if include_images:
+                export_image_names.update(_mood_image_names_from_row(row))
 
     if "sleep" in selected_sources:
         add_columns([
@@ -362,11 +426,16 @@ def export_csv(
             .filter(func.date(models.Mood.timestamp) <= end_date)
         )
         if selected_activity_ids:
-            query = (
-                query.join(models.Mood.activities)
+            matching_mood_ids = (
+                db.query(models.Mood.id)
+                .join(models.Mood.activities)
+                .filter(func.date(models.Mood.timestamp) >= start_date)
+                .filter(func.date(models.Mood.timestamp) <= end_date)
                 .filter(models.Activity.id.in_(selected_activity_ids))
                 .distinct()
+                .subquery()
             )
+            query = query.filter(models.Mood.id.in_(matching_mood_ids))
         rows = query.all()
 
         grouped_scores: dict[dt.date, list[int]] = defaultdict(list)
@@ -385,6 +454,8 @@ def export_csv(
                 text = row.notes.strip()
                 if text:
                     grouped_notes[row_date].append(text)
+            if include_images:
+                export_image_names.update(_mood_image_names_from_row(row))
             for activity in row.activities:
                 if selected_activity_ids and activity.id not in selected_activity_ids:
                     continue
@@ -416,6 +487,24 @@ def export_csv(
 
     csv_payload = output.getvalue()
     output.close()
+
+    if include_images:
+        _ensure_mood_image_dir()
+        archive = io.BytesIO()
+        with ZipFile(archive, mode="w", compression=ZIP_DEFLATED) as zip_file:
+            zip_file.writestr("export.csv", csv_payload)
+            for image_name in sorted(export_image_names):
+                image_path = (MOOD_IMAGE_DIR / image_name).resolve()
+                try:
+                    image_path.relative_to(MOOD_IMAGE_DIR.resolve())
+                except ValueError:
+                    continue
+                if image_path.exists() and image_path.is_file():
+                    zip_file.write(image_path, arcname=f"images/{image_name}")
+        archive.seek(0)
+        filename = f"export_{start_date.isoformat()}_{end_date.isoformat()}.zip"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(iter([archive.getvalue()]), media_type="application/zip", headers=headers)
 
     filename = f"export_{start_date.isoformat()}_{end_date.isoformat()}.csv"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}

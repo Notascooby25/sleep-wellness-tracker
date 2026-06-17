@@ -29,6 +29,7 @@
   let activities: Activity[] = [];
   let selectedActivityIds = new Set<number>();
   let moodRowMode: 'entry' | 'daily' = 'entry';
+  let includeImages = false;
   let busy = false;
   let status = '';
 
@@ -99,7 +100,10 @@
         include_notes: includeNotes ? 'true' : 'false'
       });
 
-          params.set('mood_row_mode', moodRowMode);
+      params.set('mood_row_mode', moodRowMode);
+      if (includeImages) {
+        params.set('include_images', 'true');
+      }
 
       if (selectedActivityIds.size > 0) {
         params.set('activity_ids', Array.from(selectedActivityIds).join(','));
@@ -115,7 +119,7 @@
       const href = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = href;
-      a.download = `export_${startDate}_${endDate}.csv`;
+      a.download = includeImages ? `export_${startDate}_${endDate}.zip` : `export_${startDate}_${endDate}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -170,6 +174,13 @@
         <span>Include Mood Notes in export</span>
       </label>
     </div>
+
+    <div class="notes-toggle block-gap">
+      <label class="source-item">
+        <input type="checkbox" bind:checked={includeImages} />
+        <span>Include attached pictures in a ZIP export</span>
+      </label>
+    </div>
   {/if}
 
   <div class="label block-gap">Mood Export Format</div>
@@ -185,7 +196,7 @@
   </div>
 
   <div class="label block-gap">Filter Export by Activities <span class="hint-inline">(optional)</span></div>
-  <p class="hint">If selected, only mood entries tagged with selected activities are exported. In entry-level mode, each entry appears as its own CSV row.</p>
+  <p class="hint">If selected, only mood entries tagged with selected activities are exported. In entry-level mode, each entry appears as its own row. If image export is enabled, the download becomes a ZIP containing the CSV plus attached pictures.</p>
 
   <section class="card acts-card">
     <div class="acts-header">
