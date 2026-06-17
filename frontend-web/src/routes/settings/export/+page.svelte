@@ -28,6 +28,7 @@
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let selectedActivityIds = new Set<number>();
+  let moodRowMode: 'entry' | 'daily' = 'entry';
   let busy = false;
   let status = '';
 
@@ -95,7 +96,11 @@
         sources: Array.from(selected).join(','),
         start_date: startDate,
         end_date: endDate,
+<<<<<<< HEAD
         include_notes: includeNotes ? 'true' : 'false'
+=======
+        mood_row_mode: moodRowMode
+>>>>>>> 92aa984 (feat(export): add activity-specific entry-level CSV rows)
       });
 
       if (selectedActivityIds.size > 0) {
@@ -160,6 +165,7 @@
     {/each}
   </div>
 
+<<<<<<< HEAD
   {#if selected.has('mood')}
     <div class="notes-toggle block-gap">
       <label class="source-item">
@@ -168,9 +174,22 @@
       </label>
     </div>
   {/if}
+=======
+  <div class="label block-gap">Mood Export Format</div>
+  <div class="mode-grid">
+    <label class="source-item">
+      <input type="radio" bind:group={moodRowMode} value="entry" />
+      <span>Entry-level rows (recommended)</span>
+    </label>
+    <label class="source-item">
+      <input type="radio" bind:group={moodRowMode} value="daily" />
+      <span>Daily summary rows</span>
+    </label>
+  </div>
+>>>>>>> 92aa984 (feat(export): add activity-specific entry-level CSV rows)
 
   <div class="label block-gap">Filter Export by Activities <span class="hint-inline">(optional)</span></div>
-  <p class="hint">If selected, the export includes only dates where at least one selected activity was tagged in Mood Log.</p>
+  <p class="hint">If selected, only mood entries tagged with selected activities are exported. In entry-level mode, each entry appears as its own CSV row.</p>
 
   <section class="card acts-card">
     <div class="acts-header">
@@ -253,6 +272,11 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.6rem;
   }
+  .mode-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
   .source-item {
     display: flex;
     align-items: center;
@@ -308,6 +332,7 @@
 
   @media (max-width: 860px) {
     .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mode-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 540px) {
     .source-grid { grid-template-columns: 1fr; }
