@@ -96,12 +96,10 @@
         sources: Array.from(selected).join(','),
         start_date: startDate,
         end_date: endDate,
-<<<<<<< HEAD
         include_notes: includeNotes ? 'true' : 'false'
-=======
-        mood_row_mode: moodRowMode
->>>>>>> 92aa984 (feat(export): add activity-specific entry-level CSV rows)
       });
+
+          params.set('mood_row_mode', moodRowMode);
 
       if (selectedActivityIds.size > 0) {
         params.set('activity_ids', Array.from(selectedActivityIds).join(','));
@@ -165,7 +163,6 @@
     {/each}
   </div>
 
-<<<<<<< HEAD
   {#if selected.has('mood')}
     <div class="notes-toggle block-gap">
       <label class="source-item">
@@ -174,7 +171,7 @@
       </label>
     </div>
   {/if}
-=======
+
   <div class="label block-gap">Mood Export Format</div>
   <div class="mode-grid">
     <label class="source-item">
@@ -186,7 +183,6 @@
       <span>Daily summary rows</span>
     </label>
   </div>
->>>>>>> 92aa984 (feat(export): add activity-specific entry-level CSV rows)
 
   <div class="label block-gap">Filter Export by Activities <span class="hint-inline">(optional)</span></div>
   <p class="hint">If selected, only mood entries tagged with selected activities are exported. In entry-level mode, each entry appears as its own CSV row.</p>
