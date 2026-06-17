@@ -342,6 +342,34 @@ Hook log behavior:
 - Event types: `OK`, `ALERT` (missing files), `ERROR` (verification failure).
 - Missing-file runs also write snapshot reports under `/srv/shared/backups/mood-images/missing-reports/`.
 
+Restore process:
+- List available archives:
+
+```bash
+ls -1 /srv/shared/backups/mood-images/mood_images_*.tar.gz | sort
+```
+
+- Restore a specific backup archive to the image storage path:
+
+```bash
+export SOURCE_DIR=/srv/shared/mood-images/mood_images
+export ARCHIVE=/srv/shared/backups/mood-images/mood_images_YYYYMMDDTHHMMSSZ.tar.gz
+mkdir -p "$SOURCE_DIR"
+tar -xzf "$ARCHIVE" -C "$SOURCE_DIR"
+```
+
+- Validate restored files against DB references:
+
+```bash
+SOURCE_DIR=/srv/shared/mood-images/mood_images ./scripts/mood_images_verify.sh
+```
+
+- Quick endpoint check (replace with any known filename):
+
+```bash
+curl -sS -o /dev/null -w "status=%{http_code}\n" http://127.0.0.1:8000/mood/image/<filename>.jpg
+```
+
 ### Data Models
 
 | Table | Description |

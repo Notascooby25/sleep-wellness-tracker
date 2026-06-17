@@ -31,9 +31,8 @@ log "Creating archive: $ARCHIVE_PATH"
 tar -C "$SOURCE_DIR" -czf "$tmp_archive" .
 
 tar -tzf "$tmp_archive" >/dev/null
-sha256sum "$tmp_archive" > "$tmp_sha"
-
 mv "$tmp_archive" "$ARCHIVE_PATH"
+sha256sum "$ARCHIVE_PATH" > "$tmp_sha"
 mv "$tmp_sha" "$SHA_PATH"
 
 count_files="$(find "$SOURCE_DIR" -maxdepth 1 -type f | wc -l | tr -d ' ')"
