@@ -23,8 +23,8 @@ jobs:
 
       - name: Lint backend (ruff)
         run: |
-          pip install ruff
-          ruff check backend/app
+          pip install ruff==0.16.3
+          ruff check --select E4,E7,E9,F backend/app
 
       - name: Set up Node
         uses: actions/setup-node@v4
