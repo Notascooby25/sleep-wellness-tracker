@@ -31,6 +31,25 @@
   };
 
   const activityName = (id: number) => activities.find((a) => a.id === id)?.name || `#${id}`;
+
+  const chipLabel = (entry: MoodEntry, aid: number): string => {
+    const name = activityName(aid);
+    const details = (entry.activity_details ?? []).filter((d) => d.activity_id === aid);
+    if (!details.length) return name;
+    const suffix = details
+      .map((d) => {
+        const parts: string[] = [];
+        if (d.position) parts.push(d.position);
+        if (d.quantity_numeric != null) {
+          parts.push(d.quantity_unit ? `${d.quantity_numeric} ${d.quantity_unit}` : String(d.quantity_numeric));
+        }
+        return parts.join(' / ');
+      })
+      .filter(Boolean)
+      .join(', ');
+    return suffix ? `${name} · ${suffix}` : name;
+  };
+
   const entryImages = (entry: MoodEntry) => entry.image_urls?.length ? entry.image_urls : entry.image_url ? [entry.image_url] : [];
 
   const loadPage = async (offset: number) => {
@@ -43,7 +62,7 @@
     try {
       const [firstPage, acts] = await Promise.all([
         loadPage(0),
-        getJson<Activity[]>('/activities/?include_archived=true')
+        getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true')
       ]);
       entries = firstPage;
       activities = acts;
@@ -248,7 +267,7 @@
                 <td data-label="Activities">
                   {#if entry.activity_ids?.length}
                     {#each entry.activity_ids as aid}
-                      <span class="act-badge">{activityName(aid)}</span>
+                      <span class="act-badge">{chipLabel(entry, aid)}</span>
                     {/each}
                   {:else}-{/if}
                 </td>
