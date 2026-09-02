@@ -1,0 +1,163 @@
+{
+  "version": 2,
+  "description": "Sleep Wellness Tracker taxonomy v2 — declarative mapping applied by scripts/apply_taxonomy_v2.py. All operations are idempotent.",
+  "categories": [
+    "Health",
+    "Headache Issues",
+    "Lifestyle",
+    "Before Sleep",
+    "During Sleep",
+    "Morning / Waking Feedback"
+  ],
+  "activities_add": [
+    { "category": "Health", "name": "Fatigue" },
+    { "category": "Health", "name": "Leg Pain" },
+    { "category": "Health", "name": "Tinnitus / Ear Humming" },
+    { "category": "Health", "name": "Ear Ache" },
+    { "category": "Health", "name": "Shoulder / Arm / Neck Pain" },
+    { "category": "Headache Issues", "name": "Headache" },
+    { "category": "Headache Issues", "name": "Jaw / TMJ Pain" },
+    { "category": "Headache Issues", "name": "Sharp Shooting Pain" },
+    { "category": "Headache Issues", "name": "Throat Strain" },
+    { "category": "Lifestyle", "name": "Light Walk" },
+    { "category": "Lifestyle", "name": "Cardio / Run" },
+    { "category": "Lifestyle", "name": "Strength / Workout" },
+    { "category": "Lifestyle", "name": "Physio (Clinic)" },
+    { "category": "Lifestyle", "name": "Physio (Home)" },
+    { "category": "Lifestyle", "name": "Outdoor Work / Gardening" },
+    { "category": "Lifestyle", "name": "Hydration OK" },
+    { "category": "Lifestyle", "name": "Low Water" },
+    { "category": "Lifestyle", "name": "Screen-Free Evening" },
+    { "category": "Lifestyle", "name": "Bright Light AM" },
+    { "category": "Before Sleep", "name": "Main Meal within 2h" },
+    { "category": "Before Sleep", "name": "Light Snack within 2h" },
+    { "category": "Before Sleep", "name": "Screen Time within 1h" },
+    { "category": "During Sleep", "name": "Health Flare-up" },
+    { "category": "Morning / Waking Feedback", "name": "Woke Naturally" },
+    { "category": "Morning / Waking Feedback", "name": "Woke by Alarm" },
+    { "category": "Morning / Waking Feedback", "name": "Woke During Night" },
+    { "category": "Morning / Waking Feedback", "name": "Dream Recall" },
+    { "category": "Morning / Waking Feedback", "name": "Morning Headache" }
+  ],
+  "activities_rename": [
+    { "from": "Workout \ud83c\udfcb\ufe0f", "to": "Strength / Workout" },
+    { "from": "Reading \ud83d\udcda", "to": "Reading" },
+    { "from": "Relax \ud83e\uddd8", "to": "Relax" },
+    { "from": "Sunshine \ud83c\udf1e", "to": "Sunshine" },
+    { "from": "Sore Hands \ud83d\udc4b", "to": "Sore Hands" },
+    { "from": "Physio", "to": "Physio (Clinic)" },
+    { "from": "Physio - At Home", "to": "Physio (Home)" },
+    { "from": "Main Meal (<2 before bed)", "to": "Main Meal within 2h" },
+    { "from": "Light Snack (<2 before bed)", "to": "Light Snack within 2h" },
+    { "from": "Screen Time (<1 before bed)", "to": "Screen Time within 1h" },
+    { "from": "Health Condition", "to": "Health Flare-up" },
+    { "from": "Legs Hurting / Aching", "to": "Leg Pain" }
+  ],
+  "activities_merge": [
+    {
+      "into": { "category": "Headache Issues", "name": "Headache" },
+      "from": [
+        { "name": "Pain in Left Side of Head", "position": "Left" },
+        { "name": "Pain Right Side of Head", "position": "Right" },
+        { "name": "Pain Front of Head", "position": "Front" },
+        { "name": "Pain Back Left of Head", "position": "Back-Left" },
+        { "name": "Pain Back Right of Head", "position": "Back-Right" }
+      ]
+    },
+    {
+      "into": { "category": "Headache Issues", "name": "Jaw / TMJ Pain" },
+      "from": [
+        { "name": "Jaw / Teeth Pain Left Side", "position": "Left" },
+        { "name": "Jaw / Teeth Pain Right Side", "position": "Right" }
+      ]
+    },
+    {
+      "into": { "category": "Headache Issues", "name": "Sharp Shooting Pain" },
+      "from": [
+        { "name": "Sharp shooting pain - back right", "position": "Right" },
+        { "name": "Sharp shooting pain - back left", "position": "Left" }
+      ]
+    },
+    {
+      "into": { "category": "Headache Issues", "name": "Throat Strain" },
+      "from": [
+        { "name": "Strain Lower Right Throat", "position": "Right" },
+        { "name": "Strain Lower Left Throat", "position": "Left" }
+      ]
+    },
+    {
+      "into": { "category": "Health", "name": "Tinnitus / Ear Humming" },
+      "from": [
+        { "name": "Ear Humming Left", "position": "Left" },
+        { "name": "Ear Humming Right", "position": "Right" }
+      ]
+    },
+    {
+      "into": { "category": "Health", "name": "Ear Ache" },
+      "from": [
+        { "name": "Right Ear Ache / Pain", "position": "Right" },
+        { "name": "Left Ear Ache", "position": "Left" }
+      ]
+    },
+    {
+      "into": { "category": "Health", "name": "Shoulder / Arm / Neck Pain" },
+      "from": [
+        { "name": "Left Shoulder / Arm / Neck", "position": "Left" },
+        { "name": "Right Side Shoulder / Arm / Neck", "position": "Right" }
+      ]
+    },
+    {
+      "into": { "category": "Health", "name": "Fatigue" },
+      "from": [
+        { "name": "Fatigue / Ache" },
+        { "name": "No Energy" },
+        { "name": "Feeling Tired" }
+      ]
+    },
+    {
+      "into": { "category": "Health", "name": "Ill / Injured" },
+      "from": [
+        { "name": "I'll / Injured \ud83e\udd12" }
+      ]
+    },
+    {
+      "into": { "category": "Lifestyle", "name": "Light Walk" },
+      "from": [
+        { "name": "Walk" }
+      ]
+    },
+    {
+      "into": { "category": "Lifestyle", "name": "Cardio / Run" },
+      "from": [
+        { "name": "Run" }
+      ]
+    },
+    {
+      "into": { "category": "Lifestyle", "name": "Outdoor Work / Gardening" },
+      "from": [
+        { "name": "DIY Gardening" },
+        { "name": "Gardening" }
+      ]
+    }
+  ],
+  "activities_deprecate": [
+    { "category": "Before Sleep", "name": "Exercise" },
+    { "category": "Before Sleep", "name": "Reading" },
+    { "category": "Before Sleep", "name": "Pain" },
+    { "category": "Before Sleep", "name": "Illness" },
+    { "category": "Lifestyle", "name": "Exercise" }
+  ],
+  "position_sensitive_activities": [
+    "Headache",
+    "Jaw / TMJ Pain",
+    "Sharp Shooting Pain",
+    "Throat Strain",
+    "Tinnitus / Ear Humming",
+    "Ear Ache",
+    "Shoulder / Arm / Neck Pain"
+  ],
+  "quantity_activities": [
+    { "name": "Alcohol", "unit": "units" },
+    { "name": "Caffeine after 4pm", "unit": "cups" }
+  ]
+}

@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     Boolean,
     Integer,
+    Numeric,
     String,
     Text,
     Date,
@@ -41,9 +42,11 @@ class Activity(Base):
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     is_archived = Column(Boolean, default=False, nullable=False)  # New column to mark activities as archived
+    deprecated_at = Column(DateTime(timezone=True), nullable=True)
 
     category = relationship("Category", back_populates="activities")
     moods = relationship("Mood", secondary=mood_activities, back_populates="activities")
+    details = relationship("MoodActivityDetail", back_populates="activity", cascade="all, delete-orphan")
 
 class Mood(Base):
     __tablename__ = "moods"
@@ -55,8 +58,26 @@ class Mood(Base):
     image_urls = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    subjective_sleep_rating = Column(Integer, nullable=True)
 
     activities = relationship("Activity", secondary=mood_activities, back_populates="moods")
+    activity_details = relationship("MoodActivityDetail", back_populates="mood", cascade="all, delete-orphan")
+
+
+class MoodActivityDetail(Base):
+    __tablename__ = "mood_activity_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mood_id = Column(Integer, ForeignKey("moods.id", ondelete="CASCADE"), nullable=False, index=True)
+    activity_id = Column(Integer, ForeignKey("activities.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = Column(String(32), nullable=True)
+    severity = Column(Integer, nullable=True)
+    quantity_numeric = Column(Numeric(6, 2), nullable=True)
+    quantity_unit = Column(String(16), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    mood = relationship("Mood", back_populates="activity_details")
+    activity = relationship("Activity", back_populates="details")
 
 
 class GarminSleepDaily(Base):

@@ -10,6 +10,15 @@ export type Activity = {
   name: string;
   category_id?: number | null;
   is_archived?: boolean; // Indicates if the activity is archived
+  deprecated_at?: string | null;
+};
+
+export type ActivityDetailInput = {
+  activity_id: number;
+  position?: string | null;
+  severity?: number | null;
+  quantity_numeric?: number | null;
+  quantity_unit?: string | null;
 };
 
 export type MoodEntry = {
@@ -20,6 +29,8 @@ export type MoodEntry = {
   image_urls?: string[] | null;
   timestamp: string;
   activity_ids: number[];
+  activity_details?: ActivityDetailInput[];
+  subjective_sleep_rating?: number | null;
   created_at?: string;
 };
 

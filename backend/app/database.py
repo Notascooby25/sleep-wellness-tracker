@@ -62,6 +62,12 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE activities ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
+        if "deprecated_at" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.deprecated_at column for legacy database")
+            conn.execute(
+                text("ALTER TABLE activities ADD COLUMN deprecated_at TIMESTAMP WITH TIME ZONE")
+            )
+
         if "require_rating" not in category_columns:
             logger.warning("Adding missing categories.require_rating column for legacy database")
             conn.execute(
@@ -84,6 +90,12 @@ def _ensure_legacy_schema_compatibility() -> None:
             logger.warning("Adding missing moods.image_urls column for legacy database")
             conn.execute(
                 text("ALTER TABLE moods ADD COLUMN image_urls JSON")
+            )
+
+        if "subjective_sleep_rating" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.subjective_sleep_rating column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN subjective_sleep_rating INTEGER")
             )
 
         mood_score_col = mood_columns.get("mood_score")

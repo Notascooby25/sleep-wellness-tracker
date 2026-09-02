@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getJson, postJson } from '$lib/api';
-  import type { Activity, Category, GarminLatestWrap, MoodEntry } from '$lib/types';
+  import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry } from '$lib/types';
 
   type SleepLatest = {
     date: string;
@@ -41,6 +41,10 @@
   let selected = new Set<number>();
   let notes = '';
   let moodScore = 3;
+  let subjectiveSleepRating: number | null = null;
+  // Per-activity extras keyed by activity id; UI shows a row only for position-sensitive or quantity tags.
+  type DetailState = { position: string | null; quantity: number | null; unit: string | null };
+  let activityDetails = new Map<number, DetailState>();
   // Derive both date and time from the same local instant to avoid UTC/local mismatch.
   const now = new Date();
   const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
@@ -103,13 +107,19 @@
   };
 
   const toggle = (id: number) => {
-    if (selected.has(id)) selected.delete(id);
-    else selected.add(id);
+    if (selected.has(id)) {
+      selected.delete(id);
+      activityDetails.delete(id);
+      activityDetails = new Map(activityDetails);
+    } else {
+      selected.add(id);
+    }
     selected = new Set(selected);
   };
 
   const clearSelected = () => {
     selected = new Set<number>();
+    activityDetails = new Map();
   };
 
   const openGalleryPicker = () => {
@@ -282,6 +292,60 @@
     5: { bg: '#ffc2be', active: '#d9423a', label: 'Red' },
   };
 
+  const POSITION_SENSITIVE_TAGS = new Set<string>([
+    'Headache',
+    'Jaw / TMJ Pain',
+    'Sharp Shooting Pain',
+    'Throat Strain',
+    'Tinnitus / Ear Humming',
+    'Ear Ache',
+    'Shoulder / Arm / Neck Pain'
+  ]);
+  const POSITION_OPTIONS = ['Left', 'Right', 'Front', 'Back-Left', 'Back-Right', 'Bilateral'];
+  const QUANTITY_TAGS: Record<string, { unit: string; step: number; max: number }> = {
+    Alcohol: { unit: 'units', step: 0.5, max: 20 },
+    'Caffeine after 4pm': { unit: 'cups', step: 1, max: 10 }
+  };
+
+  const needsPosition = (act: Activity | undefined) => !!act && POSITION_SENSITIVE_TAGS.has(act.name);
+  const quantityFor = (act: Activity | undefined) => (act ? QUANTITY_TAGS[act.name] : undefined);
+
+  const detailFor = (id: number): DetailState =>
+    activityDetails.get(id) ?? { position: null, quantity: null, unit: null };
+
+  const setPosition = (id: number, position: string | null) => {
+    const cur = detailFor(id);
+    activityDetails.set(id, { ...cur, position });
+    activityDetails = new Map(activityDetails);
+  };
+
+  const setQuantity = (id: number, quantity: number | null, unit: string) => {
+    const cur = detailFor(id);
+    activityDetails.set(id, { ...cur, quantity, unit });
+    activityDetails = new Map(activityDetails);
+  };
+
+  const buildActivityDetails = (): ActivityDetailInput[] => {
+    const out: ActivityDetailInput[] = [];
+    for (const id of selected) {
+      const rec = activityDetails.get(id);
+      if (!rec) continue;
+      if (rec.position == null && rec.quantity == null) continue;
+      out.push({
+        activity_id: id,
+        position: rec.position ?? null,
+        severity: null,
+        quantity_numeric: rec.quantity ?? null,
+        quantity_unit: rec.unit ?? null
+      });
+    }
+    return out;
+  };
+
+  $: detailRows = Array.from(selected)
+    .map((id) => ({ id, act: activities.find((a) => a.id === id) }))
+    .filter(({ act }) => act && (needsPosition(act) || quantityFor(act) !== undefined));
+
   const load = async () => {
     try {
       const [cats, acts, sleepWrap, batteryWrap, moodRows, hrvWrap, stressWrap] = await Promise.all([
@@ -316,13 +380,17 @@
         image_url: imageUrls[0] ?? null,
         image_urls: imageUrls,
         timestamp,
-        activity_ids: Array.from(selected)
+        activity_ids: Array.from(selected),
+        activity_details: buildActivityDetails(),
+        subjective_sleep_rating: subjectiveSleepRating
       };
       await postJson('/mood/', payload);
       status = 'Entry saved.';
       notes = '';
       imageUrls = [];
       selected = new Set<number>();
+      activityDetails = new Map();
+      subjectiveSleepRating = null;
     } catch (error) {
       status = `Save failed: ${error}`;
     } finally {
@@ -423,6 +491,23 @@
     {/if}
   </div>
 
+  <div style="margin-top:0.8rem;">
+    <div class="label">Sleep Rating <small style="color:#8091a7;">(optional; 1 = great, 5 = poor)</small></div>
+    <div class="mood-pills">
+      {#each [1,2,3,4,5] as score}
+        <button
+          class="mood-pill"
+          class:mood-pill-active={subjectiveSleepRating === score}
+          style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
+          on:click={() => (subjectiveSleepRating = subjectiveSleepRating === score ? null : score)}
+        ><span>{score}</span><small>{moodColors[score].label}</small>{subjectiveSleepRating === score ? ' ✓' : ''}</button>
+      {/each}
+    </div>
+    <p class="label" style="margin-top:0.3rem;">
+      {subjectiveSleepRating == null ? 'No sleep rating set' : `Sleep rating: ${subjectiveSleepRating}`}
+    </p>
+  </div>
+
   <label style="margin-top: 0.8rem; display: block;">
     <div class="label">Notes</div>
     <textarea rows="3" bind:value={notes}></textarea>
@@ -489,6 +574,48 @@
         {#if act}
           <button class="chip chip-selected" on:click={() => toggle(id)}>{act.name} ×</button>
         {/if}
+      {/each}
+    </div>
+  {/if}
+
+  {#if detailRows.length > 0}
+    <div class="activity-details">
+      {#each detailRows as row (row.id)}
+        {@const act = row.act as Activity}
+        {@const cur = detailFor(row.id)}
+        {@const qty = quantityFor(act)}
+        <div class="detail-row">
+          <div class="detail-name">{act.name}</div>
+          {#if needsPosition(act)}
+            <div class="detail-options">
+              <span class="detail-label">Position:</span>
+              {#each POSITION_OPTIONS as position}
+                <button
+                  class="chip detail-chip"
+                  class:chip-selected={cur.position === position}
+                  on:click={() => setPosition(row.id, cur.position === position ? null : position)}
+                >{position}</button>
+              {/each}
+            </div>
+          {/if}
+          {#if qty}
+            <label class="detail-quantity">
+              <span class="detail-label">Quantity ({qty.unit}):</span>
+              <input
+                type="number"
+                min="0"
+                max={qty.max}
+                step={qty.step}
+                value={cur.quantity ?? ''}
+                on:input={(event) => {
+                  const raw = (event.currentTarget as HTMLInputElement).value;
+                  const parsed = raw === '' ? null : Number(raw);
+                  setQuantity(row.id, Number.isFinite(parsed as number) ? (parsed as number) : null, qty.unit);
+                }}
+              />
+            </label>
+          {/if}
+        </div>
       {/each}
     </div>
   {/if}
@@ -574,4 +701,12 @@
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
   .chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
   .chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
+  .activity-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; background: #f7fafd; border: 1px solid #dce7f4; border-radius: 10px; }
+  .detail-row { display: flex; flex-direction: column; gap: 0.35rem; }
+  .detail-name { font-weight: 700; color: #1f4066; font-size: 0.9rem; }
+  .detail-options { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+  .detail-label { font-size: 0.8rem; color: #496685; margin-right: 0.25rem; }
+  .detail-chip { font-size: 0.78rem; padding: 0.22rem 0.6rem; }
+  .detail-quantity { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .detail-quantity input { width: 6rem; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid #c7d9ef; font-size: 0.9rem; }
 </style>

@@ -10,11 +10,14 @@ router = APIRouter(prefix="/activities", tags=["activities"])
 @router.get("/", response_model=List[schemas.ActivityResponse])
 def list_activities(
     include_archived: bool = Query(default=False),
+    include_deprecated: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
     query = db.query(models.Activity)
     if not include_archived:
         query = query.filter(models.Activity.is_archived.is_(False))
+    if not include_deprecated:
+        query = query.filter(models.Activity.deprecated_at.is_(None))
     return query.all()
 
 @router.get("/{activity_id}", response_model=schemas.ActivityResponse)

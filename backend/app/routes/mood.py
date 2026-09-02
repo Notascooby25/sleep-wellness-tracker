@@ -112,6 +112,17 @@ def _serialize_mood(mood: models.Mood) -> dict:
         "timestamp": mood.timestamp,
         "created_at": mood.created_at,
         "activity_ids": [a.id for a in mood.activities],
+        "subjective_sleep_rating": getattr(mood, "subjective_sleep_rating", None),
+        "activity_details": [
+            {
+                "activity_id": d.activity_id,
+                "position": d.position,
+                "severity": d.severity,
+                "quantity_numeric": float(d.quantity_numeric) if d.quantity_numeric is not None else None,
+                "quantity_unit": d.quantity_unit,
+            }
+            for d in (getattr(mood, "activity_details", None) or [])
+        ],
     }
 
 
@@ -196,6 +207,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
         image_url=_primary_image_url(image_urls),
         image_urls=image_urls or None,
         timestamp=payload.timestamp,
+        subjective_sleep_rating=payload.subjective_sleep_rating,
     )
     db.add(db_mood)
     db.flush()
@@ -205,6 +217,8 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
             models.Activity.id.in_(payload.activity_ids)
         ).all()
         db_mood.activities = activities
+
+    _replace_activity_details(db, db_mood, payload.activity_details)
 
     db.commit()
 
@@ -233,6 +247,7 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     m.image_url = _primary_image_url(image_urls)
     m.image_urls = image_urls or None
     m.timestamp = payload.timestamp
+    m.subjective_sleep_rating = payload.subjective_sleep_rating
 
     activities = []
     if payload.activity_ids:
@@ -240,6 +255,8 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
             models.Activity.id.in_(payload.activity_ids)
         ).all()
     m.activities = activities
+
+    _replace_activity_details(db, m, payload.activity_details)
 
     db.commit()
     db.refresh(m)
@@ -261,3 +278,27 @@ def delete_mood_entry(entry_id: int, db: Session = Depends(get_db)):
     db.commit()
     _delete_mood_image_files(old_image_urls)
     return {"ok": True, "id": entry_id}
+
+
+def _replace_activity_details(db: Session, mood: models.Mood, details) -> None:
+    if details is None:
+        return
+    db.query(models.MoodActivityDetail).filter(
+        models.MoodActivityDetail.mood_id == mood.id
+    ).delete(synchronize_session=False)
+    if not details:
+        return
+    selected_ids = {a.id for a in mood.activities}
+    for detail in details:
+        if detail.activity_id not in selected_ids:
+            continue
+        db.add(
+            models.MoodActivityDetail(
+                mood_id=mood.id,
+                activity_id=detail.activity_id,
+                position=detail.position,
+                severity=detail.severity,
+                quantity_numeric=detail.quantity_numeric,
+                quantity_unit=detail.quantity_unit,
+            )
+        )
