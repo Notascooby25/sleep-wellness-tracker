@@ -54,6 +54,17 @@ Create local data, then replicate it and verify both destinations:
 ./scripts/verify_latest_manifest.sh
 ```
 
+## Accepted Missing Image Baseline
+
+If historical mood images are confirmed unrecoverable, capture them once as an accepted-loss baseline. This preserves the mood records while keeping checks strict for every newly missing image:
+
+```bash
+WRITE_ACCEPTED_BASELINE=1 ./scripts/mood_images_verify.sh
+./scripts/mood_images_verify.sh
+```
+
+The baseline is stored at `/srv/shared/mood-images/accepted_missing_images.txt` with permissions restricted to its owner. It is included in mood-image archives. The creation command refuses to overwrite an existing baseline; review and remove that file manually only when intentionally replacing the accepted-loss record.
+
 Check the DS223 contains current files and validate its latest manifest over SSH:
 
 ```bash

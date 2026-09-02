@@ -7,6 +7,8 @@ SOURCE_DIR="${SOURCE_DIR:-/srv/shared/mood-images/mood_images}"
 CONTAINER="${CONTAINER:-sleep_db}"
 RUNTIME="${RUNTIME:-docker}"
 STRICT="${STRICT:-1}"
+ACCEPTED_MISSING_FILE="${ACCEPTED_MISSING_FILE:-$(dirname "$SOURCE_DIR")/accepted_missing_images.txt}"
+WRITE_ACCEPTED_BASELINE="${WRITE_ACCEPTED_BASELINE:-0}"
 
 log() { echo "[mood_images_verify] $*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -30,7 +32,9 @@ fi
 
 tmp_expected="$(mktemp)"
 tmp_missing="$(mktemp)"
-trap 'rm -f "$tmp_expected" "$tmp_missing"' EXIT
+tmp_accepted="$(mktemp)"
+tmp_unexpected="$(mktemp)"
+trap 'rm -f "$tmp_expected" "$tmp_missing" "$tmp_accepted" "$tmp_unexpected"' EXIT
 
 "$RUNTIME" exec "$CONTAINER" psql -U sleepuser -d sleepdb -Atc "
 with urls as (
@@ -57,15 +61,30 @@ while IFS= read -r fname; do
 done < "$tmp_expected"
 
 missing_count="$(wc -l < "$tmp_missing" | tr -d ' ')"
-if (( missing_count > 0 )); then
-  log "Missing files: $missing_count"
+if [[ "$WRITE_ACCEPTED_BASELINE" == "1" ]]; then
+  [[ ! -e "$ACCEPTED_MISSING_FILE" ]] || die "Accepted-missing baseline already exists: $ACCEPTED_MISSING_FILE"
+  install -Dm 600 "$tmp_missing" "$ACCEPTED_MISSING_FILE"
+  log "Created accepted-missing baseline: $ACCEPTED_MISSING_FILE ($missing_count file(s))"
+fi
+
+if [[ -f "$ACCEPTED_MISSING_FILE" ]]; then
+  grep -Fxf "$ACCEPTED_MISSING_FILE" "$tmp_missing" > "$tmp_accepted" || true
+  grep -Fvxf "$ACCEPTED_MISSING_FILE" "$tmp_missing" > "$tmp_unexpected" || true
+fi
+
+accepted_count="$(wc -l < "$tmp_accepted" | tr -d ' ')"
+unexpected_count="$(wc -l < "$tmp_unexpected" | tr -d ' ')"
+log "Accepted missing files: $accepted_count"
+
+if (( unexpected_count > 0 )); then
+  log "Newly missing files: $unexpected_count"
   log "First missing entries:"
-  sed -n '1,20p' "$tmp_missing"
+  sed -n '1,20p' "$tmp_unexpected"
   if [[ "$STRICT" == "1" ]]; then
     exit 2
   fi
 else
-  log "No missing files detected"
+  log "No newly missing files detected"
 fi
 
 log "Done"
