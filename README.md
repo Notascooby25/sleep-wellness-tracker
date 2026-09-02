@@ -370,6 +370,10 @@ SOURCE_DIR=/srv/shared/mood-images/mood_images ./scripts/mood_images_verify.sh
 curl -sS -o /dev/null -w "status=%{http_code}\n" http://127.0.0.1:8000/mood/image/<filename>.jpg
 ```
 
+### Off-Host Backup Copies
+
+The NUC backup runbook, including DS223 replication, encrypted Google Drive setup, scheduling, and verification, is in [`docs/backup-runbook.md`](docs/backup-runbook.md).
+
 ### Data Models
 
 | Table | Description |

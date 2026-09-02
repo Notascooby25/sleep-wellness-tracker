@@ -6,7 +6,8 @@ set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/srv/shared/backups}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-gdrive-crypt:backups/sleep-wellness}"
-VERIFY_SCRIPT="${VERIFY_SCRIPT:-/srv/sleepwell/scripts/verify_remote_manifest.sh}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERIFY_SCRIPT="${VERIFY_SCRIPT:-$SCRIPT_DIR/verify_remote_manifest.sh}"
 
 # Find the newest manifest file (if any)
 LATEST="$(ls -1t "${BACKUP_DIR}"/manifest_*.sha256 2>/dev/null | head -n1 || true)"

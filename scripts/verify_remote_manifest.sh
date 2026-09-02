@@ -17,7 +17,7 @@ fi
 
 LOCAL_MANIFEST="$1"
 REMOTE_MANIFEST_REMOTE="$2"
-RCLONE_CONF="${RCLONE_CONF:-/home/andy/.config/rclone/rclone.conf}"
+RCLONE_CONF="${RCLONE_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/rclone/rclone.conf}"
 
 if [[ ! -f "$LOCAL_MANIFEST" ]]; then
   echo "Local manifest not found: $LOCAL_MANIFEST" >&2
