@@ -343,8 +343,18 @@
   };
 
   $: detailRows = Array.from(selected)
-    .map((id) => ({ id, act: activities.find((a) => a.id === id) }))
+    .map((id) => ({
+      id,
+      act: activities.find((a) => a.id === id),
+      detail: activityDetails.get(id) ?? { position: null, quantity: null, unit: null }
+    }))
     .filter(({ act }) => act && (needsPosition(act) || quantityFor(act) !== undefined));
+
+  // Show sleep rating only when the Morning / Waking Feedback context is in play.
+  $: morningCategoryId = categories.find((c) => c.name === 'Morning / Waking Feedback')?.id ?? null;
+  $: sleepRatingVisible =
+    (morningCategoryId !== null && categories[activeCategory]?.id === morningCategoryId) ||
+    Array.from(selected).some((id) => activities.find((a) => a.id === id)?.category_id === morningCategoryId);
 
   const load = async () => {
     try {
@@ -473,7 +483,7 @@
   </div>
 
   <div style="margin-top:0.8rem;">
-    <div class="label">Mood Score <small style="color:#8091a7;">(1 = great, 5 = struggling)</small></div>
+    <div class="label">Overall Mood <small style="color:#8091a7;">(1 = great, 5 = struggling)</small></div>
     {#if ratingRequired()}
       <div class="mood-pills">
         {#each [1,2,3,4,5] as score}
@@ -491,8 +501,9 @@
     {/if}
   </div>
 
+  {#if sleepRatingVisible}
   <div style="margin-top:0.8rem;">
-    <div class="label">Sleep Rating <small style="color:#8091a7;">(optional; 1 = great, 5 = poor)</small></div>
+    <div class="label">Last Night's Sleep <small style="color:#8091a7;">(optional; 1 = great, 5 = poor)</small></div>
     <div class="mood-pills">
       {#each [1,2,3,4,5] as score}
         <button
@@ -504,9 +515,10 @@
       {/each}
     </div>
     <p class="label" style="margin-top:0.3rem;">
-      {subjectiveSleepRating == null ? 'No sleep rating set' : `Sleep rating: ${subjectiveSleepRating}`}
+      {subjectiveSleepRating == null ? 'Tap a value or leave blank' : `Sleep rating: ${subjectiveSleepRating}`}
     </p>
   </div>
+  {/if}
 
   <label style="margin-top: 0.8rem; display: block;">
     <div class="label">Notes</div>
@@ -582,7 +594,6 @@
     <div class="activity-details">
       {#each detailRows as row (row.id)}
         {@const act = row.act as Activity}
-        {@const cur = detailFor(row.id)}
         {@const qty = quantityFor(act)}
         <div class="detail-row">
           <div class="detail-name">{act.name}</div>
@@ -592,8 +603,8 @@
               {#each POSITION_OPTIONS as position}
                 <button
                   class="chip detail-chip"
-                  class:chip-selected={cur.position === position}
-                  on:click={() => setPosition(row.id, cur.position === position ? null : position)}
+                  class:chip-selected={row.detail.position === position}
+                  on:click={() => setPosition(row.id, row.detail.position === position ? null : position)}
                 >{position}</button>
               {/each}
             </div>
@@ -606,7 +617,7 @@
                 min="0"
                 max={qty.max}
                 step={qty.step}
-                value={cur.quantity ?? ''}
+                value={row.detail.quantity ?? ''}
                 on:input={(event) => {
                   const raw = (event.currentTarget as HTMLInputElement).value;
                   const parsed = raw === '' ? null : Number(raw);
