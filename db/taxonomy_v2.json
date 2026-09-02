@@ -117,7 +117,7 @@
     {
       "into": { "category": "Health", "name": "Ill / Injured" },
       "from": [
-        { "name": "I'll / Injured \ud83e\udd12" }
+        { "name": "I'll / Injured 🤕" }
       ]
     },
     {

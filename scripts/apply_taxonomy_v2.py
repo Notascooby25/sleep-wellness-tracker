@@ -123,6 +123,7 @@ def _ensure_category(conn, name: str, apply: bool, stats: Stats, audit) -> int |
     existing = _get_category_id(conn, name)
     if existing is not None:
         return existing
+    stats.categories_added += 1
     if not apply:
         logger.info("[dry-run] would create category: %s", name)
         return None
@@ -130,7 +131,6 @@ def _ensure_category(conn, name: str, apply: bool, stats: Stats, audit) -> int |
         text("INSERT INTO categories (name, require_rating) VALUES (:name, 1) RETURNING id"),
         {"name": name},
     ).fetchone()
-    stats.categories_added += 1
     _audit(audit, "category_added", name=name, id=row[0])
     return row[0]
 
@@ -151,6 +151,7 @@ def _ensure_activity(conn, name: str, category_id: int | None, apply: bool, stat
     row = _get_activity(conn, name, category_id)
     if row is not None:
         return row[0]
+    stats.activities_added += 1
     if not apply:
         logger.info("[dry-run] would create activity: %s (category_id=%s)", name, category_id)
         return None
@@ -161,7 +162,6 @@ def _ensure_activity(conn, name: str, category_id: int | None, apply: bool, stat
         ),
         {"name": name, "cid": category_id},
     ).fetchone()
-    stats.activities_added += 1
     _audit(audit, "activity_added", name=name, category_id=category_id, id=result[0])
     return result[0]
 
@@ -170,15 +170,19 @@ def _rename_activity(conn, old: str, new: str, apply: bool, stats: Stats, audit)
     row_old = _get_activity(conn, old)
     if row_old is None:
         return
-    row_new = _get_activity(conn, new)
+    # Ignore deprecated targets so we don't merge historical entries into a stale duplicate.
+    row_new = conn.execute(
+        text("SELECT id FROM activities WHERE name = :name AND deprecated_at IS NULL"),
+        {"name": new},
+    ).fetchone()
     if row_new is not None and row_new[0] != row_old[0]:
         _merge_activity(conn, old_id=row_old[0], into_id=row_new[0], position=None, apply=apply, stats=stats, audit=audit)
         return
+    stats.activities_renamed += 1
     if not apply:
         logger.info("[dry-run] would rename activity: %s -> %s", old, new)
         return
     conn.execute(text("UPDATE activities SET name = :new WHERE id = :id"), {"new": new, "id": row_old[0]})
-    stats.activities_renamed += 1
     _audit(audit, "activity_renamed", old=old, new=new, id=row_old[0])
 
 
@@ -195,6 +199,11 @@ def _merge_activity(conn, old_id: int, into_id: int, position: str | None, apply
             "[dry-run] would repoint %d mood link(s) from activity_id=%s into %s with position=%s",
             len(mood_ids), old_id, into_id, position,
         )
+        stats.join_rows_repointed += len(mood_ids)
+        stats.activities_deprecated += 1
+        stats.activities_merged += 1
+        if position is not None:
+            stats.detail_rows_inserted += len(mood_ids)
         return
     for mood_id in mood_ids:
         exists_new = conn.execute(
@@ -248,6 +257,7 @@ def _deprecate_activity(conn, category_id: int | None, name: str, apply: bool, s
     row = _get_activity(conn, name, category_id)
     if row is None or row[2] is not None:
         return
+    stats.activities_deprecated += 1
     if not apply:
         logger.info("[dry-run] would deprecate activity: %s (category_id=%s)", name, category_id)
         return
@@ -255,7 +265,6 @@ def _deprecate_activity(conn, category_id: int | None, name: str, apply: bool, s
         text("UPDATE activities SET deprecated_at = NOW() WHERE id = :id"),
         {"id": row[0]},
     )
-    stats.activities_deprecated += 1
     _audit(audit, "activity_deprecated", name=name, category_id=category_id, id=row[0])
 
 
@@ -267,6 +276,10 @@ def _apply_all(conn, taxonomy: dict[str, Any], apply: bool, stats: Stats, audit)
     for item in taxonomy.get("activities_add", []):
         cat = category_ids.get(item["category"])
         _ensure_activity(conn, item["name"], cat, apply, stats, audit)
+
+    for item in taxonomy.get("activities_deprecate", []):
+        cat = category_ids.get(item.get("category")) if item.get("category") else None
+        _deprecate_activity(conn, cat, item["name"], apply, stats, audit)
 
     for item in taxonomy.get("activities_rename", []):
         _rename_activity(conn, item["from"], item["to"], apply, stats, audit)
@@ -281,6 +294,7 @@ def _apply_all(conn, taxonomy: dict[str, Any], apply: bool, stats: Stats, audit)
                 continue
             if into_id is None:
                 logger.info("[dry-run] would merge %s into %s (position=%s)", src["name"], into_name, src.get("position"))
+                stats.activities_merged += 1
                 continue
             _merge_activity(
                 conn,
@@ -291,10 +305,6 @@ def _apply_all(conn, taxonomy: dict[str, Any], apply: bool, stats: Stats, audit)
                 stats=stats,
                 audit=audit,
             )
-
-    for item in taxonomy.get("activities_deprecate", []):
-        cat = category_ids.get(item.get("category")) if item.get("category") else None
-        _deprecate_activity(conn, cat, item["name"], apply, stats, audit)
 
 
 def main(argv: Iterable[str] | None = None) -> int:
