@@ -93,22 +93,28 @@ Open the app. In the mood-entry page:
 - Selecting `Alcohol` or `Caffeine after 4pm` shows a quantity input.
 - The Sleep Rating pill row appears.
 
-Spot-check historical data:
+Spot-check historical data. Two categories of deprecation are expected:
+
+- **Merged** deprecated activities must have zero live mood links (their data moved to the parent).
+- **Explicit-only** deprecated activities (`Reading`, `Exercise`, `Pain`, `Illness` in Before Sleep, plus `Exercise` in Lifestyle) intentionally keep their historical mood links; they are simply hidden from the picker.
+
+Check **merged** activities have no live links:
 
 ```bash
 docker exec -i sleep_db psql -U sleepuser -d sleepdb -c "
-SELECT a.name, COUNT(*)
+SELECT a.id, a.name, COUNT(*) AS live_links
 FROM mood_activities ma JOIN activities a ON a.id = ma.activity_id
 WHERE a.deprecated_at IS NOT NULL
-GROUP BY a.name
-ORDER BY 2 DESC
+  AND a.name NOT IN ('Reading','Exercise','Pain','Illness')
+GROUP BY a.id, a.name
+ORDER BY 3 DESC
 LIMIT 20;
 "
 ```
 
-Expected result: zero rows. If any deprecated activity still has live join rows, the merge did not complete for it — investigate the audit log before making any further changes.
+Expected result: zero rows. If any row appears, the merge did not complete for it — inspect the audit log before making further changes.
 
-Also confirm position rows were created:
+Confirm position rows were created:
 
 ```bash
 docker exec -i sleep_db psql -U sleepuser -d sleepdb -c "
@@ -125,7 +131,7 @@ If verification fails and you want to revert to pre-migration state:
 
 ```bash
 # Stop backend so no new writes happen
-./scripts/podman-compose-native.sh stop backend
+docker compose -f docker-compose.prod.yml stop backend
 
 # Restore the most recent .dump taken in Step 3
 NEWEST_DUMP=$(ls -1t /srv/shared/backups/*.dump | head -n1)
@@ -133,7 +139,7 @@ docker cp "$NEWEST_DUMP" sleep_db:/tmp/restore.dump
 docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" sleep_db \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --clean --if-exists /tmp/restore.dump
 
-./scripts/podman-compose-native.sh up -d backend
+docker compose -f docker-compose.prod.yml up -d backend
 ```
 
 Then investigate before re-attempting the migration.
