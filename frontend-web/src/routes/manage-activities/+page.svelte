@@ -99,7 +99,7 @@
     categories.find((c) => c.id === id)?.name || '(uncategorized)';
 
   $: filtered = filterCategoryId
-    ? activities.filter((a) => String(a.category_id ?? '') === filterCategoryId)
+    ? activities.filter((a) => String(a.category_id ?? '') === String(filterCategoryId))
     : activities;
 
   $: activeActivities = filtered.filter((a) => !a.is_archived); // Ensure 'is_archived' is used correctly

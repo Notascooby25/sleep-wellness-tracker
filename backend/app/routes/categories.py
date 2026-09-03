@@ -32,6 +32,37 @@ def create_position_option(payload: schemas.PositionOptionCreate, db: Session = 
     return option
 
 
+@router.put("/position-options/{option_id}", response_model=schemas.PositionOptionResponse)
+def update_position_option(option_id: int, payload: schemas.PositionOptionCreate, db: Session = Depends(get_db)):
+    option = db.query(models.PositionOption).filter(models.PositionOption.id == option_id).first()
+    if not option:
+        raise HTTPException(status_code=404, detail="Position option not found")
+    label = payload.label.strip()
+    if not label:
+        raise HTTPException(status_code=400, detail="Position label cannot be empty")
+    duplicate = (
+        db.query(models.PositionOption)
+        .filter(models.PositionOption.label == label, models.PositionOption.id != option_id)
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(status_code=400, detail="Another position option already uses that label")
+    option.label = label
+    db.commit()
+    db.refresh(option)
+    return option
+
+
+@router.delete("/position-options/{option_id}", status_code=204)
+def delete_position_option(option_id: int, db: Session = Depends(get_db)):
+    option = db.query(models.PositionOption).filter(models.PositionOption.id == option_id).first()
+    if not option:
+        raise HTTPException(status_code=404, detail="Position option not found")
+    db.delete(option)
+    db.commit()
+    return
+
+
 @router.get("/{category_id}", response_model=schemas.CategoryResponse)
 def get_category(category_id: int, db: Session = Depends(get_db)):
     category = db.query(models.Category).filter(models.Category.id == category_id).first()

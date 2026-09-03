@@ -77,6 +77,27 @@
     }
   };
 
+  const savePositionOption = async (option: PositionOption) => {
+    status = '';
+    try {
+      await putJson(`/categories/position-options/${option.id}`, { label: option.label });
+      await load();
+    } catch (error) {
+      status = `Save position failed: ${error}`;
+    }
+  };
+
+  const removePositionOption = async (id: number) => {
+    if (!confirm('Delete this position option?')) return;
+    status = '';
+    try {
+      await deleteJson(`/categories/position-options/${id}`);
+      await load();
+    } catch (error) {
+      status = `Delete position failed: ${error}`;
+    }
+  };
+
   onMount(load);
 </script>
 
@@ -139,12 +160,14 @@
 <section class="card">
   <h3>Position Options</h3>
   <p>Options available when tagging a position-sensitive activity or category (e.g. Left, Right, Front).</p>
-  <ul>
-    {#each positionOptions as option (option.id)}
-      <li>{option.label}</li>
-    {/each}
-  </ul>
-  <div style="display:flex; gap:0.5rem;">
+  {#each positionOptions as option (option.id)}
+    <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem;">
+      <input bind:value={option.label} />
+      <button on:click={() => savePositionOption(option)}>Save</button>
+      <button on:click={() => removePositionOption(option.id)}>Delete</button>
+    </div>
+  {/each}
+  <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
     <input placeholder="New position label" bind:value={newPositionLabel} />
     <button on:click={addPositionOption}>Add</button>
   </div>
