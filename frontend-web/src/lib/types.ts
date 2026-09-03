@@ -3,6 +3,12 @@ export type Category = {
   name: string;
   require_rating?: number;
   rating_label?: string | null;
+  supports_position?: boolean;
+};
+
+export type PositionOption = {
+  id: number;
+  label: string;
 };
 
 export type Activity = {

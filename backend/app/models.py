@@ -32,8 +32,16 @@ class Category(Base):
     name = Column(String(255), unique=True, nullable=False)
     require_rating = Column(Integer, nullable=False, default=1)  # 1=true (required), 0=false (optional)
     rating_label = Column(String(80), nullable=True)  # e.g., "Pain/Discomfort Level", "Mood"
+    supports_position = Column(Boolean, default=False, nullable=False)  # default for new activities in this category
 
     activities = relationship("Activity", back_populates="category", cascade="all, delete-orphan")
+
+
+class PositionOption(Base):
+    __tablename__ = "position_options"
+
+    id = Column(Integer, primary_key=True, index=True)
+    label = Column(String(32), unique=True, nullable=False)
 
 class Activity(Base):
     __tablename__ = "activities"

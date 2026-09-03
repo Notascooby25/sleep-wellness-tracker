@@ -22,6 +22,12 @@
     }
   };
 
+  // Default the new activity's position toggle from its category (still overridable before saving).
+  const onCategoryChange = () => {
+    const category = categories.find((c) => String(c.id) === newCategoryId);
+    newSupportsPosition = Boolean(category?.supports_position);
+  };
+
   const add = async () => {
     if (!newName.trim()) return;
     status = '';
@@ -116,7 +122,7 @@
     </label>
     <label>
       <div class="label">Category</div>
-      <select bind:value={newCategoryId}>
+      <select bind:value={newCategoryId} on:change={onCategoryChange}>
         <option value="">(uncategorized)</option>
         {#each categories as category}
           <option value={category.id}>{category.name}</option>

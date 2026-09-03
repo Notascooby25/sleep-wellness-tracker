@@ -1,6 +1,6 @@
 # Sleep Wellness Tracker — Operations Reference
 
-Current version: `4.7.1`. Last significant change: 2026-09-02 (taxonomy v2 migration, position/quantity/sleep-rating UI, backup workflow).
+Current version: `4.9.0`. Last significant change: 2026-09-03 (category-level position support, custom position options).
 
 ---
 

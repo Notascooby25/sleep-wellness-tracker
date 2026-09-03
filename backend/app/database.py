@@ -51,6 +51,8 @@ def _ensure_legacy_schema_compatibility() -> None:
     if not inspector.has_table("categories"):
         return
 
+    BUILTIN_POSITION_OPTIONS = ["Left", "Right", "Front", "Back-Left", "Back-Right", "Bilateral"]
+
     category_columns = {col["name"] for col in inspector.get_columns("categories")}
     activity_columns = {col["name"] for col in inspector.get_columns("activities")} if inspector.has_table("activities") else {}
     mood_columns = {col["name"]: col for col in inspector.get_columns("moods")} if inspector.has_table("moods") else {}
@@ -100,6 +102,18 @@ def _ensure_legacy_schema_compatibility() -> None:
             conn.execute(
                 text("ALTER TABLE categories ADD COLUMN rating_label VARCHAR(80)")
             )
+
+        if "supports_position" not in category_columns:
+            logger.warning("Adding missing categories.supports_position column for legacy database")
+            conn.execute(
+                text("ALTER TABLE categories ADD COLUMN supports_position BOOLEAN NOT NULL DEFAULT FALSE")
+            )
+
+        if inspector.has_table("position_options"):
+            existing_labels = {row[0] for row in conn.execute(text("SELECT label FROM position_options"))}
+            missing_labels = [label for label in BUILTIN_POSITION_OPTIONS if label not in existing_labels]
+            for label in missing_labels:
+                conn.execute(text("INSERT INTO position_options (label) VALUES (:label)"), {"label": label})
 
         if "image_url" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.image_url column for legacy database")

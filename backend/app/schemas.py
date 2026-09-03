@@ -62,11 +62,24 @@ class CategoryBase(BaseModel):
 class CategoryCreate(CategoryBase):
     require_rating: int = 1
     rating_label: Optional[str] = None
+    supports_position: bool = False
 
 class CategoryResponse(CategoryBase):
     id: int
     require_rating: int
     rating_label: Optional[str] = None
+    supports_position: bool
+
+    class Config:
+        from_attributes = True
+
+
+class PositionOptionCreate(BaseModel):
+    label: str
+
+class PositionOptionResponse(BaseModel):
+    id: int
+    label: str
 
     class Config:
         from_attributes = True

@@ -1,15 +1,21 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { deleteJson, getJson, postJson, putJson } from '$lib/api';
-  import type { Category } from '$lib/types';
+  import type { Category, PositionOption } from '$lib/types';
 
   let categories: Category[] = [];
+  let positionOptions: PositionOption[] = [];
   let name = '';
+  let newSupportsPosition = false;
+  let newPositionLabel = '';
   let status = '';
 
   const load = async () => {
     try {
-      categories = await getJson<Category[]>('/categories/');
+      [categories, positionOptions] = await Promise.all([
+        getJson<Category[]>('/categories/'),
+        getJson<PositionOption[]>('/categories/position-options/')
+      ]);
     } catch (error) {
       status = `Load failed: ${error}`;
     }
@@ -19,8 +25,14 @@
     if (!name.trim()) return;
     status = '';
     try {
-      await postJson('/categories/', { name: name.trim(), require_rating: 1, rating_label: null });
+      await postJson('/categories/', {
+        name: name.trim(),
+        require_rating: 1,
+        rating_label: null,
+        supports_position: newSupportsPosition
+      });
       name = '';
+      newSupportsPosition = false;
       await load();
     } catch (error) {
       status = `Add failed: ${error}`;
@@ -33,7 +45,8 @@
       await putJson(`/categories/${cat.id}`, {
         name: cat.name,
         require_rating: Number(cat.require_rating ?? 1),
-        rating_label: cat.rating_label || null
+        rating_label: cat.rating_label || null,
+        supports_position: Boolean(cat.supports_position)
       });
       await load();
     } catch (error) {
@@ -52,6 +65,18 @@
     }
   };
 
+  const addPositionOption = async () => {
+    if (!newPositionLabel.trim()) return;
+    status = '';
+    try {
+      await postJson('/categories/position-options/', { label: newPositionLabel.trim() });
+      newPositionLabel = '';
+      await load();
+    } catch (error) {
+      status = `Add position failed: ${error}`;
+    }
+  };
+
   onMount(load);
 </script>
 
@@ -62,8 +87,12 @@
 
 <section class="card">
   <h3>Add Category</h3>
-  <div style="display:flex; gap:0.5rem;">
+  <div style="display:flex; gap:0.5rem; align-items:center;">
     <input placeholder="Category name" bind:value={name} />
+    <label style="display:flex; gap:0.4rem; align-items:center;">
+      <input type="checkbox" bind:checked={newSupportsPosition} />
+      <span>Supports position</span>
+    </label>
     <button on:click={add}>Add</button>
     <button on:click={load}>Refresh</button>
   </div>
@@ -93,6 +122,10 @@
             <div class="label">Rating Label</div>
             <input bind:value={category.rating_label} placeholder="Mood Score" />
           </label>
+          <label style="display:flex; gap:0.5rem; align-items:end; padding-bottom:0.35rem;">
+            <input type="checkbox" bind:checked={category.supports_position} />
+            <span>Supports position (default for new activities)</span>
+          </label>
         </div>
         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
           <button on:click={() => save(category)}>Save</button>
@@ -101,4 +134,18 @@
       </div>
     {/each}
   {/if}
+</section>
+
+<section class="card">
+  <h3>Position Options</h3>
+  <p>Options available when tagging a position-sensitive activity or category (e.g. Left, Right, Front).</p>
+  <ul>
+    {#each positionOptions as option (option.id)}
+      <li>{option.label}</li>
+    {/each}
+  </ul>
+  <div style="display:flex; gap:0.5rem;">
+    <input placeholder="New position label" bind:value={newPositionLabel} />
+    <button on:click={addPositionOption}>Add</button>
+  </div>
 </section>

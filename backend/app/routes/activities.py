@@ -29,10 +29,16 @@ def get_activity(activity_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.ActivityResponse)
 def create_activity(payload: schemas.ActivityCreate, db: Session = Depends(get_db)):
+    supports_position = payload.supports_position
+    if "supports_position" not in payload.model_fields_set and payload.category_id is not None:
+        category = db.query(models.Category).filter(models.Category.id == payload.category_id).first()
+        if category is not None:
+            supports_position = category.supports_position
+
     new_act = models.Activity(
         name=payload.name,
         category_id=payload.category_id,
-        supports_position=bool(payload.supports_position),
+        supports_position=bool(supports_position),
     )
     db.add(new_act)
     db.commit()

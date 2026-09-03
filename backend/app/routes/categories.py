@@ -11,6 +11,27 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 def list_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
+
+@router.get("/position-options/", response_model=List[schemas.PositionOptionResponse])
+def list_position_options(db: Session = Depends(get_db)):
+    return db.query(models.PositionOption).order_by(models.PositionOption.id.asc()).all()
+
+
+@router.post("/position-options/", response_model=schemas.PositionOptionResponse)
+def create_position_option(payload: schemas.PositionOptionCreate, db: Session = Depends(get_db)):
+    label = payload.label.strip()
+    if not label:
+        raise HTTPException(status_code=400, detail="Position label cannot be empty")
+    existing = db.query(models.PositionOption).filter(models.PositionOption.label == label).first()
+    if existing:
+        return existing
+    option = models.PositionOption(label=label)
+    db.add(option)
+    db.commit()
+    db.refresh(option)
+    return option
+
+
 @router.get("/{category_id}", response_model=schemas.CategoryResponse)
 def get_category(category_id: int, db: Session = Depends(get_db)):
     category = db.query(models.Category).filter(models.Category.id == category_id).first()
@@ -27,6 +48,7 @@ def create_category(payload: schemas.CategoryCreate, db: Session = Depends(get_d
         name=payload.name,
         require_rating=payload.require_rating,
         rating_label=payload.rating_label,
+        supports_position=payload.supports_position,
     )
     db.add(new_cat)
     db.commit()
@@ -41,6 +63,7 @@ def update_category(category_id: int, payload: schemas.CategoryCreate, db: Sessi
     cat.name = payload.name
     cat.require_rating = payload.require_rating
     cat.rating_label = payload.rating_label
+    cat.supports_position = payload.supports_position
     db.commit()
     db.refresh(cat)
     return cat

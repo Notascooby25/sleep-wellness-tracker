@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getJson, postJson } from '$lib/api';
-  import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry } from '$lib/types';
+  import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry, PositionOption } from '$lib/types';
 
   type SleepLatest = {
     date: string;
@@ -292,7 +292,8 @@
     5: { bg: '#ffc2be', active: '#d9423a', label: 'Red' },
   };
 
-  const POSITION_OPTIONS = ['Left', 'Right', 'Front', 'Back-Left', 'Back-Right', 'Bilateral'];
+  const FALLBACK_POSITION_OPTIONS = ['Left', 'Right', 'Front', 'Back-Left', 'Back-Right', 'Bilateral'];
+  let POSITION_OPTIONS: string[] = FALLBACK_POSITION_OPTIONS;
   const QUANTITY_TAGS: Record<string, { unit: string; step: number; max: number }> = {
     Alcohol: { unit: 'units', step: 0.5, max: 20 },
     'Caffeine after 4pm': { unit: 'cups', step: 1, max: 10 }
@@ -349,7 +350,7 @@
 
   const load = async () => {
     try {
-      const [cats, acts, sleepWrap, batteryWrap, moodRows, hrvWrap, stressWrap] = await Promise.all([
+      const [cats, acts, sleepWrap, batteryWrap, moodRows, hrvWrap, stressWrap, positionOptions] = await Promise.all([
         getJson<Category[]>('/categories/'),
         getJson<Activity[]>('/activities/'),
         getJson<GarminLatestWrap<SleepLatest>>('/garmin/sleep/latest'),
@@ -357,6 +358,7 @@
         getJson<MoodEntry[]>('/mood/?limit=365&offset=0'),
         getJson<GarminLatestWrap<HrvLatest>>('/garmin/hrv/latest'),
         getJson<GarminLatestWrap<StressLatest>>('/garmin/stress/latest'),
+        getJson<PositionOption[]>('/categories/position-options/').catch(() => null)
       ]);
       categories = cats;
       activities = acts;
@@ -365,6 +367,9 @@
       latestHrv = hrvWrap?.data || null;
       latestStress = stressWrap?.data || null;
       currentStreakDays = computeMoodStreak(moodRows);
+      if (positionOptions && positionOptions.length > 0) {
+        POSITION_OPTIONS = positionOptions.map((option) => option.label);
+      }
     } catch (error) {
       status = `Load error: ${error}`;
     }
