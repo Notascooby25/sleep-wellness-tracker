@@ -2,6 +2,7 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
 
   const links = [
     { href: '/mood-entry', label: 'Mood Entry' },
@@ -11,6 +12,11 @@
     { href: '/analytics', label: 'Analytics' },
     { href: '/settings', label: 'Settings' }
   ];
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    await goto('/login', { invalidateAll: true });
+  };
 
   onMount(() => {
     if (typeof Notification === 'undefined') return;
@@ -33,20 +39,27 @@
   });
 </script>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <h1>Sleep Wellness Tracker</h1>
-    <nav>
-      {#each links as link}
-        <a href={link.href} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
-      {/each}
-    </nav>
-  </div>
-</header>
+{#if $page.url.pathname === '/login'}
+  <main>
+    <slot />
+  </main>
+{:else}
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>Sleep Wellness Tracker</h1>
+      <nav>
+        {#each links as link}
+          <a href={link.href} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
+        {/each}
+        <button on:click={logout} class="logout-link">Log out</button>
+      </nav>
+    </div>
+  </header>
 
-<main>
-  <slot />
-</main>
+  <main>
+    <slot />
+  </main>
+{/if}
 
 <style>
   .topbar {
@@ -90,5 +103,15 @@
     background: #d4e9ff;
     border-color: #a9c9ea;
     font-weight: 700;
+  }
+
+  .logout-link {
+    border: 1px solid #cadcef;
+    border-radius: 999px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.82rem;
+    color: #1e4b76;
+    background: #edf4fd;
+    cursor: pointer;
   }
 </style>

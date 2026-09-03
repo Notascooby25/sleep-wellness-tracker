@@ -66,6 +66,10 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
     if (incomingContentType) {
       outgoingHeaders['content-type'] = incomingContentType;
     }
+    const incomingCookie = request.headers.get('cookie');
+    if (incomingCookie) {
+      outgoingHeaders['cookie'] = incomingCookie;
+    }
 
     const uploadFilename = normalizeUploadFilename(request.headers.get('x-upload-filename'));
 
@@ -125,6 +129,15 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
     const upstreamContentType = upstream.headers.get('content-type');
     if (upstreamContentType) {
       responseHeaders.set('content-type', upstreamContentType);
+    }
+    const upstreamSetCookies =
+      typeof upstream.headers.getSetCookie === 'function'
+        ? upstream.headers.getSetCookie()
+        : upstream.headers.get('set-cookie')
+          ? [upstream.headers.get('set-cookie') as string]
+          : [];
+    for (const cookie of upstreamSetCookies) {
+      responseHeaders.append('set-cookie', cookie);
     }
     return new Response(body, {
       status: upstream.status,

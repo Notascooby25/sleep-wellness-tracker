@@ -4,10 +4,12 @@ import os
 import threading
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
+from . import auth
 from .database import SessionLocal
-from .routes import mood, categories, activities, garmin, export, lifestyle_impact
+from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes
 from .services.garmin_sync import (
     sync_activities_if_due,
     sync_sleep_if_due,
@@ -22,6 +24,18 @@ from .services.garmin_sync import (
 app = FastAPI()
 logger = logging.getLogger("app.main")
 UK_TZ = ZoneInfo("Europe/London")
+
+_PUBLIC_PATHS = {"/health", "/auth/login", "/auth/status", "/auth/logout"}
+
+
+@app.middleware("http")
+async def require_session(request: Request, call_next):
+    if not auth.AUTH_ENABLED or request.method == "OPTIONS" or request.url.path in _PUBLIC_PATHS:
+        return await call_next(request)
+    token = request.cookies.get(auth.SESSION_COOKIE_NAME)
+    if not auth.verify_session_token(token):
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    return await call_next(request)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -158,6 +172,7 @@ app.include_router(activities.router)
 app.include_router(garmin.router)
 app.include_router(export.router)
 app.include_router(lifestyle_impact.router)
+app.include_router(auth_routes.router)
 
 
 @app.get("/health")
