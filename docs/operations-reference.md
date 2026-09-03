@@ -8,9 +8,11 @@ Current version: `4.7.1`. Last significant change: 2026-09-02 (taxonomy v2 migra
 
 | Host | Address | Role |
 |---|---|---|
-| NUC | `192.168.68.126` | Runs the app in Docker |
-| DS223 NAS | `192.168.68.107` (SSH port `8022`, user `Congreve202`) | Local mirror of backups |
+| NUC | see local ops notes (not committed) | Runs the app in Docker |
+| DS223 NAS | see local ops notes (not committed); SSH port `8022` | Local mirror of backups |
 | Google Drive | remote `gdrive-crypt` (rclone) | Encrypted offsite backup |
+
+Real hostnames/IPs/usernames for this deployment are kept out of the public repo. Set them as environment variables (e.g. `DS223_HOST`, `DS223_USER`) or in a local, gitignored notes file when running the scripts under `scripts/`.
 
 **On the NUC**
 
@@ -119,7 +121,7 @@ Script: [scripts/push_backups_to_synology.sh](scripts/push_backups_to_synology.s
 - Destination: `/volume1/Backups/nuc-server`
   - `backups/` — DB dumps + manifests
   - `mood-images/` — image archives
-- Auth: SSH key `/home/andy/.ssh/id_ed25519_synology`, port `8022`, user `Congreve202`.
+- Auth: SSH key at `$SSH_KEY` (see script), port `8022`, user/host from `NAS_USER`/`NAS_HOST` env vars (not committed).
 - Uses `rsync -az` with excludes for `.env*`, `postgres-data/`.
 - Logs: `/srv/shared/backups/synology_sync_<UTC>.log`
 

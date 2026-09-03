@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-: "${DS223_HOST:?Set DS223_HOST, e.g. DS223_HOST=192.168.68.107}"
+: "${DS223_HOST:?Set DS223_HOST, e.g. DS223_HOST=192.0.2.10}"
 DS223_USER="${DS223_USER:-admin}"
 DS223_PORT="${DS223_PORT:-8022}"
 DS223_SSH_TARGET="${DS223_USER}@${DS223_HOST}"

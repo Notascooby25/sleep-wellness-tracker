@@ -4,11 +4,11 @@
 
 set -euo pipefail
 
-NAS_USER="Congreve202"
-NAS_HOST="192.168.68.107"
-NAS_PORT="8022"
-NAS_TARGET="/volume1/Backups/nuc-server"
-SSH_KEY="/home/andy/.ssh/id_ed25519_synology"
+: "${NAS_USER:?Set NAS_USER, e.g. NAS_USER=myuser}"
+: "${NAS_HOST:?Set NAS_HOST, e.g. NAS_HOST=192.0.2.10}"
+NAS_PORT="${NAS_PORT:-8022}"
+NAS_TARGET="${NAS_TARGET:-/volume1/Backups/nuc-server}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_synology}"
 RSYNC="/usr/bin/rsync"
 LOG_DIR="/srv/shared/backups"
 

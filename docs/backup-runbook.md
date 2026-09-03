@@ -65,10 +65,10 @@ WRITE_ACCEPTED_BASELINE=1 ./scripts/mood_images_verify.sh
 
 The baseline is stored at `/srv/shared/mood-images/accepted_missing_images.txt` with permissions restricted to its owner. It is included in mood-image archives. The creation command refuses to overwrite an existing baseline; review and remove that file manually only when intentionally replacing the accepted-loss record.
 
-Check the DS223 contains current files and validate its latest manifest over SSH:
+Check the DS223 contains current files and validate its latest manifest over SSH (substitute your own NAS user/host):
 
 ```bash
-ssh -p 8022 Congreve202@192.168.68.107 'find /volume1/Backups/nuc-server -type f -printf "%TY-%Tm-%Td %TH:%TM %s %p\\n" | sort -r | head -n 30'
+ssh -p 8022 "${NAS_USER}@${NAS_HOST}" 'find /volume1/Backups/nuc-server -type f -printf "%TY-%Tm-%Td %TH:%TM %s %p\\n" | sort -r | head -n 30'
 ```
 
 For the Google copy, `verify_latest_manifest.sh` must exit zero. It downloads the encrypted remote manifest and compares it byte-for-byte with the current local manifest.
