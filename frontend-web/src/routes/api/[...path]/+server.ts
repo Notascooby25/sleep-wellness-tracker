@@ -11,7 +11,7 @@ const fallbackBackends = (env.API_BASE_FALLBACKS || '')
 const BACKENDS = Array.from(
   new Set([BACKEND, ...fallbackBackends].map((base) => base.replace(/\/$/, '')))
 );
-const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood']);
+const SLASH_BASE_PATHS = new Set(['categories', 'activities', 'mood', 'categories/position-options']);
 const UPLOAD_PATH = 'mood/upload-image';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
