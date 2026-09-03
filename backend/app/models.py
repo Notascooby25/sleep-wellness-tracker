@@ -43,6 +43,7 @@ class Activity(Base):
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     is_archived = Column(Boolean, default=False, nullable=False)  # New column to mark activities as archived
     deprecated_at = Column(DateTime(timezone=True), nullable=True)
+    supports_position = Column(Boolean, default=False, nullable=False)
 
     category = relationship("Category", back_populates="activities")
     moods = relationship("Mood", secondary=mood_activities, back_populates="activities")

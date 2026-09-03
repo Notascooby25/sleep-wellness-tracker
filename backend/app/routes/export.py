@@ -122,6 +122,33 @@ def _mood_image_names_from_row(mood: models.Mood) -> list[str]:
     return image_names
 
 
+def _mood_activity_details_text(mood: models.Mood, selected_activity_ids: set[int]) -> str:
+    by_activity: dict[int, list[models.MoodActivityDetail]] = defaultdict(list)
+    for detail in mood.activity_details:
+        by_activity[detail.activity_id].append(detail)
+
+    values: list[str] = []
+    for activity in mood.activities:
+        if selected_activity_ids and activity.id not in selected_activity_ids:
+            continue
+        details = by_activity.get(activity.id, [])
+        if not details:
+            continue
+        detail_text: list[str] = []
+        for detail in details:
+            parts = [detail.position] if detail.position else []
+            if detail.severity is not None:
+                parts.append(f"severity {detail.severity}")
+            if detail.quantity_numeric is not None:
+                quantity = str(detail.quantity_numeric)
+                parts.append(f"{quantity} {detail.quantity_unit}".strip())
+            if parts:
+                detail_text.append(" / ".join(parts))
+        if detail_text:
+            values.append(f"{activity.name}: {', '.join(detail_text)}")
+    return "; ".join(values)
+
+
 @router.get("/csv")
 def export_csv(
     sources: str = Query(..., description="Comma-separated sources"),
@@ -186,14 +213,21 @@ def export_csv(
         return target_date in allowed_dates
 
     if "mood" in selected_sources and use_mood_entry_rows:
-        mood_columns = ["Mood Entry ID", "Mood Timestamp", "Mood Score", "Mood Activities"]
+        mood_columns = [
+            "Mood Entry ID",
+            "Mood Timestamp",
+            "Mood Score",
+            "Subjective Sleep Rating",
+            "Mood Activities",
+            "Mood Activity Details",
+        ]
         if include_notes:
             mood_columns.append("Mood Notes")
         add_columns(mood_columns)
 
         query = (
             db.query(models.Mood)
-            .options(selectinload(models.Mood.activities))
+            .options(selectinload(models.Mood.activities), selectinload(models.Mood.activity_details))
             .filter(func.date(models.Mood.timestamp) >= start_date)
             .filter(func.date(models.Mood.timestamp) <= end_date)
         )
@@ -224,7 +258,9 @@ def export_csv(
                 "Mood Entry ID": row.id,
                 "Mood Timestamp": row.timestamp.isoformat(),
                 "Mood Score": int(row.mood_score) if row.mood_score is not None else None,
+                "Subjective Sleep Rating": int(row.subjective_sleep_rating) if row.subjective_sleep_rating is not None else None,
                 "Mood Activities": ", ".join(sorted(set(activity_names))),
+                "Mood Activity Details": _mood_activity_details_text(row, selected_activity_ids) or None,
             }
             if include_notes:
                 export_row["Mood Notes"] = (row.notes or "").strip() or None

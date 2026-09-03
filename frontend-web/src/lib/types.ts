@@ -11,6 +11,7 @@ export type Activity = {
   category_id?: number | null;
   is_archived?: boolean; // Indicates if the activity is archived
   deprecated_at?: string | null;
+  supports_position?: boolean;
 };
 
 export type ActivityDetailInput = {

@@ -292,22 +292,13 @@
     5: { bg: '#ffc2be', active: '#d9423a', label: 'Red' },
   };
 
-  const POSITION_SENSITIVE_TAGS = new Set<string>([
-    'Headache',
-    'Jaw / TMJ Pain',
-    'Sharp Shooting Pain',
-    'Throat Strain',
-    'Tinnitus / Ear Humming',
-    'Ear Ache',
-    'Shoulder / Arm / Neck Pain'
-  ]);
   const POSITION_OPTIONS = ['Left', 'Right', 'Front', 'Back-Left', 'Back-Right', 'Bilateral'];
   const QUANTITY_TAGS: Record<string, { unit: string; step: number; max: number }> = {
     Alcohol: { unit: 'units', step: 0.5, max: 20 },
     'Caffeine after 4pm': { unit: 'cups', step: 1, max: 10 }
   };
 
-  const needsPosition = (act: Activity | undefined) => !!act && POSITION_SENSITIVE_TAGS.has(act.name);
+  const needsPosition = (act: Activity | undefined) => Boolean(act?.supports_position);
   const quantityFor = (act: Activity | undefined) => (act ? QUANTITY_TAGS[act.name] : undefined);
 
   const detailFor = (id: number): DetailState =>

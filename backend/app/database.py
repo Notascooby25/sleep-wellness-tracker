@@ -54,6 +54,15 @@ def _ensure_legacy_schema_compatibility() -> None:
     category_columns = {col["name"] for col in inspector.get_columns("categories")}
     activity_columns = {col["name"] for col in inspector.get_columns("activities")} if inspector.has_table("activities") else {}
     mood_columns = {col["name"]: col for col in inspector.get_columns("moods")} if inspector.has_table("moods") else {}
+    position_activity_names = [
+        "Headache",
+        "Jaw / TMJ Pain",
+        "Sharp Shooting Pain",
+        "Throat Strain",
+        "Tinnitus / Ear Humming",
+        "Ear Ache",
+        "Shoulder / Arm / Neck Pain",
+    ]
 
     with engine.begin() as conn:
         if "is_archived" not in activity_columns and inspector.has_table("activities"):
@@ -66,6 +75,18 @@ def _ensure_legacy_schema_compatibility() -> None:
             logger.warning("Adding missing activities.deprecated_at column for legacy database")
             conn.execute(
                 text("ALTER TABLE activities ADD COLUMN deprecated_at TIMESTAMP WITH TIME ZONE")
+            )
+
+        if "supports_position" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.supports_position column for legacy database")
+            conn.execute(
+                text("ALTER TABLE activities ADD COLUMN supports_position BOOLEAN NOT NULL DEFAULT FALSE")
+            )
+
+        if inspector.has_table("activities"):
+            conn.execute(
+                text("UPDATE activities SET supports_position = TRUE WHERE name = ANY(:names)"),
+                {"names": position_activity_names},
             )
 
         if "require_rating" not in category_columns:

@@ -8,13 +8,14 @@
   let status = '';
   let newName = '';
   let newCategoryId = '';
+  let newSupportsPosition = false;
   let filterCategoryId = '';
 
   const load = async () => {
     try {
       [categories, activities] = await Promise.all([
         getJson<Category[]>('/categories/'),
-        getJson<Activity[]>('/activities/?include_archived=true')
+        getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true')
       ]);
     } catch (error) {
       status = `Load failed: ${error}`;
@@ -27,9 +28,11 @@
     try {
       await postJson('/activities/', {
         name: newName.trim(),
-        category_id: newCategoryId ? Number(newCategoryId) : null
+        category_id: newCategoryId ? Number(newCategoryId) : null,
+        supports_position: newSupportsPosition
       });
       newName = '';
+      newSupportsPosition = false;
       await load();
     } catch (error) {
       status = `Add failed: ${error}`;
@@ -46,7 +49,8 @@
 
       await putJson(`/activities/${activity.id}`, {
         name: activity.name,
-        category_id: normalizedCategoryId
+        category_id: normalizedCategoryId,
+        supports_position: Boolean(activity.supports_position)
       });
       await load();
     } catch (error) {
@@ -119,6 +123,10 @@
         {/each}
       </select>
     </label>
+    <label style="display:flex; gap:0.5rem; align-items:end; padding-bottom:0.35rem;">
+      <input type="checkbox" bind:checked={newSupportsPosition} />
+      <span>Supports position</span>
+    </label>
     <div style="display:flex; align-items:end;">
       <button on:click={add}>Add</button>
     </div>
@@ -156,6 +164,10 @@
                 <option value={category.id}>{category.name}</option>
               {/each}
             </select>
+          </label>
+          <label style="display:flex; gap:0.5rem; align-items:end; padding-bottom:0.35rem;">
+            <input type="checkbox" bind:checked={activity.supports_position} />
+            <span>Supports position</span>
           </label>
           <div>
             <div class="label">Current</div>

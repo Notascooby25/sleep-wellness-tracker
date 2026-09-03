@@ -29,7 +29,11 @@ def get_activity(activity_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.ActivityResponse)
 def create_activity(payload: schemas.ActivityCreate, db: Session = Depends(get_db)):
-    new_act = models.Activity(name=payload.name, category_id=payload.category_id)
+    new_act = models.Activity(
+        name=payload.name,
+        category_id=payload.category_id,
+        supports_position=bool(payload.supports_position),
+    )
     db.add(new_act)
     db.commit()
     db.refresh(new_act)
@@ -48,6 +52,9 @@ def update_activity(activity_id: int, payload: schemas.ActivityUpdate, db: Sessi
 
     if "category_id" in payload.model_fields_set:
         act.category_id = payload.category_id
+
+    if "supports_position" in payload.model_fields_set:
+        act.supports_position = bool(payload.supports_position)
 
     db.commit()
     db.refresh(act)
