@@ -1,5 +1,6 @@
 import csv
 import datetime as dt
+import json
 import io
 import os
 import re
@@ -136,7 +137,14 @@ def _mood_activity_details_text(mood: models.Mood, selected_activity_ids: set[in
             continue
         detail_text: list[str] = []
         for detail in details:
-            parts = [detail.position] if detail.position else []
+            positions: list[str] = []
+            if detail.position:
+                try:
+                    parsed = json.loads(detail.position)
+                    positions = parsed if isinstance(parsed, list) else [str(parsed)]
+                except (TypeError, json.JSONDecodeError):
+                    positions = [detail.position]
+            parts = [", ".join(positions)] if positions else []
             if detail.severity is not None:
                 parts.append(f"severity {detail.severity}")
             if detail.quantity_numeric is not None:

@@ -43,7 +43,7 @@
   let moodScore = 3;
   let subjectiveSleepRating: number | null = null;
   // Per-activity extras keyed by activity id; UI shows a row only for position-sensitive or quantity tags.
-  type DetailState = { position: string | null; quantity: number | null; unit: string | null };
+  type DetailState = { positions: string[]; quantity: number | null; unit: string | null };
   let activityDetails = new Map<number, DetailState>();
   // Derive both date and time from the same local instant to avoid UTC/local mismatch.
   const now = new Date();
@@ -303,11 +303,14 @@
   const quantityFor = (act: Activity | undefined) => (act ? QUANTITY_TAGS[act.name] : undefined);
 
   const detailFor = (id: number): DetailState =>
-    activityDetails.get(id) ?? { position: null, quantity: null, unit: null };
+    activityDetails.get(id) ?? { positions: [], quantity: null, unit: null };
 
-  const setPosition = (id: number, position: string | null) => {
+  const togglePosition = (id: number, position: string) => {
     const cur = detailFor(id);
-    activityDetails.set(id, { ...cur, position });
+    const positions = cur.positions.includes(position)
+      ? cur.positions.filter((value) => value !== position)
+      : [...cur.positions, position];
+    activityDetails.set(id, { ...cur, positions });
     activityDetails = new Map(activityDetails);
   };
 
@@ -322,10 +325,10 @@
     for (const id of selected) {
       const rec = activityDetails.get(id);
       if (!rec) continue;
-      if (rec.position == null && rec.quantity == null) continue;
+      if (rec.positions.length === 0 && rec.quantity == null) continue;
       out.push({
         activity_id: id,
-        position: rec.position ?? null,
+        position: rec.positions,
         severity: null,
         quantity_numeric: rec.quantity ?? null,
         quantity_unit: rec.unit ?? null
@@ -338,7 +341,7 @@
     .map((id) => ({
       id,
       act: activities.find((a) => a.id === id),
-      detail: activityDetails.get(id) ?? { position: null, quantity: null, unit: null }
+      detail: activityDetails.get(id) ?? { positions: [], quantity: null, unit: null }
     }))
     .filter(({ act }) => act && (needsPosition(act) || quantityFor(act) !== undefined));
 
@@ -599,8 +602,8 @@
               {#each POSITION_OPTIONS as position}
                 <button
                   class="chip detail-chip"
-                  class:chip-selected={row.detail.position === position}
-                  on:click={() => setPosition(row.id, row.detail.position === position ? null : position)}
+                  class:chip-selected={row.detail.positions.includes(position)}
+                  on:click={() => togglePosition(row.id, position)}
                 >{position}</button>
               {/each}
             </div>

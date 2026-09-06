@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { deleteJson, getJson, putJson } from '$lib/api';
-  import type { Activity, MoodEntry } from '$lib/types';
+  import type { Activity, MoodEntry, PositionOption } from '$lib/types';
 
   let entries: MoodEntry[] = [];
   let activities: Activity[] = [];
+  let positionOptions: PositionOption[] = [];
   let status = '';
   let loading = false;
   const PAGE_SIZE = 100;
@@ -17,6 +18,7 @@
   let editNotes = '';
   let editTimestamp = '';
   let editActivityIds = new Set<number>();
+  let editActivityPositions = new Map<number, string[]>();
   let editImageUrls: string[] = [];
   let editActivityFilter = '';
   let editBusy = false;
@@ -39,7 +41,7 @@
     const suffix = details
       .map((d) => {
         const parts: string[] = [];
-        if (d.position) parts.push(d.position);
+        if (d.position?.length) parts.push(d.position.join(', '));
         if (d.quantity_numeric != null) {
           parts.push(d.quantity_unit ? `${d.quantity_numeric} ${d.quantity_unit}` : String(d.quantity_numeric));
         }
@@ -60,12 +62,14 @@
     loading = true;
     status = '';
     try {
-      const [firstPage, acts] = await Promise.all([
+      const [firstPage, acts, options] = await Promise.all([
         loadPage(0),
-        getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true')
+        getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true'),
+        getJson<PositionOption[]>('/categories/position-options/').catch(() => [])
       ]);
       entries = firstPage;
       activities = acts;
+      positionOptions = options;
       hasMore = firstPage.length === PAGE_SIZE;
     } catch (error) {
       status = `Load failed: ${error}`;
@@ -105,6 +109,9 @@
     editNotes = entry.notes ?? '';
     editTimestamp = toLocalInput(entry.timestamp);
     editActivityIds = new Set(entry.activity_ids || []);
+    editActivityPositions = new Map(
+      (entry.activity_details ?? []).map((detail) => [detail.activity_id, detail.position ?? []])
+    );
     editImageUrls = entryImages(entry);
     editActivityFilter = '';
   };
@@ -112,8 +119,21 @@
   const cancelEdit = () => {
     editId = null;
     editActivityIds = new Set<number>();
+    editActivityPositions = new Map<number, string[]>();
     editImageUrls = [];
     editActivityFilter = '';
+  };
+
+  const toggleEditPosition = (activityId: number, position: string) => {
+    const next = new Map(editActivityPositions);
+    const current = next.get(activityId) ?? [];
+    next.set(
+      activityId,
+      current.includes(position)
+        ? current.filter((value) => value !== position)
+        : [...current, position]
+    );
+    editActivityPositions = next;
   };
 
   const toggleEditActivity = (id: number) => {
@@ -149,10 +169,17 @@
         image_url: editImageUrls[0] ?? null,
         image_urls: editImageUrls,
         timestamp: ts,
-        activity_ids: Array.from(editActivityIds)
+        activity_ids: Array.from(editActivityIds),
+        activity_details: Array.from(editActivityIds)
+          .map((activity_id) => ({
+            activity_id,
+            position: editActivityPositions.get(activity_id) ?? []
+          }))
+          .filter((detail) => detail.position.length > 0)
       });
       editId = null;
       editActivityIds = new Set<number>();
+      editActivityPositions = new Map<number, string[]>();
       editImageUrls = [];
       editActivityFilter = '';
       await load();
@@ -237,6 +264,20 @@
                         >
                           {act.name}
                         </button>
+                        {#if editActivityIds.has(act.id) && act.supports_position && positionOptions.length}
+                          <div class="edit-position-chips">
+                            {#each positionOptions as option}
+                              <button
+                                type="button"
+                                class="position-chip"
+                                class:position-chip-selected={(editActivityPositions.get(act.id) ?? []).includes(option.label)}
+                                on:click={() => toggleEditPosition(act.id, option.label)}
+                              >
+                                {option.label}
+                              </button>
+                            {/each}
+                          </div>
+                        {/if}
                       {/each}
                     </div>
                   </div>
@@ -302,6 +343,9 @@
   .edit-row { background: #f0f7ff; }
   .edit-acts { min-width: 260px; }
   .edit-acts-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; max-height: 130px; overflow: auto; margin-top: 0.35rem; }
+  .edit-position-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.2rem 0 0.35rem 0.4rem; }
+  .position-chip { border: 1px solid #b9cce0; background: #fff; color: #315678; border-radius: 999px; padding: 0.18rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
+  .position-chip-selected { background: #315678; color: #fff; border-color: #315678; }
   .act-chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
   .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
   .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: #1e4b76; margin: 0.1rem 0.15rem 0.1rem 0; }

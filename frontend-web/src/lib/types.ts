@@ -22,7 +22,7 @@ export type Activity = {
 
 export type ActivityDetailInput = {
   activity_id: number;
-  position?: string | null;
+  position?: string[] | null;
   severity?: number | null;
   quantity_numeric?: number | null;
   quantity_unit?: string | null;

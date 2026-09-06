@@ -79,7 +79,7 @@ class MoodActivityDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     mood_id = Column(Integer, ForeignKey("moods.id", ondelete="CASCADE"), nullable=False, index=True)
     activity_id = Column(Integer, ForeignKey("activities.id", ondelete="CASCADE"), nullable=False, index=True)
-    position = Column(String(32), nullable=True)
+    position = Column(String(512), nullable=True)
     severity = Column(Integer, nullable=True)
     quantity_numeric = Column(Numeric(6, 2), nullable=True)
     quantity_unit = Column(String(16), nullable=True)

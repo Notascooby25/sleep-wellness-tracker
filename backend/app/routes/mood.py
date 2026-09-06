@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging
 import os
 import re
@@ -96,6 +97,32 @@ def _get_mood_image_urls(mood: models.Mood) -> list[str]:
     return _normalize_image_urls(image_url=mood.image_url, image_urls=mood.image_urls)
 
 
+def _normalize_positions(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        candidates = value
+    elif isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            parsed = [value]
+        candidates = parsed if isinstance(parsed, list) else [str(parsed)]
+    else:
+        candidates = [str(value)]
+    positions: list[str] = []
+    for candidate in candidates:
+        label = str(candidate).strip()
+        if label and label not in positions:
+            positions.append(label)
+    return positions
+
+
+def _store_positions(value) -> str | None:
+    positions = _normalize_positions(value)
+    return json.dumps(positions, separators=(",", ":")) if positions else None
+
+
 def _delete_mood_image_files(image_urls: list[str]) -> None:
     for image_url in image_urls:
         _delete_mood_image_file(image_url)
@@ -116,7 +143,7 @@ def _serialize_mood(mood: models.Mood) -> dict:
         "activity_details": [
             {
                 "activity_id": d.activity_id,
-                "position": d.position,
+                "position": _normalize_positions(d.position),
                 "severity": d.severity,
                 "quantity_numeric": float(d.quantity_numeric) if d.quantity_numeric is not None else None,
                 "quantity_unit": d.quantity_unit,
@@ -296,7 +323,7 @@ def _replace_activity_details(db: Session, mood: models.Mood, details) -> None:
             models.MoodActivityDetail(
                 mood_id=mood.id,
                 activity_id=detail.activity_id,
-                position=detail.position,
+                position=_store_positions(detail.position),
                 severity=detail.severity,
                 quantity_numeric=detail.quantity_numeric,
                 quantity_unit=detail.quantity_unit,

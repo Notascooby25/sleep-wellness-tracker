@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from decimal import Decimal
 
@@ -9,7 +9,7 @@ from decimal import Decimal
 
 class MoodActivityDetailInput(BaseModel):
     activity_id: int
-    position: Optional[str] = None
+    position: Optional[Union[str, List[str]]] = None
     severity: Optional[int] = None
     quantity_numeric: Optional[Decimal] = None
     quantity_unit: Optional[str] = None

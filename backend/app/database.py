@@ -56,6 +56,7 @@ def _ensure_legacy_schema_compatibility() -> None:
     category_columns = {col["name"] for col in inspector.get_columns("categories")}
     activity_columns = {col["name"] for col in inspector.get_columns("activities")} if inspector.has_table("activities") else {}
     mood_columns = {col["name"]: col for col in inspector.get_columns("moods")} if inspector.has_table("moods") else {}
+    detail_columns = {col["name"]: col for col in inspector.get_columns("mood_activity_details")} if inspector.has_table("mood_activity_details") else {}
     position_activity_names = [
         "Headache",
         "Jaw / TMJ Pain",
@@ -132,6 +133,15 @@ def _ensure_legacy_schema_compatibility() -> None:
             conn.execute(
                 text("ALTER TABLE moods ADD COLUMN subjective_sleep_rating INTEGER")
             )
+
+        position_column = detail_columns.get("position")
+        if position_column and inspector.has_table("mood_activity_details"):
+            position_type = str(position_column.get("type", "")).upper()
+            if dialect == "postgresql" and "VARCHAR(32)" in position_type:
+                logger.warning("Widening mood_activity_details.position for multiple selections")
+                conn.execute(
+                    text("ALTER TABLE mood_activity_details ALTER COLUMN position TYPE VARCHAR(512)")
+                )
 
         mood_score_col = mood_columns.get("mood_score")
         if mood_score_col and mood_score_col.get("nullable") is False:

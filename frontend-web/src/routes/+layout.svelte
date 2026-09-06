@@ -39,7 +39,7 @@
   });
 </script>
 
-{#if $page.url.pathname === '/login'}
+{#if String($page.url.pathname) === '/login'}
   <main>
     <slot />
   </main>
