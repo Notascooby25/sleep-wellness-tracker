@@ -19,7 +19,10 @@ PUSH_CONFIGURED = bool(VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY and VAPID_CLAIMS_S
 def send_reminder_push(db: Session, message: str | None) -> None:
     """Send a Web Push notification to every registered device. Prunes stale/revoked subscriptions."""
     if not PUSH_CONFIGURED:
-        logger.warning("Skipping reminder push: VAPID_PRIVATE_KEY/PUBLIC_KEY/CLAIMS_SUB not fully configured")
+        logger.error(
+            "Reminder push aborted: VAPID_PRIVATE_KEY/PUBLIC_KEY/CLAIMS_SUB not fully configured "
+            "(check .env on the server and restart the backend)"
+        )
         return
 
     from pywebpush import webpush, WebPushException

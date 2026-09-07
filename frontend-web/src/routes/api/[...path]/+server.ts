@@ -124,7 +124,8 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
       throw lastError ?? new Error('Unable to reach backend');
     }
 
-    const body = await upstream.arrayBuffer();
+    // 204 responses have no body — constructing a Response with a body for 204 throws.
+    const body = upstream.status === 204 ? null : await upstream.arrayBuffer();
     const responseHeaders = new Headers();
     const upstreamContentType = upstream.headers.get('content-type');
     if (upstreamContentType) {
