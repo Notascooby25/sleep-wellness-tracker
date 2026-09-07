@@ -167,6 +167,8 @@ def _reminder_scheduler_loop() -> None:
                 .filter(models.ReminderSchedule.last_fired_date != today)
                 .all()
             )
+            if due_reminders:
+                logger.info("Reminder scheduler found %d due reminder(s) at %s UK", len(due_reminders), current_hhmm)
             for reminder in due_reminders:
                 try:
                     send_reminder_push(db, reminder.message)

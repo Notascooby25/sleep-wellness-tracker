@@ -33,6 +33,7 @@ def send_reminder_push(db: Session, message: str | None) -> None:
         return
 
     payload = json.dumps({"title": "Sleep Wellness Tracker", "body": message or DEFAULT_REMINDER_MESSAGE})
+    logger.info("Sending reminder push to %d subscription(s)", len(subscriptions))
     stale_ids: list[int] = []
 
     for subscription in subscriptions:
@@ -47,6 +48,7 @@ def send_reminder_push(db: Session, message: str | None) -> None:
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": VAPID_CLAIMS_SUB},
             )
+            logger.info("Push send succeeded for subscription id=%s", subscription.id)
         except WebPushException as exc:
             status_code = getattr(exc.response, "status_code", None)
             if status_code in (404, 410):
