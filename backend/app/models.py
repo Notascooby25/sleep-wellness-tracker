@@ -215,3 +215,26 @@ class GarminSyncState(Base):
     key = Column(String(80), primary_key=True)
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
     detail = Column(Text, nullable=True)
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(String(1024), unique=True, nullable=False, index=True)
+    p256dh_key = Column(String(255), nullable=False)
+    auth_key = Column(String(255), nullable=False)
+    device_label = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ReminderSchedule(Base):
+    __tablename__ = "reminder_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    time_of_day = Column(String(5), nullable=False)  # "HH:MM", UK local time
+    message = Column(String(255), nullable=True)  # null = use generic default
+    enabled = Column(Boolean, default=True, nullable=False)
+    last_fired_date = Column(Date, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

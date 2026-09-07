@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4792ff" />
+      <stop offset="100%" stop-color="#0d6efd" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Smooth rounded app icon background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGradient)" />
+  
+  <!-- Wellness Moon -->
+  <path d="M260 130 A 136 136 0 0 0 350 376 A 152 152 0 1 1 260 130 Z" fill="#ffffff" />
+  
+  <!-- Activity / Wellness Stars -->
+  <circle cx="350" cy="190" r="18" fill="#ffffff" opacity="0.9"/>
+  <circle cx="400" cy="260" r="12" fill="#ffffff" opacity="0.6"/>
+  <circle cx="320" cy="270" r="8" fill="#ffffff" opacity="0.4"/>
+</svg>

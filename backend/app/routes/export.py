@@ -157,6 +157,102 @@ def _mood_activity_details_text(mood: models.Mood, selected_activity_ids: set[in
     return "; ".join(values)
 
 
+_SOURCE_MODEL_DATE_COLUMN = {
+    "sleep": (models.GarminSleepDaily, models.GarminSleepDaily.sleep_date),
+    "hrv": (models.GarminHRVDaily, models.GarminHRVDaily.hrv_date),
+    "stress": (models.GarminStressDaily, models.GarminStressDaily.stress_date),
+    "body_battery": (models.GarminBodyBatteryDaily, models.GarminBodyBatteryDaily.battery_date),
+    "rhr": (models.GarminRestingHeartRateDaily, models.GarminRestingHeartRateDaily.heart_rate_date),
+    "hydration": (models.GarminHydrationDaily, models.GarminHydrationDaily.hydration_date),
+    "steps": (models.GarminStepsDaily, models.GarminStepsDaily.steps_date),
+    "activities": (models.GarminActivity, models.GarminActivity.activity_date),
+}
+
+
+@router.get("/preview")
+def export_preview(
+    sources: str = Query(..., description="Comma-separated sources"),
+    start_date: dt.date = Query(...),
+    end_date: dt.date = Query(...),
+    activity_ids: str | None = Query(default=None, description="Optional comma-separated mood activity IDs"),
+    include_images: bool = Query(default=False, description="Include attached mood images in a ZIP export"),
+    db: Session = Depends(get_db),
+):
+    """Lightweight row/photo counts for the selected filters, shown before download."""
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+    selected_sources = _parse_sources(sources)
+    selected_activity_ids = _parse_activity_ids(activity_ids)
+
+    mood_query = (
+        db.query(models.Mood)
+        .options(selectinload(models.Mood.activities))
+        .filter(func.date(models.Mood.timestamp) >= start_date)
+        .filter(func.date(models.Mood.timestamp) <= end_date)
+    )
+    if selected_activity_ids:
+        matching_mood_ids = (
+            db.query(models.Mood.id)
+            .join(models.Mood.activities)
+            .filter(func.date(models.Mood.timestamp) >= start_date)
+            .filter(func.date(models.Mood.timestamp) <= end_date)
+            .filter(models.Activity.id.in_(selected_activity_ids))
+            .distinct()
+            .subquery()
+        )
+        mood_query = mood_query.filter(models.Mood.id.in_(matching_mood_ids))
+
+    allowed_dates: set[dt.date] | None = None
+    if selected_activity_ids:
+        mood_date_rows = (
+            db.query(func.date(models.Mood.timestamp))
+            .join(models.Mood.activities)
+            .filter(func.date(models.Mood.timestamp) >= start_date)
+            .filter(func.date(models.Mood.timestamp) <= end_date)
+            .filter(models.Activity.id.in_(selected_activity_ids))
+            .distinct()
+            .all()
+        )
+        allowed_dates = {row_date for (row_date,) in mood_date_rows if isinstance(row_date, dt.date)}
+
+    counts: dict[str, int] = {}
+    if "mood" in selected_sources:
+        counts["mood"] = mood_query.count()
+
+    for source in selected_sources:
+        if source == "mood":
+            continue
+        model, date_column = _SOURCE_MODEL_DATE_COLUMN[source]
+        rows_query = db.query(model).filter(date_column >= start_date).filter(date_column <= end_date)
+        if allowed_dates is not None:
+            rows_query = rows_query.filter(date_column.in_(allowed_dates)) if allowed_dates else rows_query.filter(False)
+        counts[source] = rows_query.count()
+
+    photo_count = 0
+    photo_size_bytes = 0
+    if include_images and "mood" in selected_sources:
+        _ensure_mood_image_dir()
+        image_names: set[str] = set()
+        for row in mood_query.all():
+            image_names.update(_mood_image_names_from_row(row))
+        photo_count = len(image_names)
+        for image_name in image_names:
+            image_path = (MOOD_IMAGE_DIR / image_name).resolve()
+            try:
+                image_path.relative_to(MOOD_IMAGE_DIR.resolve())
+            except ValueError:
+                continue
+            if image_path.exists() and image_path.is_file():
+                photo_size_bytes += image_path.stat().st_size
+
+    return {
+        "counts": counts,
+        "photo_count": photo_count,
+        "photo_size_bytes": photo_size_bytes,
+    }
+
+
 @router.get("/csv")
 def export_csv(
     sources: str = Query(..., description="Comma-separated sources"),
@@ -545,11 +641,18 @@ def export_csv(
                     continue
                 if image_path.exists() and image_path.is_file():
                     zip_file.write(image_path, arcname=f"images/{image_name}")
-        archive.seek(0)
+        archive_bytes = archive.getvalue()
         filename = f"export_{start_date.isoformat()}_{end_date.isoformat()}.zip"
-        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-        return StreamingResponse(iter([archive.getvalue()]), media_type="application/zip", headers=headers)
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(archive_bytes)),
+        }
+        return StreamingResponse(iter([archive_bytes]), media_type="application/zip", headers=headers)
 
     filename = f"export_{start_date.isoformat()}_{end_date.isoformat()}.csv"
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    return StreamingResponse(iter([csv_payload]), media_type="text/csv", headers=headers)
+    csv_bytes = csv_payload.encode("utf-8")
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Length": str(len(csv_bytes)),
+    }
+    return StreamingResponse(iter([csv_bytes]), media_type="text/csv", headers=headers)

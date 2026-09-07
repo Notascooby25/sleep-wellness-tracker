@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { beforeNavigate } from '$app/navigation';
   import { getJson, postJson } from '$lib/api';
   import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry, PositionOption } from '$lib/types';
 
@@ -29,6 +30,7 @@
 
   type ImageUploadResponse = {
     image_url: string;
+    uploaded_at?: string;
   };
 
   const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -56,12 +58,40 @@
   let latestBattery: BatteryLatest | null = null;
   let latestHrv: HrvLatest | null = null;
   let latestStress: StressLatest | null = null;
-  let activeCategory = 0;
+  let activeCategoryId: number | null = null;
   let currentStreakDays = 0;
   let imageUrls: string[] = [];
+  // Maps an uploaded photo's URL to its upload timestamp, for the "uploaded on" caption.
+  let imageUploadedAt = new Map<string, string>();
   let imageUploadBusy = false;
   let galleryInputEl: HTMLInputElement | null = null;
   let cameraInputEl: HTMLInputElement | null = null;
+  let loadError = false;
+
+  const formatUploadedAt = (iso: string | undefined) => {
+    if (!iso) return '';
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const isDirty = () =>
+    notes.trim() !== '' ||
+    selected.size > 0 ||
+    imageUrls.length > 0 ||
+    subjectiveSleepRating !== null;
+
+  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!isDirty()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
+
+  beforeNavigate((navigation) => {
+    if (!isDirty()) return;
+    const confirmed = confirm('You have unsaved mood entry changes. Leave without saving?');
+    if (!confirmed) navigation.cancel();
+  });
 
   const fmtMinutes = (value?: number) => {
     if (value === undefined || value === null) return '-';
@@ -236,7 +266,7 @@
     }
 
     const data = (await response.json()) as ImageUploadResponse;
-    return data.image_url;
+    return data;
   };
 
   const uploadFromInput = async (event: Event) => {
@@ -250,17 +280,21 @@
     try {
       const uploadedUrls: string[] = [];
       for (const file of files) {
-        status = files.length > 1 ? `Preparing image ${uploadedUrls.length + 1} of ${files.length}...` : 'Preparing image...';
+        status = files.length > 1 ? `Preparing photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Preparing photo...';
         const uploadFile = await prepareUploadFile(file);
         if (uploadFile.size > MAX_UPLOAD_BYTES) {
           status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
           input.value = '';
           return;
         }
-        uploadedUrls.push(await fileToImageUrl(uploadFile));
+        status = files.length > 1 ? `Uploading photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Uploading photo...';
+        const uploaded = await fileToImageUrl(uploadFile);
+        uploadedUrls.push(uploaded.image_url);
+        if (uploaded.uploaded_at) imageUploadedAt.set(uploaded.image_url, uploaded.uploaded_at);
         uploadedCount = uploadedUrls.length;
       }
       imageUrls = [...imageUrls, ...uploadedUrls];
+      imageUploadedAt = new Map(imageUploadedAt);
       status = `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'photo' : 'photos'} attached.`;
     } catch (error) {
       const message = String(error);
@@ -281,7 +315,12 @@
   };
 
   const removeImage = (index: number) => {
+    const [removed] = imageUrls.slice(index, index + 1);
     imageUrls = imageUrls.filter((_, i) => i !== index);
+    if (removed) {
+      imageUploadedAt.delete(removed);
+      imageUploadedAt = new Map(imageUploadedAt);
+    }
   };
 
   const moodColors: Record<number, { bg: string; active: string; label: string }> = {
@@ -348,10 +387,11 @@
   // Show sleep rating only when the Morning / Waking Feedback context is in play.
   $: morningCategoryId = categories.find((c) => c.name === 'Morning / Waking Feedback')?.id ?? null;
   $: sleepRatingVisible =
-    (morningCategoryId !== null && categories[activeCategory]?.id === morningCategoryId) ||
+    (morningCategoryId !== null && activeCategoryId === morningCategoryId) ||
     Array.from(selected).some((id) => activities.find((a) => a.id === id)?.category_id === morningCategoryId);
 
   const load = async () => {
+    loadError = false;
     try {
       const [cats, acts, sleepWrap, batteryWrap, moodRows, hrvWrap, stressWrap, positionOptions] = await Promise.all([
         getJson<Category[]>('/categories/'),
@@ -373,8 +413,12 @@
       if (positionOptions && positionOptions.length > 0) {
         POSITION_OPTIONS = positionOptions.map((option) => option.label);
       }
+      if (activeCategoryId === null || !categories.some((c) => c.id === activeCategoryId)) {
+        activeCategoryId = categories[0]?.id ?? null;
+      }
     } catch (error) {
       status = `Load error: ${error}`;
+      loadError = true;
     }
   };
 
@@ -397,6 +441,7 @@
       status = 'Entry saved.';
       notes = '';
       imageUrls = [];
+      imageUploadedAt = new Map();
       selected = new Set<number>();
       activityDetails = new Map();
       subjectiveSleepRating = null;
@@ -407,7 +452,14 @@
     }
   };
 
-  onMount(load);
+  onMount(() => {
+    load();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  });
+
+  onDestroy(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload);
+  });
 
   // ── Readiness score ───────────────────────────────────────────────────────
   // Weighted: 40% sleep quality, 30% HRV vs personal baseline, 30% low stress
@@ -557,6 +609,9 @@
         {#each imageUrls as imageUrl, index}
           <div class="image-preview-card">
             <img src={`/api${imageUrl}`} alt={`Mood attachment preview ${index + 1}`} class="image-preview" />
+            {#if formatUploadedAt(imageUploadedAt.get(imageUrl))}
+              <span class="image-uploaded-at">Uploaded {formatUploadedAt(imageUploadedAt.get(imageUrl))}</span>
+            {/if}
             <button class="btn-clear" on:click={() => removeImage(index)} disabled={busy || imageUploadBusy}>Remove</button>
           </div>
         {/each}
@@ -569,6 +624,7 @@
     <button disabled={busy} on:click={load}>Refresh</button>
   </div>
   {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if loadError}<button class="btn-clear" on:click={load}>Retry loading</button>{/if}
 </section>
 
 <section class="card">
@@ -634,11 +690,11 @@
     <p>No categories found.</p>
   {:else}
     <div class="cat-tabs">
-      {#each categories as cat, i}
+      {#each categories as cat}
         <button
           class="cat-tab"
-          class:cat-tab-active={activeCategory === i}
-          on:click={() => (activeCategory = i)}
+          class:cat-tab-active={activeCategoryId === cat.id}
+          on:click={() => (activeCategoryId = cat.id)}
         >
           {cat.name}
           {#if byCategory(cat.id).some(a => selected.has(a.id))}
@@ -648,8 +704,8 @@
       {/each}
     </div>
 
-    {#if categories[activeCategory]}
-      {@const catActivities = byCategory(categories[activeCategory].id)}
+    {#if categories.find((c) => c.id === activeCategoryId)}
+      {@const catActivities = byCategory(activeCategoryId as number)}
       <div class="chips">
         {#each catActivities as activity}
           <button
@@ -691,6 +747,7 @@
   .hidden-file-input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
   .image-preview-wrap { margin-top: 0.55rem; display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
   .image-preview-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+  .image-uploaded-at { font-size: 0.76rem; color: #8091a7; }
   .image-preview {
     width: min(260px, 100%);
     max-height: 260px;

@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { registerServiceWorker } from '$lib/push';
 
   const links = [
     { href: '/mood-entry', label: 'Mood Entry' },
@@ -13,29 +14,50 @@
     { href: '/settings', label: 'Settings' }
   ];
 
+  let isOnline = true;
+  let installPromptEvent: any = null;
+  let showInstallButton = false;
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     await goto('/login', { invalidateAll: true });
   };
 
+  const installApp = async () => {
+    if (!installPromptEvent) return;
+    installPromptEvent.prompt();
+    await installPromptEvent.userChoice;
+    installPromptEvent = null;
+    showInstallButton = false;
+  };
+
   onMount(() => {
-    if (typeof Notification === 'undefined') return;
-    const check = () => {
-      if (localStorage.getItem('moodReminderEnabled') !== 'true') return;
-      if (Notification.permission !== 'granted') return;
-      const reminderTime = localStorage.getItem('moodReminderTime') || '21:00';
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const today = now.toISOString().slice(0, 10);
-      if (`${hh}:${mm}` === reminderTime && localStorage.getItem('moodReminderLastFired') !== today) {
-        localStorage.setItem('moodReminderLastFired', today);
-        new Notification('Sleep Wellness Tracker', { body: "Time to log today's mood 🌙" });
-      }
+    registerServiceWorker();
+
+    isOnline = navigator.onLine;
+    const setOnline = () => (isOnline = true);
+    const setOffline = () => (isOnline = false);
+    window.addEventListener('online', setOnline);
+    window.addEventListener('offline', setOffline);
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      if (isStandalone) return;
+      installPromptEvent = event;
+      showInstallButton = true;
     };
-    check();
-    const id = setInterval(check, 60_000);
-    return () => clearInterval(id);
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', () => {
+      showInstallButton = false;
+      installPromptEvent = null;
+    });
+
+    return () => {
+      window.removeEventListener('online', setOnline);
+      window.removeEventListener('offline', setOffline);
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    };
   });
 </script>
 
@@ -44,6 +66,9 @@
     <slot />
   </main>
 {:else}
+  {#if !isOnline}
+    <div class="offline-banner">Offline — can't reach the server. Some actions may not work until reconnected.</div>
+  {/if}
   <header class="topbar">
     <div class="topbar-inner">
       <h1>Sleep Wellness Tracker</h1>
@@ -51,6 +76,9 @@
         {#each links as link}
           <a href={link.href} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
         {/each}
+        {#if showInstallButton}
+          <button on:click={installApp} class="install-link">Install app</button>
+        {/if}
         <button on:click={logout} class="logout-link">Log out</button>
       </nav>
     </div>
@@ -113,5 +141,24 @@
     color: #1e4b76;
     background: #edf4fd;
     cursor: pointer;
+  }
+
+  .install-link {
+    border: 1px solid #9ec0e7;
+    border-radius: 999px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.82rem;
+    color: #fff;
+    background: #0d6efd;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .offline-banner {
+    background: #fee4e2;
+    color: #b42318;
+    text-align: center;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
   }
 </style>

@@ -32,6 +32,58 @@
   let includeImages = false;
   let busy = false;
   let status = '';
+  let downloadProgressPct: number | null = null;
+
+  type PreviewResponse = { counts: Record<string, number>; photo_count: number; photo_size_bytes: number };
+  let preview: PreviewResponse | null = null;
+  let previewLoading = false;
+  let previewError = '';
+  let previewDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const sourceLabel = (value: string) => sourceOptions.find((s) => s.value === value)?.label || value;
+
+  const loadPreview = async () => {
+    if (!startDate || !endDate || endDate < startDate || selected.size === 0) {
+      preview = null;
+      return;
+    }
+    previewLoading = true;
+    previewError = '';
+    try {
+      const params = new URLSearchParams({
+        sources: Array.from(selected).join(','),
+        start_date: startDate,
+        end_date: endDate
+      });
+      if (includeImages) params.set('include_images', 'true');
+      if (selectedActivityIds.size > 0) params.set('activity_ids', Array.from(selectedActivityIds).join(','));
+
+      const response = await fetch(`/api/export/preview?${params.toString()}`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `${response.status} ${response.statusText}`);
+      }
+      preview = (await response.json()) as PreviewResponse;
+    } catch (error) {
+      previewError = `Could not load export preview: ${error}`;
+      preview = null;
+    } finally {
+      previewLoading = false;
+    }
+  };
+
+  const schedulePreview = () => {
+    if (previewDebounceHandle) clearTimeout(previewDebounceHandle);
+    previewDebounceHandle = setTimeout(loadPreview, 400);
+  };
+
+  $: startDate, endDate, selected, selectedActivityIds, includeImages, schedulePreview();
 
   const loadCatalog = async () => {
     try {
@@ -92,6 +144,7 @@
     }
 
     busy = true;
+    downloadProgressPct = null;
     try {
       const params = new URLSearchParams({
         sources: Array.from(selected).join(','),
@@ -115,7 +168,24 @@
         throw new Error(text || `${response.status} ${response.statusText}`);
       }
 
-      const blob = await response.blob();
+      const totalBytes = Number(response.headers.get('content-length') || '0');
+      const reader = response.body?.getReader();
+      const chunks: Uint8Array[] = [];
+      let receivedBytes = 0;
+
+      if (reader && totalBytes > 0) {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            receivedBytes += value.byteLength;
+            downloadProgressPct = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+          }
+        }
+      }
+
+      const blob = chunks.length ? new Blob(chunks as BlobPart[]) : await response.blob();
       const href = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = href;
@@ -130,6 +200,7 @@
       status = `Export failed: ${error}`;
     } finally {
       busy = false;
+      downloadProgressPct = null;
     }
   };
 
@@ -258,11 +329,37 @@
     </div>
   </section>
 
+  {#if previewLoading}
+    <p class="preview-msg">Checking what's included…</p>
+  {:else if previewError}
+    <p class="preview-msg preview-warn">{previewError}</p>
+  {:else if preview}
+    <div class="preview-msg">
+      <span>This export includes </span>
+      {#each Object.entries(preview.counts) as [source, count], i}
+        <strong>{count} {sourceLabel(source)}</strong>{i < Object.entries(preview.counts).length - 1 ? ', ' : ''}
+      {/each}
+      {#if preview.photo_count > 0}
+        <span> and <strong>{preview.photo_count} {preview.photo_count === 1 ? 'photo' : 'photos'}</strong> (~{formatBytes(preview.photo_size_bytes)}).</span>
+        {#if preview.photo_count > 20 || preview.photo_size_bytes > 20 * 1024 * 1024}
+          <span class="preview-warn"> This is a lot of photos — the download may take a while.</span>
+        {/if}
+      {:else}
+        <span>.</span>
+      {/if}
+    </div>
+  {/if}
+
   <div class="actions">
     <button class="btn-primary" disabled={busy} on:click={exportCsv}>
       {busy ? 'Exporting...' : 'Export CSV'}
     </button>
   </div>
+
+  {#if busy && downloadProgressPct !== null}
+    <div class="progress-bar"><div class="progress-fill" style="width:{downloadProgressPct}%;"></div></div>
+    <p class="preview-msg">Downloading… {downloadProgressPct}%</p>
+  {/if}
 
   {#if status}
     <p class="status-msg">{status}</p>
@@ -271,6 +368,10 @@
 
 <style>
   .export-card { padding: 1rem; }
+  .preview-msg { margin: 0.7rem 0 0; font-size: 0.85rem; color: #486888; }
+  .preview-warn { color: #b42318; font-weight: 600; }
+  .progress-bar { margin-top: 0.5rem; height: 8px; border-radius: 999px; background: #e5eef8; overflow: hidden; }
+  .progress-fill { height: 100%; background: #0d6efd; transition: width 150ms ease; }
   .block-gap { margin-top: 0.9rem; }
   .hint-inline { font-size: 0.82rem; color: #496685; font-weight: 400; }
   .notes-toggle { display: flex; }

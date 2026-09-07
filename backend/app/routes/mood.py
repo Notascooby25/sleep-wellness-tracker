@@ -161,7 +161,9 @@ async def upload_mood_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Unsupported image type. Use JPG, PNG, WEBP, HEIC, or HEIF.")
 
     _ensure_mood_image_dir()
-    image_name = f"{uuid4().hex}{extension}"
+    uploaded_at = dt.datetime.now(dt.timezone.utc)
+    # Date-prefixed filename keeps the upload date visible on disk (backups, manual browsing).
+    image_name = f"{uploaded_at:%Y%m%d}_{uuid4().hex}{extension}"
     target = MOOD_IMAGE_DIR / image_name
 
     total_size = 0
@@ -180,7 +182,7 @@ async def upload_mood_image(file: UploadFile = File(...)):
     finally:
         await file.close()
 
-    return {"image_url": f"{IMAGE_URL_PREFIX}{image_name}"}
+    return {"image_url": f"{IMAGE_URL_PREFIX}{image_name}", "uploaded_at": uploaded_at.isoformat()}
 
 
 @router.get("/image/{image_name}")

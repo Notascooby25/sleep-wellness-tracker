@@ -8,5 +8,6 @@ python-dotenv
 alembic
 garminconnect
 curl_cffi
+pywebpush
 
 

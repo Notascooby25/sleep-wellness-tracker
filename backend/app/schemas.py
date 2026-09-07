@@ -112,3 +112,52 @@ class ActivityResponse(ActivityBase):
 
     class Config:
         from_attributes = True
+
+
+# -------------------------
+# PUSH NOTIFICATION SCHEMAS
+# -------------------------
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+    device_label: Optional[str] = None
+
+
+class PushSubscriptionResponse(BaseModel):
+    id: int
+    endpoint: str
+    device_label: Optional[str] = None
+    created_at: datetime
+    last_seen_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReminderScheduleBase(BaseModel):
+    time_of_day: str = Field(..., pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    message: Optional[str] = None
+    enabled: bool = True
+
+
+class ReminderScheduleCreate(ReminderScheduleBase):
+    pass
+
+
+class ReminderScheduleUpdate(BaseModel):
+    time_of_day: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    message: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class ReminderScheduleResponse(ReminderScheduleBase):
+    id: int
+
+    class Config:
+        from_attributes = True

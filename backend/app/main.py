@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from . import auth
 from .database import SessionLocal
-from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes
+from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes, push
 from .services.garmin_sync import (
     sync_activities_if_due,
     sync_sleep_if_due,
@@ -20,6 +20,7 @@ from .services.garmin_sync import (
     sync_hydration_if_due,
     sync_steps_if_due,
 )
+from .services.push_sender import send_reminder_push
 
 app = FastAPI()
 logger = logging.getLogger("app.main")
@@ -143,9 +144,51 @@ def _garmin_sleep_autosync_loop() -> None:
         _autosync_stop.wait(_AUTOSYNC_POLL_SECONDS)
 
 
+_REMINDER_POLL_SECONDS = 30
+_reminder_stop = threading.Event()
+_reminder_thread: threading.Thread | None = None
+
+
+def _reminder_scheduler_loop() -> None:
+    from . import models
+
+    logger.info("Reminder scheduler loop started")
+    while not _reminder_stop.is_set():
+        now_local = dt.datetime.now(dt.timezone.utc).astimezone(UK_TZ)
+        today = now_local.date()
+        current_hhmm = now_local.strftime("%H:%M")
+
+        db = SessionLocal()
+        try:
+            due_reminders = (
+                db.query(models.ReminderSchedule)
+                .filter(models.ReminderSchedule.enabled.is_(True))
+                .filter(models.ReminderSchedule.time_of_day == current_hhmm)
+                .filter(models.ReminderSchedule.last_fired_date != today)
+                .all()
+            )
+            for reminder in due_reminders:
+                try:
+                    send_reminder_push(db, reminder.message)
+                except Exception:
+                    logger.exception("Failed to send reminder push for schedule id=%s", reminder.id)
+                reminder.last_fired_date = today
+            if due_reminders:
+                db.commit()
+        finally:
+            db.close()
+
+        _reminder_stop.wait(_REMINDER_POLL_SECONDS)
+
+
 @app.on_event("startup")
 def _start_background_workers() -> None:
-    global _autosync_thread
+    global _autosync_thread, _reminder_thread
+
+    if not _reminder_thread or not _reminder_thread.is_alive():
+        _reminder_stop.clear()
+        _reminder_thread = threading.Thread(target=_reminder_scheduler_loop, name="reminder-scheduler", daemon=True)
+        _reminder_thread.start()
 
     if not GARMIN_AUTOSYNC_ENABLED:
         logger.info("Garmin sleep autosync is disabled via GARMIN_AUTOSYNC_ENABLED")
@@ -164,6 +207,9 @@ def _stop_background_workers() -> None:
     _autosync_stop.set()
     if _autosync_thread:
         _autosync_thread.join(timeout=5)
+    _reminder_stop.set()
+    if _reminder_thread:
+        _reminder_thread.join(timeout=5)
 
 
 app.include_router(mood.router)
@@ -173,6 +219,7 @@ app.include_router(garmin.router)
 app.include_router(export.router)
 app.include_router(lifestyle_impact.router)
 app.include_router(auth_routes.router)
+app.include_router(push.router)
 
 
 @app.get("/health")

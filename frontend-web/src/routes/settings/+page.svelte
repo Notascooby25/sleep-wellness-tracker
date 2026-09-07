@@ -1,28 +1,104 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import {
+    pushSupported,
+    subscribeThisDevice,
+    listSubscriptions,
+    removeSubscription,
+    listReminders,
+    createReminder,
+    updateReminder,
+    deleteReminder,
+    type PushSubscriptionRow,
+    type ReminderSchedule
+  } from '$lib/push';
+
   const appVersion = __APP_VERSION__;
   // BUILD_DATE is injected by vite.config.ts
   const buildDate = __BUILD_DATE__;
 
-  let reminderEnabled = false;
-  let reminderTime = '21:00';
-  let notifPermission = 'default';
-  let savedMsg = '';
+  let reminders: ReminderSchedule[] = [];
+  let subscriptions: PushSubscriptionRow[] = [];
+  let newTime = '21:00';
+  let newMessage = '';
+  let notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+  let pushIsSupported = false;
+  let busyReminders = false;
+  let subscribeBusy = false;
+  let reminderError = '';
+  let subscriptionError = '';
+
+  const load = async () => {
+    try {
+      reminders = await listReminders();
+    } catch (error) {
+      reminderError = `Could not load reminders: ${error}`;
+    }
+    try {
+      subscriptions = await listSubscriptions();
+    } catch (error) {
+      subscriptionError = `Could not load devices: ${error}`;
+    }
+  };
 
   onMount(() => {
-    reminderEnabled = localStorage.getItem('moodReminderEnabled') === 'true';
-    reminderTime = localStorage.getItem('moodReminderTime') || '21:00';
-    notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+    pushIsSupported = pushSupported();
+    load();
   });
 
-  const saveReminder = async () => {
-    if (reminderEnabled && notifPermission !== 'granted' && typeof Notification !== 'undefined') {
-      notifPermission = await Notification.requestPermission();
+  const addReminder = async () => {
+    busyReminders = true;
+    reminderError = '';
+    try {
+      await createReminder({ time_of_day: newTime, message: newMessage.trim() || null, enabled: true });
+      newMessage = '';
+      await load();
+    } catch (error) {
+      reminderError = `Could not add reminder: ${error}`;
+    } finally {
+      busyReminders = false;
     }
-    localStorage.setItem('moodReminderEnabled', String(reminderEnabled));
-    localStorage.setItem('moodReminderTime', reminderTime);
-    savedMsg = 'Saved!';
-    setTimeout(() => (savedMsg = ''), 2000);
+  };
+
+  const toggleReminder = async (reminder: ReminderSchedule) => {
+    try {
+      await updateReminder(reminder.id, { enabled: !reminder.enabled });
+      await load();
+    } catch (error) {
+      reminderError = `Could not update reminder: ${error}`;
+    }
+  };
+
+  const removeReminder = async (id: number) => {
+    try {
+      await deleteReminder(id);
+      await load();
+    } catch (error) {
+      reminderError = `Could not delete reminder: ${error}`;
+    }
+  };
+
+  const enableThisDevice = async () => {
+    subscribeBusy = true;
+    subscriptionError = '';
+    try {
+      await subscribeThisDevice();
+      notifPermission = Notification.permission;
+      await load();
+    } catch (error) {
+      subscriptionError = `Could not enable notifications: ${error}`;
+    } finally {
+      subscribeBusy = false;
+    }
+  };
+
+  const removeDevice = async (id: number) => {
+    try {
+      await removeSubscription(id);
+      await load();
+    } catch (error) {
+      subscriptionError = `Could not remove device: ${error}`;
+    }
   };
 </script>
 
@@ -32,25 +108,53 @@
 </section>
 
 <section class="card reminder-card">
-  <h3 style="margin:0 0 0.5rem;">Mood Reminder</h3>
-  <p style="margin:0 0 0.75rem;color:#5f6f84;font-size:0.88rem;">Receive a browser notification at a set time each day to log your mood. Saved per device in this browser only.</p>
-  <div class="reminder-row">
-    <label class="chk">
-      <input type="checkbox" bind:checked={reminderEnabled} />
-      Enable daily reminder
-    </label>
-    <label style="display:flex;align-items:center;gap:0.5rem;">
-      <span class="label" style="margin:0;">Time</span>
-      <input type="time" bind:value={reminderTime} style="width:auto;" />
-    </label>
-    <button on:click={saveReminder}>Save</button>
-    {#if savedMsg}<span class="saved-msg">{savedMsg}</span>{/if}
-  </div>
-  {#if notifPermission === 'denied'}
-    <p class="notif-warn">Browser notifications are blocked — allow them in your browser's site settings.</p>
-  {:else if notifPermission === 'unsupported'}
-    <p class="notif-warn">Your browser does not support notifications.</p>
+  <h3 style="margin:0 0 0.5rem;">Reminders</h3>
+  <p style="margin:0 0 0.75rem;color:#5f6f84;font-size:0.88rem;">Push notifications sent to devices you enable below, at any times you add. They fire even if the app isn't open.</p>
+
+  <h4 style="margin:0 0 0.4rem;font-size:0.92rem;">Notification devices</h4>
+  {#if !pushIsSupported}
+    <p class="notif-warn">Your browser does not support push notifications.</p>
+  {:else}
+    <div class="reminder-row">
+      <button on:click={enableThisDevice} disabled={subscribeBusy}>{subscribeBusy ? 'Enabling…' : 'Enable notifications on this device'}</button>
+    </div>
+    {#if notifPermission === 'denied'}
+      <p class="notif-warn">Notifications are blocked — allow them in your browser's site settings.</p>
+    {/if}
   {/if}
+  {#if subscriptionError}<p class="notif-warn">{subscriptionError}</p>{/if}
+  {#if subscriptions.length > 0}
+    <ul class="device-list">
+      {#each subscriptions as sub}
+        <li>
+          <span>{sub.device_label || 'Unnamed device'}</span>
+          <button class="btn-clear" on:click={() => removeDevice(sub.id)}>Remove</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <h4 style="margin:1rem 0 0.4rem;font-size:0.92rem;">Reminder times</h4>
+  {#if reminderError}<p class="notif-warn">{reminderError}</p>{/if}
+  {#if reminders.length > 0}
+    <ul class="device-list">
+      {#each reminders as reminder}
+        <li>
+          <label class="chk" style="flex:0;">
+            <input type="checkbox" checked={reminder.enabled} on:change={() => toggleReminder(reminder)} />
+          </label>
+          <span class="reminder-time">{reminder.time_of_day}</span>
+          <span class="reminder-msg">{reminder.message || 'Update your tracker'}</span>
+          <button class="btn-clear" on:click={() => removeReminder(reminder.id)}>Remove</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  <div class="reminder-row">
+    <input type="time" bind:value={newTime} style="width:auto;" />
+    <input type="text" bind:value={newMessage} placeholder="Custom message (optional)" style="flex:1;min-width:160px;" />
+    <button on:click={addReminder} disabled={busyReminders}>Add reminder</button>
+  </div>
 </section>
 
 <section class="card grid two">
@@ -95,11 +199,15 @@
   }
 
   .reminder-card { margin-bottom: 0.75rem; }
-  .reminder-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .reminder-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.4rem 0; }
   .chk { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
   .chk input { width: auto; }
-  .saved-msg { font-size: 0.85rem; color: #086c3a; font-weight: 600; }
   .notif-warn { margin: 0.6rem 0 0; font-size: 0.84rem; color: #b42318; background: #fee4e2; border-radius: 8px; padding: 0.3rem 0.6rem; }
+  .device-list { list-style: none; margin: 0.4rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .device-list li { display: flex; align-items: center; gap: 0.6rem; border: 1px solid #d7e6f7; border-radius: 8px; background: #f8fbff; padding: 0.4rem 0.6rem; font-size: 0.86rem; }
+  .device-list li span { flex: 1; }
+  .reminder-time { font-weight: 700; color: #163c61; flex: 0 0 auto !important; }
+  .reminder-msg { color: #486888; }
 
   .settings-link {
     display: block;
