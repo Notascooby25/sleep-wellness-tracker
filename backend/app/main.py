@@ -7,9 +7,6 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-# Ensure app.* loggers emit INFO to stdout under uvicorn (which doesn't configure root handlers).
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
 from . import auth
 from .database import SessionLocal
 from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes, push
@@ -24,6 +21,9 @@ from .services.garmin_sync import (
     sync_steps_if_due,
 )
 from .services.push_sender import send_reminder_push
+
+# Configure root logging so app.* INFO logs emit under uvicorn (which doesn't configure root handlers).
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = FastAPI()
 logger = logging.getLogger("app.main")
