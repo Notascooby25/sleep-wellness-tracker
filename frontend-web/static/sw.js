@@ -1,12 +1,21 @@
+const CACHE_NAME = 'sleepwell-v4.12.4'; // bump this on each release to invalidate old caches
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open('sleepwell-shell-v1').then((cache) => cache.addAll(['/offline.html', '/icons/icon-192.png']))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(['/offline.html', '/icons/icon-192.png']))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  // Clean up old cache versions so users get the new build immediately after update
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
 // Navigation requests fall back to a static offline page when the network is unreachable.
