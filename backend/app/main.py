@@ -157,31 +157,34 @@ def _reminder_scheduler_loop() -> None:
 
     logger.info("Reminder scheduler loop started")
     while not _reminder_stop.is_set():
-        now_local = dt.datetime.now(dt.timezone.utc).astimezone(UK_TZ)
-        today = now_local.date()
-        current_hhmm = now_local.strftime("%H:%M")
-
-        db = SessionLocal()
         try:
-            due_reminders = (
-                db.query(models.ReminderSchedule)
-                .filter(models.ReminderSchedule.enabled.is_(True))
-                .filter(models.ReminderSchedule.time_of_day == current_hhmm)
-                .filter(models.ReminderSchedule.last_fired_date != today)
-                .all()
-            )
-            if due_reminders:
-                logger.info("Reminder scheduler found %d due reminder(s) at %s UK", len(due_reminders), current_hhmm)
-            for reminder in due_reminders:
-                try:
-                    send_reminder_push(db, reminder.message)
-                except Exception:
-                    logger.exception("Failed to send reminder push for schedule id=%s", reminder.id)
-                reminder.last_fired_date = today
-            if due_reminders:
-                db.commit()
-        finally:
-            db.close()
+            now_local = dt.datetime.now(dt.timezone.utc).astimezone(UK_TZ)
+            today = now_local.date()
+            current_hhmm = now_local.strftime("%H:%M")
+
+            db = SessionLocal()
+            try:
+                due_reminders = (
+                    db.query(models.ReminderSchedule)
+                    .filter(models.ReminderSchedule.enabled.is_(True))
+                    .filter(models.ReminderSchedule.time_of_day == current_hhmm)
+                    .filter(models.ReminderSchedule.last_fired_date != today)
+                    .all()
+                )
+                if due_reminders:
+                    logger.info("Reminder scheduler found %d due reminder(s) at %s UK", len(due_reminders), current_hhmm)
+                for reminder in due_reminders:
+                    try:
+                        send_reminder_push(db, reminder.message)
+                    except Exception:
+                        logger.exception("Failed to send reminder push for schedule id=%s", reminder.id)
+                    reminder.last_fired_date = today
+                if due_reminders:
+                    db.commit()
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("Reminder scheduler loop crashed")
 
         _reminder_stop.wait(_REMINDER_POLL_SECONDS)
 
