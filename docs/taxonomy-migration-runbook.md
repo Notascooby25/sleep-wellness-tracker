@@ -47,7 +47,7 @@ You should see lines about `activities.deprecated_at`, `moods.subjective_sleep_r
 ```bash
 ./scripts/run_db_backup_rotation.sh
 ./scripts/mood_images_backup.sh
-./scripts/push_backups_to_synology.sh
+./scripts/push_srv_to_synology.sh
 ./scripts/sync_backups_to_google.sh
 ./scripts/verify_latest_manifest.sh
 ```

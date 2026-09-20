@@ -116,14 +116,15 @@ crontab -l
 
 ### Tier 2 — DS223 mirror
 
-Script: [scripts/push_backups_to_synology.sh](scripts/push_backups_to_synology.sh)
+Script: [scripts/push_srv_to_synology.sh](scripts/push_srv_to_synology.sh) (replaces `push_backups_to_synology.sh`; full details in [backup-runbook.md](backup-runbook.md#nas-mirror))
 
-- Destination: `/volume1/Backups/nuc-server`
-  - `backups/` — DB dumps + manifests
-  - `mood-images/` — image archives
-- Auth: SSH key at `$SSH_KEY` (see script), port `8022`, user/host from `NAS_USER`/`NAS_HOST` env vars (not committed).
-- Uses `rsync -az` with excludes for `.env*`, `postgres-data/`.
-- Logs: `/srv/shared/backups/synology_sync_<UTC>.log`
+- Destination: `/volume1/Backups/nuc-server`, mirroring the layout of `/srv`
+  - `shared/backups/` — DB dumps + manifests (append-only)
+  - `shared/{mood-images,garmin-tokens,logs}/` and the `sleepwell`, `audio-scrobbler-app`, `UK-Expense-Tracker` app folders — mirrors
+  - `_versions/<UTC>/` — files changed/deleted by mirror runs, pruned after 30 days
+- Auth: SSH key at `$SSH_KEY`, port `8022`; `NAS_USER`/`NAS_HOST` come from `~/.config/nas-sync.env` on the NUC (not committed).
+- Uses `rsync -az`; `postgres-data/` is never copied (the `.dump` files are the DB backup).
+- Logs: `/srv/shared/backups/synology_backup_cron.log`
 
 ### Tier 3 — Google Drive encrypted
 
@@ -270,7 +271,7 @@ GROUP BY a.name, mad.position ORDER BY 1, 2;
 cd /srv/sleepwell
 ./scripts/run_db_backup_rotation.sh
 ./scripts/mood_images_backup.sh
-./scripts/push_backups_to_synology.sh
+./scripts/push_srv_to_synology.sh
 ./scripts/sync_backups_to_google.sh
 ./scripts/verify_latest_manifest.sh
 ```
