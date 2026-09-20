@@ -17,6 +17,12 @@ command -v rclone >/dev/null 2>&1 || die "rclone not found in PATH"
 
 mkdir -p "$LOG_DIR"
 
+LOCK_FILE="${LOG_DIR}/.google_sync.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    die "Another google sync process is already running."
+fi
+
 log "Checking encrypted remote: $RCLONE_REMOTE"
 rclone lsd "$RCLONE_REMOTE" --config "$RCLONE_CONFIG" >/dev/null
 
@@ -27,5 +33,11 @@ rclone copy "$BACKUP_DIR" "$RCLONE_REMOTE" \
   --exclude '*.lock' \
   --exclude '*.log' \
   --create-empty-src-dirs
+
+log "Pruning backups older than 90 days from $RCLONE_REMOTE"
+rclone delete "$RCLONE_REMOTE" \
+  --config "$RCLONE_CONFIG" \
+  --min-age 90d \
+  --rmdirs || log "Warning: Pruning encountered an issue, continuing."
 
 log "Backup copy completed"

@@ -15,6 +15,13 @@ LOG_DIR="/srv/shared/backups"
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
+LOCK_FILE="${LOG_DIR}/.synology_sync.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "Another synology sync process is already running." >&2
+    exit 1
+fi
+
 # rsync options:
 # -a: archive
 # -z: compress during transfer

@@ -83,6 +83,12 @@ info "Container '$CONTAINER' is running."
 umask 077
 mkdir -p "$OUTPUT_DIR"
 chmod 700 "$OUTPUT_DIR"
+
+LOCK_FILE="$OUTPUT_DIR/.db_backup.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    die "Another db_backup process is already running."
+fi
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DUMP_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.dump"
 SQL_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.sql.gz"

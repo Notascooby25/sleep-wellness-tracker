@@ -11,7 +11,8 @@ RCLONE_REMOTE="${RCLONE_REMOTE:-gdrive-crypt:backups/sleep-wellness}"
 NAS_SCHEDULE="${NAS_SCHEDULE:-30 */6 * * *}"
 GOOGLE_SCHEDULE="${GOOGLE_SCHEDULE:-35 */6 * * *}"
 VERIFY_SCHEDULE="${VERIFY_SCHEDULE:-50 */6 * * *}"
-NAS_JOB="$ROOT_DIR/scripts/push_backups_to_synology.sh"
+NAS_JOB="$ROOT_DIR/scripts/push_srv_to_synology.sh"
+OLD_NAS_JOB="$ROOT_DIR/scripts/push_backups_to_synology.sh"
 GOOGLE_JOB="$ROOT_DIR/scripts/sync_backups_to_google.sh"
 VERIFY_JOB="$ROOT_DIR/scripts/verify_latest_manifest.sh"
 
@@ -25,7 +26,7 @@ tmpfile="$(mktemp)"
 trap 'rm -f "$tmpfile"' EXIT
 
 if crontab -l >/dev/null 2>&1; then
-  crontab -l | grep -vF "$NAS_JOB" | grep -vF "$GOOGLE_JOB" | grep -vF "$VERIFY_JOB" > "$tmpfile"
+  crontab -l | grep -vF "$NAS_JOB" | grep -vF "$OLD_NAS_JOB" | grep -vF "$GOOGLE_JOB" | grep -vF "$VERIFY_JOB" > "$tmpfile"
 fi
 
 printf '%s\n%s\n%s\n' "$nas_line" "$google_line" "$verify_line" >> "$tmpfile"

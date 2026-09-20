@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BACKUP_DIR="${BACKUP_DIR:-/srv/shared/backups}"
-MAX_BACKUPS="${MAX_BACKUPS:-4}"
+MAX_BACKUPS="${MAX_BACKUPS:-14}"
 SCHEDULE="${SCHEDULE:-0 */12 * * *}"
 JOB_SCRIPT="$ROOT_DIR/scripts/run_db_backup_rotation.sh"
 LOG_FILE="$BACKUP_DIR/db_backup_cron.log"
