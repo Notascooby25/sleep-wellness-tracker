@@ -4,7 +4,7 @@
 
 1. Database dumps and mood-image archives are created on the NUC at `/srv/shared/backups`.
 2. `push_srv_to_synology.sh` mirrors the `/srv` tree to the DS223 at `/volume1/Backups/nuc-server` (see [NAS Mirror](#nas-mirror)): the backup artifacts plus the three app folders and `shared/{mood-images,garmin-tokens,logs}`.
-3. The backup artifacts (only) are copied through the `gdrive-crypt` rclone crypt remote to Google Drive. File names and contents stored in Drive are encrypted by the crypt remote. App folders and secrets are never sent to Google.
+3. The backup artifacts (only) are copied through the `gdrive-crypt` rclone crypt remote to Google Drive. File names and contents stored in Drive are encrypted by the crypt remote. App folders and `.env` files are never sent to Google (the Garmin token tarball travels inside the encrypted backup copy).
 
 Google copy uses `rclone copy`, not `rclone sync`, so Google retention is independent of local retention and an accidental local deletion does not delete remote copies.
 
@@ -70,6 +70,7 @@ Create local data, then replicate it and verify both destinations:
 
 - `shared/postgres-data` is **never** copied. It is owned by the container's postgres user (mode 700, unreadable to the cron user), and a file copy of a live database is not a usable backup. Restore the database from the `.dump` files in `shared/backups`.
 - Mirrors delete files on the NAS that were deleted on the NUC, but the old version is moved to `_versions/` first. A mirror whose source is missing or empty is skipped and reported as a failure, and a run that would delete more than `MAX_DELETE` (200) files aborts that target.
+- The NAS folder `nuc-server` is mode 700 (`chmod 700`), so other NAS users can't read the mirrored secrets even where a source file is 644 on the NUC. DSM admins still can.
 - Mirrors include secrets (`.env`, `.env.production`, `secrets.toml`, `garmin_tokens.json`) with their permissions preserved. This is a convenience copy on the NAS only; the scrobbler's `.env.production` must still be kept in your password manager (see its DISASTER_RECOVERY.md).
 - The audio-scrobbler backup pipeline (systemd timer, `gdrive-crypt:AudioScrobblerBackups`) is separate and untouched. Mirroring its folder just gives its dumps a second copy on the NAS under `audio-scrobbler-app/backups/`.
 - Live restore of a mirrored folder: `rsync -a <nas>:/volume1/Backups/nuc-server/<name>/ /srv/<name>/`. To get back a deleted or overwritten file, look in `_versions/`.
