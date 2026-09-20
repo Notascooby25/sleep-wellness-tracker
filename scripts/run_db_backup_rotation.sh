@@ -9,6 +9,19 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MAX_BACKUPS="${MAX_BACKUPS:-4}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/shared/backups}"
 
+# Cron doesn't load .env, so read HEALTHCHECK_URL from it unless the caller already set one.
+# Only this one key is parsed; the file is never sourced.
+if [[ -z "${HEALTHCHECK_URL:-}" && -f "$ROOT_DIR/.env" ]]; then
+    while IFS='=' read -r key value || [[ -n "$key" ]]; do
+        [[ "$key" == "HEALTHCHECK_URL" ]] || continue
+        value="${value%%[[:space:]]#*}"              # strip a trailing " # comment"
+        value="${value%"${value##*[![:space:]]}"}"   # rtrim
+        value="${value#\"}" value="${value%\"}"
+        value="${value#\'}" value="${value%\'}"
+        HEALTHCHECK_URL="$value"
+    done < "$ROOT_DIR/.env"
+fi
+
 "$ROOT_DIR/scripts/db_backup.sh"
 "$ROOT_DIR/scripts/db_cleanup.sh" --backup-dir "$BACKUP_DIR" --max-backups "$MAX_BACKUPS"
 
@@ -42,8 +55,9 @@ echo "[run_db_backup_rotation] Manifest created: $MANIFEST_FILE"
 
 # ── cleanup old garmin tokens and manifests ──
 # Keep only MAX_BACKUPS of garmin_tokens and manifests
-ls -1t "$BACKUP_DIR"/garmin_tokens_*.tar.gz 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -f
-ls -1t "$BACKUP_DIR"/manifest_*.sha256 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -f
+# `|| true`: with pipefail, an unmatched glob (ls exits 2) would otherwise abort the script before the ping.
+ls -1t "$BACKUP_DIR"/garmin_tokens_*.tar.gz 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -f || true
+ls -1t "$BACKUP_DIR"/manifest_*.sha256 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -f || true
 
 # ── send healthchecks.io ping ──
 if [[ -n "${HEALTHCHECK_URL:-}" ]]; then

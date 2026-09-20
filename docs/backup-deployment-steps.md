@@ -38,6 +38,8 @@ We are using a "dead man's switch" approach to alerting. Instead of the script t
    ```
 7. Save and exit (in nano, press `Ctrl+O`, `Enter`, then `Ctrl+X`).
 
+`run_db_backup_rotation.sh` reads `HEALTHCHECK_URL` from this `.env` itself (cron does not load `.env`), so no change to the cron line is needed. A `HEALTHCHECK_URL` set in the environment takes precedence. The ping is sent only after a successful run, which is what makes it a dead man's switch.
+
 ---
 
 ## 3. Update the Cron Job Configuration
