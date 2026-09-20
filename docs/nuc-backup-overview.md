@@ -89,6 +89,9 @@ How it behaves:
 
 - Crontab: one line changed (`push_backups_to_synology.sh` to `push_srv_to_synology.sh`, same schedule). Previous crontab saved as `~/crontab-backup-20260920T181417.txt`.
 - Created `~/.config/nas-sync.env`.
+- DB backup cron line changed from `MAX_BACKUPS=4` to `MAX_BACKUPS=14` (crontab saved as `~/crontab-backup-20260920T183711.txt`). The first Garmin token tarball was created by a manual run of the upgraded rotation script; from now on one is made every 12h with the DB dump.
+- `HEALTHCHECK_URL` (a healthchecks.io check, every 12h with a 1h grace period) was added to `/srv/sleepwell/.env`. `run_db_backup_rotation.sh` reads it from there and pings after each successful run, so a silent failure or a dead cron shows up as a missed ping. Verified with a manual run (ping accepted).
+- `/srv/sleepwell/.env` tightened from mode 644 to 600 (it holds the DB password and the ping URL). It is only read by the docker client and the backup scripts, both running as the NUC user, and it is not mounted into any container, so nothing broke (verified: `docker compose config`, containers still healthy). The NAS copy follows at the next sync.
 - `/srv/sleepwell` was reset onto GitHub `origin/main`: the NUC's old history had been rewritten upstream and the only content difference was a tracked `.history/` folder. Safety branch `backup-pre-reset-20260920` keeps the old history. A NUC-only uncommitted edit in `docker-compose.prod.yml` (`WATCHTOWER_SCOPE=none`) was preserved. `pull.ff only` is set so a future `git pull` fails loudly instead of merging.
 
 **NAS**
@@ -106,7 +109,7 @@ Old `backups/` and `mood-images/` are parked in `nuc-server/_old-layout/`. Nothi
 
 1. **Don't point your backups at another app's directory.** Keep your artifacts inside your own `/srv/<app>` folder (scrobbler: `/srv/audio-scrobbler-app/backups`). The mirror carries them to the NAS under your own folder, correctly filed. Writing into `/srv/shared/backups` files them under sleepwell's Google path and its append-only NAS tree. (Expense tracker already writes its tarballs there; that works and is covered by sleepwell's Google copy.)
 2. **Never rsync or copy a live Postgres data directory.** Back databases up with `pg_dump` and keep the dumps.
-3. **Everything in your `/srv/<app>` folder is mirrored every 6 hours, secrets included.** Don't leave stray copies of secrets lying around (e.g. old `.env.production.bak-*`); they will be mirrored too. Keep large regenerable data out of the app folder, or ask for an exclude.
+3. **Everything in your `/srv/<app>` folder is mirrored every 6 hours, secrets included.** Don't leave stray copies of secrets lying around (e.g. old `.env.production.bak-*`); they will be mirrored too. Keep large regenerable data out of the app folder, or ask for an exclude. Keep secret files mode 600 (like `.env` and `.env.production`) unless a container reads them through a bind mount, where a stricter mode could break the app.
 4. **A new folder under `/srv` is not picked up automatically.** Adding a new app means one line in `push_srv_to_synology.sh`: `sync_dir mirror <folder-name> "${APP_EXCLUDES[@]}"`.
 5. **Don't edit the NAS cron job or its script from another repo.** Make the change in the sleepwell repo and deploy it with `git pull` on the NUC.
 6. **Keep your own recovery secrets off the NUC too.** The NAS copy of `.env.production` is a convenience, not a replacement for a password-manager copy (see the scrobbler DR doc).
@@ -142,8 +145,9 @@ systemctl --user list-timers audio-scrobbler-backup.timer     # scrobbler pipeli
 
 ## 8. Known gaps and follow-ups
 
-- **Pending from the DB-backup upgrade** (`backup-deployment-steps.md`): re-run `setup_db_backup_cron.sh` so the cron line uses `MAX_BACKUPS=14` (it is 4 today), and add `HEALTHCHECK_URL` to sleepwell's `.env` on the NUC (the script now reads it from there; until it is set, no ping is sent).
 - **No NAS-side pruning of `shared/backups`.** It grows roughly 70 MB/day (about 25 GB/year). Fine for the 2.4 TB volume, but it needs a retention rule eventually.
+- **Other secret files are still mode 644 on the NUC:** `UK-Expense-Tracker/.streamlit/secrets.toml` and `shared/garmin-tokens/garmin_tokens.json` (root-owned). Both are read by containers via bind mounts, so they were left alone rather than risk breaking those apps. They are protected on the NAS by its 700 folder.
+- **Every push to sleepwell's `main` runs the image build and watchtower redeploys the app** (a few seconds of restart), even for docs-only commits. Put `[skip ci]` in the commit message of docs/script-only commits. (A `paths-ignore` filter in `.github/workflows/build-amd64.yml` would make this automatic; not done.)
 - **No alerting on the NAS job** unless `NAS_HEALTHCHECK_URL` is set (optional, not configured).
 - **Google jobs are duplicated in the crontab** (raw `rclone copy` lines at 00:20/12:20 plus the script lines). Harmless; not cleaned up. Some cron comment headers are stale.
 - **Cleanup dates:** delete `nuc-server/_old-layout/` after about 2026-10-20; delete `push_backups_to_synology.sh` once the new job has run cleanly for a few cycles.

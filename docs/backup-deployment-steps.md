@@ -37,6 +37,7 @@ We are using a "dead man's switch" approach to alerting. Instead of the script t
    HEALTHCHECK_URL=https://hc-ping.com/your-unique-uuid-here
    ```
 7. Save and exit (in nano, press `Ctrl+O`, `Enter`, then `Ctrl+X`).
+8. Restrict the file, since it holds the database password and this URL: `chmod 600 /srv/sleepwell/.env` (only the docker client and the backup scripts read it, both as your user).
 
 `run_db_backup_rotation.sh` reads `HEALTHCHECK_URL` from this `.env` itself (cron does not load `.env`), so no change to the cron line is needed. A `HEALTHCHECK_URL` set in the environment takes precedence. The ping is sent only after a successful run, which is what makes it a dead man's switch.
 
