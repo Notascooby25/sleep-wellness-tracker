@@ -6,7 +6,7 @@
 2. `push_srv_to_synology.sh` mirrors the `/srv` tree to the DS223 at `/volume1/Backups/nuc-server` (see [NAS Mirror](#nas-mirror)): the backup artifacts plus the three app folders and `shared/{mood-images,garmin-tokens,logs}`.
 3. The backup artifacts (only) are copied through the `gdrive-crypt` rclone crypt remote to Google Drive. File names and contents stored in Drive are encrypted by the crypt remote. App folders and `.env` files are never sent to Google (the Garmin token tarball travels inside the encrypted backup copy).
 
-Google copy uses `rclone copy`, not `rclone sync`, so Google retention is independent of local retention and an accidental local deletion does not delete remote copies.
+Google copy uses `rclone copy`, not `rclone sync`, so Google retention is independent of local retention and an accidental local deletion does not delete remote copies. After each upload `sync_backups_to_google.sh` also checks that the producers are current (see [Google Copy: Freshness and Heartbeat](#google-copy-freshness-and-heartbeat)), and `backup_host_config.sh` adds a daily snapshot of the host's own configuration to what travels off the host (see [Host Config Snapshot](#host-config-snapshot)).
 
 ## One-Time NUC Setup
 
@@ -119,6 +119,47 @@ tail -n 50 /srv/shared/backups/synology_backup_cron.log
 ```
 
 The script exits non-zero and lists the failed targets if anything goes wrong. Each run logs to `synology_backup_cron.log` (the old per-run `synology_sync_*.log` files are pruned after 14 days). Once the new job has run cleanly for a few cycles, `push_backups_to_synology.sh` can be deleted.
+
+## Google Copy: Freshness and Heartbeat
+
+`rclone copy` succeeds when the local job that should have produced a new archive silently died: it just re-uploads yesterday's files. So `scripts/sync_backups_to_google.sh` (cron `35 */6 * * *`) does more than upload. After copying and pruning it checks the age of the newest file of each kind and exits non-zero, pinging `/fail`, if any is stale or missing:
+
+| Producer | Pattern | Limit |
+|---|---|---|
+| Sleepwell DB dump | `sleepdb_*.dump` | 26h |
+| Mood image archive | `mood-images/mood_images_*.tar.gz` | 13h |
+| Expense tracker archive | `expense_tracker_data_*.tar.gz` | 26h |
+| Host config snapshot | `host-config/host_config_*.tar.gz` | 26h |
+
+Only when the upload succeeded **and** all four are current does it ping success, so one healthchecks.io check (every 6h, 1h grace) covers the producers and the upload together.
+
+Settings live in `~/.config/google-sync.env` on the NUC (`chmod 600`, not in git). Anything set in the environment (for example an inline `VAR=` in the cron line) overrides the file:
+
+```bash
+GOOGLE_HEALTHCHECK_URL=https://hc-ping.com/<uuid>
+# optional, hours (0 disables that one check): FRESH_DB_HOURS=26 FRESH_MOOD_HOURS=13 FRESH_EXPENSE_HOURS=26 FRESH_HOSTCONFIG_HOURS=26
+```
+
+A healthy run logs four `OK: newest ... is Nh old` lines. The old `--rmdirs` prune (which logged "directory not empty" on every run) is replaced by `rclone delete --min-age 90d` followed by `rclone rmdirs --leave-root`.
+
+## Host Config Snapshot
+
+`scripts/backup_host_config.sh` (cron `10 4 * * *`, installed by `setup_offsite_backup_cron.sh`) writes `/srv/shared/backups/host-config/host_config_<UTC>.tar.gz` (mode 600, newest 14 kept). The NAS mirror and the Google copy then carry it off the host with the other artifacts. It captures what makes the NUC *work* but lives outside `/srv`: the crontab, the systemd user timers and unit files, `tailscale funnel status`, `docker ps`, the rclone remote **names**, a redacted copy of `nas-sync.env` / `google-sync.env`, the OS release, and each `/srv` checkout's git HEAD, status and local diff (so a NUC-only edit is not lost).
+
+It **never** captures `~/.config/rclone/rclone.conf`, SSH private keys or `~/.docker/config.json`; anything that looks like a URL, token, password or key is redacted from everything it does capture. Those three secrets must live in a password manager. A section that cannot be captured is noted in the archive's `README.txt` and does not stop the rest.
+
+Use it to rebuild a host: extract the newest snapshot and re-create the crontab and timers from `crontab.txt` and `systemd-user/`, the Funnel mapping from `tailscale/funnel-status.txt`, and the container layout from `docker/ps.txt`.
+
+## Script tests
+
+The backup scripts added or changed on 2026-09-21 have hermetic fixture tests (stubbed `rclone`, `curl`, `crontab`; temp dirs only). Run them after any change to those scripts:
+
+```bash
+scripts/tests/test_sync_backups_to_google.sh       # freshness, heartbeat pings, prune flags, env precedence
+scripts/tests/test_host_config_and_cron.sh         # snapshot contents, secret redaction, cron installer
+```
+
+Each prints `passed=N failed=0` and exits non-zero on any failure. A test that has never been seen to fail proves little, so when you add a check, break the script on purpose once and confirm the test catches it.
 
 ## Accepted Missing Image Baseline
 
