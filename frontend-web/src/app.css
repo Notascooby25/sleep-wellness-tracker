@@ -1,3 +1,4 @@
+@import "tokens.css";
 :root {
   font-family: 'DM Sans', 'Segoe UI', Tahoma, sans-serif;
   color: #132238;
@@ -123,3 +124,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* Hardening: Accessibility */
+*:focus-visible {
+  outline: 2px solid #9ec0e7;
+  outline-offset: 2px;
+}
+

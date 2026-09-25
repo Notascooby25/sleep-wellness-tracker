@@ -543,7 +543,7 @@
   );
 
   const heatmapCellColor = (value: number | null, type: 'mood' | 'sleep') => {
-    if (value === null) return '#e2eaf4';
+    if (value === null) return 'var(--color-primary)';
     if (type === 'mood') {
       const v = Math.round(value);
       if (v <= 1) return '#22c55e';
@@ -705,14 +705,14 @@
         <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:{c}"></span>{l}</span>
       {/each}
     {/if}
-    <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:#e2eaf4"></span>No data</span>
+    <span class="heatmap-leg-item"><span class="heatmap-leg-swatch" style="background:var(--color-primary)"></span>No data</span>
   </div>
 </section>
 
 
 <section class="card">
   <h3>Correlations & Insights</h3>
-  <p style="color: #5f6f84; font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
+  <p style="color: var(--color-neutral-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
   
   <div class="insights-grid">
       <!-- Influence on Mood -->
@@ -780,7 +780,7 @@
             <div class="mood-bar-row" style={`--mood-color: ${moodColors[item.score]}`}>
               <span class="mood-label">{moodLabels[item.score]}</span>
               <div class="mood-bar-bg">
-                <div class="mood-bar-fill" style={`width: ${item.percentage}%`}></div>
+                <div class="mood-bar-fill" style={`transform: scaleX(${item.percentage / 100}); width: 100%;`}></div>
               </div>
               <span class="mood-count">{item.count}</span>
             </div>
@@ -812,7 +812,7 @@
             <div class="activity-row">
               <span class="activity-name" title="{item.name}">{item.name}</span>
               <div class="percentage-bar">
-                <div class="percentage-fill" style={`width: ${item.percentage}%`}></div>
+                <div class="percentage-fill" style={`transform: scaleX(${item.percentage / 100}); width: 100%;`}></div>
                 <span class="percentage-text">{item.percentage.toFixed(0)}%</span>
               </div>
             </div>
@@ -847,22 +847,22 @@
   .btn-row { display:flex; align-items:end; }
   .status { margin-top: 0.5rem; color: #22543d; }
   .summary-grid { display:grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.7rem; }
-  .stat-card { background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; padding: 0.75rem; }
-  .sl { color:#5f6f84; font-size:0.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
-  .sv { color:#132238; font-size:1.45rem; font-weight:800; margin-top:0.1rem; }
-  .chart { width: 100%; height: 220px; background: #f9fcff; border: 1px solid #d9e2ef; border-radius: 10px; }
+  .stat-card { background: var(--color-neutral-bg); border: 1px solid var(--color-neutral-border); border-radius: 12px; padding: 0.75rem; }
+  .sl { color:var(--color-neutral-text-muted); font-size:0.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
+  .sv { color:var(--color-neutral-text); font-size:1.45rem; font-weight:800; margin-top:0.1rem; }
+  .chart { width: 100%; height: 220px; background: var(--color-neutral-bg); border: 1px solid var(--color-neutral-border); border-radius: 10px; }
   .line { fill: none; stroke-width: 2.5; }
   .line.main { stroke: #1f78d1; }
   .line.sleep { stroke: #74b9ff; }
   .line.mood { stroke: #ef4444; }
-  .chart-meta { display:flex; justify-content:space-between; gap:0.6rem; color:#5f6f84; font-size:0.82rem; margin-top:0.4rem; }
+  .chart-meta { display:flex; justify-content:space-between; gap:0.6rem; color:var(--color-neutral-text-muted); font-size:0.82rem; margin-top:0.4rem; }
   .bar-row { display:grid; grid-template-columns: 28px 1fr 36px; align-items:center; gap:0.5rem; margin:0.35rem 0; }
-  .bar-bg { height: 12px; background: #e8f0f9; border-radius: 999px; overflow: hidden; }
-  .bar-fill { height: 100%; background: #3c79c5; }
-  .bar-label, .bar-val { font-size: 0.82rem; color: #496685; }
-  .legend-box { margin-top: 0.7rem; border: 1px solid #d7e6f7; border-radius: 10px; background: #f7fbff; padding: 0.55rem 0.7rem; }
-  .legend-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #496685; margin-bottom: 0.3rem; }
-  .legend-grid { display: grid; gap: 0.2rem; color: #2a3f58; font-size: 0.82rem; }
+  .bar-bg { height: 12px; background: var(--color-primary); border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--color-primary-content); }
+  .bar-label, .bar-val { font-size: 0.82rem; color: var(--color-neutral-text-muted); }
+  .legend-box { margin-top: 0.7rem; border: 1px solid var(--color-neutral-border); border-radius: 10px; background: var(--color-bg-start); padding: 0.55rem 0.7rem; }
+  .legend-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-neutral-text-muted); margin-bottom: 0.3rem; }
+  .legend-grid { display: grid; gap: 0.2rem; color: var(--color-neutral-text); font-size: 0.82rem; }
   .week-kpis { display: grid; gap: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sleep-debt-badge {
     display: flex;
@@ -876,75 +876,76 @@
   }
   .sleep-debt-badge.debt { color: #b42318; background: #fee4e2; border-color: #fecdca; }
   .sleep-debt-badge.surplus { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
-  .week-summary { margin: 0.75rem 0 0; color: #2a3f58; font-size: 0.9rem; }
+  .week-summary { margin: 0.75rem 0 0; color: var(--color-neutral-text); font-size: 0.9rem; }
   /* 12-week heatmap */
   .heatmap-wrap { display: flex; gap: 5px; align-items: flex-start; overflow-x: auto; padding-bottom: 2px; }
-  .heatmap-days { display: grid; grid-template-rows: repeat(7, 14px); gap: 3px; }
-  .heatmap-days span { font-size: 0.65rem; color: #8091a7; line-height: 14px; width: 10px; text-align: right; }
-  .heatmap-grid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; gap: 3px; }
-  .heatmap-cell { width: 14px; height: 14px; border-radius: 2px; background: #e2eaf4; cursor: default; transition: opacity 0.1s; }
+  .heatmap-days { display: grid; grid-template-rows: repeat(7, 24px); gap: 3px; }
+  .heatmap-days span { font-size: 0.65rem; color: #8091a7; line-height: 24px; width: 10px; text-align: right; }
+  .heatmap-grid { display: grid; grid-template-rows: repeat(7, 24px); grid-auto-flow: column; gap: 3px; }
+  .heatmap-cell { width: 24px; height: 24px; border-radius: 2px; background: var(--color-primary); cursor: default; transition: opacity 0.1s; }
   .heatmap-cell:hover { opacity: 0.75; }
   .heatmap-pad { background: transparent !important; pointer-events: none; }
-  .heatmap-toggle { display: flex; border: 1px solid #d9e2ef; border-radius: 8px; overflow: hidden; }
-  .heatmap-toggle button { border: none; background: #f5faff; padding: 0.3rem 0.7rem; font-size: 0.82rem; cursor: pointer; color: #496685; }
-  .heatmap-toggle button.active { background: #3c79c5; color: #fff; font-weight: 600; }
+  .heatmap-toggle { display: flex; border: 1px solid var(--color-neutral-border); border-radius: 8px; overflow: hidden; }
+  .heatmap-toggle button { border: none; background: var(--color-bg-start); padding: 0.3rem 0.7rem; font-size: 0.82rem; cursor: pointer; color: var(--color-neutral-text-muted); }
+  .heatmap-toggle button.active { background: var(--color-primary-content); color: var(--color-neutral-bg); font-weight: 600; }
   .heatmap-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.65rem; }
-  .heatmap-leg-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: #496685; }
+  .heatmap-leg-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--color-neutral-text-muted); }
   .heatmap-leg-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 
   /* Correlations & Insights Styles */
   .insights-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
-  .insight-card { background: #f9fcff; border: 1px solid #d9e2ef; border-radius: 12px; padding: 1rem; }
-  .insight-card h4 { margin: 0 0 0.3rem 0; color: #132238; font-size: 1rem; font-weight: 700; }
-  .insight-desc { margin: 0 0 0.8rem 0; color: #5f6f84; font-size: 0.85rem; }
+  .insight-card { background: var(--color-neutral-bg); border: 1px solid var(--color-neutral-border); border-radius: 12px; padding: 1rem; }
+  .insight-card h4 { margin: 0 0 0.3rem 0; color: var(--color-neutral-text); font-size: 1rem; font-weight: 700; }
+  .insight-desc { margin: 0 0 0.8rem 0; color: var(--color-neutral-text-muted); font-size: 0.85rem; }
   
   /* Influence on Mood */
   .influence-list { display: flex; flex-direction: column; gap: 0.6rem; }
   .influence-row { display: flex; gap: 0.5rem; align-items: center; }
   .influence-bar-wrapper { display: flex; align-items: center; flex: 1; gap: 0.5rem; }
-  .influence-label { font-size: 0.82rem; color: #496685; flex: 0 0 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .influence-bar { flex: 1; height: 24px; background: #e8f0f9; border-radius: 6px; display: flex; align-items: center; justify-content: center; border-left: 3px solid var(--color); }
-  .influence-val { font-size: 0.75rem; font-weight: 600; color: #132238; }
+  .influence-label { font-size: 0.82rem; color: var(--color-neutral-text-muted); flex: 0 0 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .influence-bar { flex: 1; height: 24px; background: var(--color-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center;  }
+  .influence-val { font-size: 0.75rem; font-weight: 600; color: var(--color-neutral-text); }
   .influence-na { padding: 0 0.5rem; font-size: 0.75rem; color: #999; }
   .influence-count { font-size: 0.82rem; color: #999; flex: 0 0 40px; text-align: right; }
 
   /* Frequency Comparison */
   .frequency-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .frequency-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #fff; border-radius: 8px; border: 1px solid #e0e7ff; }
-  .freq-label { font-size: 0.82rem; color: #496685; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frequency-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--color-neutral-bg); border-radius: 8px; border: 1px solid #e0e7ff; }
+  .freq-label { font-size: 0.82rem; color: var(--color-neutral-text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .freq-values { display: flex; gap: 0.5rem; align-items: center; }
-  .freq-num { font-size: 0.82rem; font-weight: 600; color: #132238; flex: 0 0 30px; text-align: center; }
+  .freq-num { font-size: 0.82rem; font-weight: 600; color: var(--color-neutral-text); flex: 0 0 30px; text-align: center; }
   .freq-arrow { font-size: 1rem; flex: 0 0 20px; text-align: center; }
 
   /* Mood Count by Category */
   .mood-count-bars { display: flex; flex-direction: column; gap: 0.5rem; }
   .mood-bar-row { display: grid; grid-template-columns: 60px 1fr 40px; align-items: center; gap: 0.5rem; }
-  .mood-label { font-size: 0.82rem; color: #496685; }
-  .mood-bar-bg { height: 20px; background: #e8f0f9; border-radius: 6px; overflow: hidden; }
-  .mood-bar-fill { height: 100%; background: var(--mood-color); transition: width 0.3s ease; }
-  .mood-count { font-size: 0.82rem; font-weight: 600; color: #132238; }
+  .mood-label { font-size: 0.82rem; color: var(--color-neutral-text-muted); }
+  .mood-bar-bg { height: 20px; background: var(--color-primary); border-radius: 6px; overflow: hidden; }
+  .mood-bar-fill { height: 100%; background: var(--mood-color); transition: transform 0.3s ease; transform-origin: left; }
+  .mood-count { font-size: 0.82rem; font-weight: 600; color: var(--color-neutral-text); }
 
   /* Mood Buttons */
   .mood-buttons { display: flex; gap: 0.5rem; }
-  .mood-btn { padding: 0.5rem 0.75rem; border: 2px solid #d9e2ef; border-radius: 8px; background: #fff; color: #132238; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 0.9rem; }
+  .mood-btn { padding: 0.5rem 0.75rem; border: 2px solid var(--color-neutral-border); border-radius: 8px; background: var(--color-neutral-bg); color: var(--color-neutral-text); font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+  @media (prefers-reduced-motion: reduce) { transition: none; } font-size: 0.9rem; }
   .mood-btn:hover { border-color: var(--mood-color); }
-  .mood-btn.active { border-color: var(--mood-color); background: var(--mood-color); color: #fff; }
+  .mood-btn.active { border-color: var(--mood-color); background: var(--mood-color); color: var(--color-neutral-bg); }
 
   /* Related Activities */
   .related-activities { display: flex; flex-direction: column; gap: 0.5rem; }
   .activity-row { display: flex; gap: 0.5rem; align-items: center; }
-  .activity-name { font-size: 0.82rem; color: #496685; flex: 0 0 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .percentage-bar { flex: 1; height: 22px; background: #e8f0f9; border-radius: 6px; position: relative; overflow: hidden; }
-  .percentage-fill { height: 100%; background: linear-gradient(90deg, #3c79c5, #74b9ff); }
-  .percentage-text { position: absolute; top: 50%; left: 0.5rem; transform: translateY(-50%); font-size: 0.75rem; font-weight: 600; color: #132238; }
+  .activity-name { font-size: 0.82rem; color: var(--color-neutral-text-muted); flex: 0 0 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .percentage-bar { flex: 1; height: 22px; background: var(--color-primary); border-radius: 6px; position: relative; overflow: hidden; }
+  .percentage-fill { height: 100%; transition: transform 0.3s ease; transform-origin: left; background: linear-gradient(90deg, var(--color-primary-content), #74b9ff); }
+  .percentage-text { position: absolute; top: 50%; left: 0.5rem; transform: translateY(-50%); font-size: 0.75rem; font-weight: 600; color: var(--color-neutral-text); }
 
   /* Activity-Consequence Links */
   .consequence-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.8rem; margin-top: 0.8rem; }
-  .consequence-block { display: flex; flex-direction: column; align-items: center; padding: 0.8rem; background: #fff; border: 1px solid #d9e2ef; border-radius: 10px; }
-  .consequence-label { font-size: 0.75rem; color: #496685; text-align: center; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+  .consequence-block { display: flex; flex-direction: column; align-items: center; padding: 0.8rem; background: var(--color-neutral-bg); border: 1px solid var(--color-neutral-border); border-radius: 10px; }
+  .consequence-label { font-size: 0.75rem; color: var(--color-neutral-text-muted); text-align: center; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
   .consequence-arrow { font-size: 1.5rem; margin: 0.3rem 0; }
-  .consequence-outcome { padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #132238; text-align: center; margin: 0.3rem 0; }
-  .consequence-strength { font-size: 0.8rem; color: #5f6f84; font-weight: 600; }
+  .consequence-outcome { padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--color-neutral-text); text-align: center; margin: 0.3rem 0; }
+  .consequence-strength { font-size: 0.8rem; color: var(--color-neutral-text-muted); font-weight: 600; }
 
   @media (max-width: 900px) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

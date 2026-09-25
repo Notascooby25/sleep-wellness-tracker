@@ -371,7 +371,7 @@
   .preview-msg { margin: 0.7rem 0 0; font-size: 0.85rem; color: #486888; }
   .preview-warn { color: #b42318; font-weight: 600; }
   .progress-bar { margin-top: 0.5rem; height: 8px; border-radius: 999px; background: #e5eef8; overflow: hidden; }
-  .progress-fill { height: 100%; background: #0d6efd; transition: width 150ms ease; }
+  .progress-fill { height: 100%; background: #0d6efd; transition: transform 150ms ease; transform-origin: left; }
   .block-gap { margin-top: 0.9rem; }
   .hint-inline { font-size: 0.82rem; color: #496685; font-weight: 400; }
   .notes-toggle { display: flex; }

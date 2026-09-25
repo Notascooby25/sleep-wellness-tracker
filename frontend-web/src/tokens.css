@@ -1,0 +1,11 @@
+:root {
+  --color-primary: #dceeff;
+  --color-primary-content: #173a5c;
+  --color-primary-border: #9ec0e7;
+  --color-neutral-text: #132238;
+  --color-neutral-text-muted: #496685;
+  --color-neutral-bg: #ffffff;
+  --color-neutral-border: #d9e2ef;
+  --color-bg-start: #f9fbff;
+  --color-bg-end: #f2f6fc;
+}

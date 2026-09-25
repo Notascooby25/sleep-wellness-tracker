@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-25T17:25:00Z",
+  "title": "Design System: Sleep & Wellness Tracker",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Soft Morning Blue", "canonical": "#dceeff", "tonalRamp": ["#f7fbff", "#ecf5ff", "#dceeff", "#baddff", "#92caff", "#69b4ff", "#399bff", "#0d7df2"] },
+      "primary-content": { "role": "primary", "displayName": "Morning Blue Content", "canonical": "#173a5c", "tonalRamp": ["#6e8ca8", "#597996", "#456685", "#335473", "#234463", "#173a5c", "#0d2b4a", "#051c38"] },
+      "neutral-text": { "role": "neutral", "displayName": "Deep Night Slate", "canonical": "#132238", "tonalRamp": ["#60728c", "#4c5e7a", "#3b4c69", "#2b3c59", "#1e2f4a", "#132238", "#0a172b", "#030c1f"] },
+      "neutral-text-muted": { "role": "neutral", "displayName": "Muted Slate", "canonical": "#496685", "tonalRamp": ["#a1b6cc", "#8ba3bc", "#7590ac", "#617d9b", "#4e6a8a", "#496685", "#2e4a69", "#1f3754"] }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "General paragraph text and readable content." },
+      "label": { "displayName": "Label", "purpose": "Small text for field labels, table headers, and metadata." }
+    },
+    "breakpoints": [
+      { "name": "md", "value": "860px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Tactile primary action button.",
+      "html": "<button class=\"ds-btn-primary\">LOG MOOD</button>",
+      "css": ".ds-btn-primary { background: #dceeff; color: #173a5c; border: 1px solid #9ec0e7; border-radius: 10px; padding: 0.48rem 0.72rem; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; transition: opacity 0.2s; } .ds-btn-primary:hover { opacity: 0.85; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Data Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Clean container for charts and sleep metrics.",
+      "html": "<div class=\"ds-card\"><h3>Sleep Score</h3><p>85 / 100</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid #d9e2ef; border-radius: 12px; padding: 12px; font-family: 'DM Sans', sans-serif; color: #132238; } .ds-card h3 { margin: 0 0 8px 0; font-size: 0.86rem; color: #496685; } .ds-card p { margin: 0; font-size: 1.5rem; font-weight: bold; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text and select field.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\">Notes</label><input class=\"ds-input\" type=\"text\" placeholder=\"How did you sleep?\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; font-family: 'DM Sans', sans-serif; } .ds-label { font-size: 0.86rem; color: #496685; margin-bottom: 0.25rem; } .ds-input { width: 100%; border: 1px solid #c7d9ef; border-radius: 10px; padding: 0.45rem 0.55rem; background: #ffffff; font-size: 1rem; color: #132238; outline: none; } .ds-input:focus { border-color: #9ec0e7; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Small pill for statuses and categories.",
+      "html": "<span class=\"ds-badge\">Restful</span>",
+      "css": ".ds-badge { display: inline-block; border-radius: 999px; border: 1px solid #c3d8f1; background: #ecf5ff; color: #1d4b76; padding: 0.12rem 0.58rem; font-size: 0.78rem; font-family: 'DM Sans', sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Sanctuary",
+    "overview": "This application serves as a soft, calming, and reflective space for ending the day and reviewing wellness. The aesthetic is explicitly calm, airy, and inviting, leaning on soft gradients and gentle contrast rather than sharp divides. It is an introspective tool designed to make reviewing health metrics a peaceful ritual rather than a stressful data-entry chore.",
+    "keyCharacteristics": [
+      "Gentle, low-contrast UI with airy spacing.",
+      "Pale blues and muted slates dominating the palette.",
+      "Friendly, tactile components with rounded corners.",
+      "Flat default surfaces with no heavy shadows."
+    ],
+    "rules": [
+      {
+        "name": "The Low-Contrast Calm Rule",
+        "body": "Never use pure black (#000000) or pure white (#ffffff) for page backgrounds. Rely on the soft #f9fbff to #f2f6fc gradient to maintain the sanctuary feel.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Sanctuary Rule",
+        "body": "Surfaces are flat at rest. Rely entirely on the soft borders (#d9e2ef) and the off-white background gradients to separate cards from the page. Any legacy drop shadows on hero elements should be phased out in favor of this clean, modern approach.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do wrap primary interactive elements in the standard 10px border radius to maintain tactile friendliness.",
+      "Do ensure all text uses the Deep Night Slate (#132238) or Muted Slate (#496685) rather than harsh blacks."
+    ],
+    "donts": [
+      "Don't add drop shadows to cards or modals. Rely on the Flat Sanctuary Rule.",
+      "Don't use sharp, 0px border radii anywhere in the UI."
+    ]
+  }
+}
