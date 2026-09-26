@@ -35,6 +35,20 @@ _METRIC_CONFIG = {
         "higher_is_better": False,
         "label": "overnight stress",
     },
+    "resting_heart_rate": {
+        "model": models.GarminRestingHeartRateDaily,
+        "date_field": models.GarminRestingHeartRateDaily.heart_rate_date,
+        "value_field": models.GarminRestingHeartRateDaily.resting_heart_rate,
+        "higher_is_better": False,
+        "label": "resting heart rate",
+    },
+    "steps": {
+        "model": models.GarminStepsDaily,
+        "date_field": models.GarminStepsDaily.steps_date,
+        "value_field": models.GarminStepsDaily.total_steps,
+        "higher_is_better": True,
+        "label": "steps",
+    },
 }
 
 
@@ -67,7 +81,7 @@ def _is_sleep_category(name: str | None) -> bool:
 
 @router.get("")
 def get_lifestyle_impact(
-    metric: str = Query(..., pattern="^(sleep_score|overnight_hrv|overnight_stress)$"),
+    metric: str = Query(..., pattern="^(sleep_score|overnight_hrv|overnight_stress|resting_heart_rate|steps)$"),
     days: int = Query(28, ge=7, le=84),
     db: Session = Depends(get_db),
 ):
@@ -109,7 +123,7 @@ def get_lifestyle_impact(
     mood_to_dt = dt.datetime(end_date.year, end_date.month, end_date.day, tzinfo=dt.timezone.utc) + dt.timedelta(days=1)
     mood_rows = (
         db.query(models.Mood)
-        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
+        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category), selectinload(models.Mood.activity_details))
         .filter(models.Mood.timestamp >= mood_from_dt)
         .filter(models.Mood.timestamp < mood_to_dt)
         .all()
@@ -118,11 +132,18 @@ def get_lifestyle_impact(
     activity_dates: dict[str, set[dt.date]] = defaultdict(set)
     for mood in mood_rows:
         mood_date = mood.timestamp.date()
+        detail_map = {d.activity_id: d for d in mood.activity_details}
         for activity in mood.activities:
             if not _is_sleep_category(activity.category.name if activity.category else None):
                 continue
             name = (activity.name or "").strip()
             if name:
+                det = detail_map.get(activity.id)
+                if det:
+                    if det.quantity_numeric is not None:
+                        name = f"{name} (Qty: {det.quantity_numeric:g})"
+                    elif det.severity is not None:
+                        name = f"{name} (Sev: {det.severity})"
                 activity_dates[name].add(mood_date)
 
     positive: list[dict] = []

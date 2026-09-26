@@ -10,7 +10,7 @@
   };
 
   type ImpactResponse = {
-    metric: 'sleep_score' | 'overnight_hrv' | 'overnight_stress';
+    metric: 'sleep_score' | 'overnight_hrv' | 'overnight_stress' | 'resting_heart_rate' | 'steps';
     period_label: string;
     avg_value: number | null;
     positive_impact: ImpactItem[];
@@ -29,7 +29,9 @@
   const metricOptions = [
     { value: 'overnight_stress', label: 'Overnight Stress' },
     { value: 'overnight_hrv', label: 'Overnight HRV' },
-    { value: 'sleep_score', label: 'Sleep Score' }
+    { value: 'sleep_score', label: 'Sleep Score' },
+    { value: 'resting_heart_rate', label: 'Resting Heart Rate' },
+    { value: 'steps', label: 'Steps' }
   ] as const;
 
   let selectedDays = 28;

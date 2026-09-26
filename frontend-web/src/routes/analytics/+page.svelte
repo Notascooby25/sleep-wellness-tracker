@@ -22,6 +22,9 @@
   let sleepRows: Array<Record<string, unknown>> = [];
   let bodyRows: Array<Record<string, unknown>> = [];
   let hrvRows: Array<Record<string, unknown>> = [];
+  let rhrRows: Array<Record<string, unknown>> = [];
+  let stressRows: Array<Record<string, unknown>> = [];
+  let stepsRows: Array<Record<string, unknown>> = [];
   let status = '';
 
   let selectedActivity = '';
@@ -77,11 +80,14 @@
   const load = async () => {
     status = '';
     try {
-      const [moodData, sleepWrap, bodyWrap, hrvWrap, acts, cats] = await Promise.all([
+      const [moodData, sleepWrap, bodyWrap, hrvWrap, rhrWrap, stressWrap, stepsWrap, acts, cats] = await Promise.all([
         getJson<MoodEntry[]>(`/mood/?from_date=${fromDate}&to_date=${toDate}`),
         getJson<GarminRows>(`/garmin/sleep/range?start_date=${fromDate}&end_date=${toDate}`),
         getJson<GarminRows>(`/garmin/body-battery/range?start_date=${fromDate}&end_date=${toDate}`),
         getJson<GarminRows>(`/garmin/hrv/range?start_date=${fromDate}&end_date=${toDate}`),
+        getJson<GarminRows>(`/garmin/resting-heart-rate/range?start_date=${fromDate}&end_date=${toDate}`),
+        getJson<GarminRows>(`/garmin/stress/range?start_date=${fromDate}&end_date=${toDate}`),
+        getJson<GarminRows>(`/garmin/steps/range?start_date=${fromDate}&end_date=${toDate}`),
         getJson<Activity[]>('/activities/?include_archived=true'),
         getJson<Category[]>('/categories/'),
       ]);
@@ -89,6 +95,9 @@
       sleepRows = sleepWrap?.data || [];
       bodyRows = bodyWrap?.data || [];
       hrvRows = hrvWrap?.data || [];
+      rhrRows = rhrWrap?.data || [];
+      stressRows = stressWrap?.data || [];
+      stepsRows = stepsWrap?.data || [];
       activities = acts;
       categories = cats;
       if (!selectedActivity) {
@@ -104,6 +113,9 @@
   $: sleepByDateMap = new Map(sleepRows.map((r) => [String(r.date), r]));
   $: bodyByDateMap = new Map(bodyRows.map((r) => [String(r.date), r]));
   $: hrvByDateMap = new Map(hrvRows.map((r) => [String(r.date), r]));
+  $: rhrByDateMap = new Map(rhrRows.map((r) => [String(r.date), r]));
+  $: stressByDateMap = new Map(stressRows.map((r) => [String(r.date), r]));
+  $: stepsByDateMap = new Map(stepsRows.map((r) => [String(r.date), r]));
 
   $: rated = entries.filter((e) => e.mood_score !== null).map((e) => Number(e.mood_score));
   $: sleepScores = sleepRows.map((r) => Number(r.sleep_score)).filter((n) => Number.isFinite(n));
@@ -349,6 +361,36 @@
 
   // ── Correlations & Insights Computed Properties ───────────────────────────
 
+  // -- Subjective vs Objective Sleep --
+  $: sleepGapList = entries
+    .filter(e => e.subjective_sleep_rating !== null)
+    .map(e => {
+      const gDate = String(e.timestamp).split('T')[0];
+      const objSleepRow = sleepByDateMap.get(gDate);
+      if (!objSleepRow || typeof objSleepRow.sleep_score !== 'number') return null;
+      // Map 1(Great)->100, 5(Crisis)->0
+      const subjScore = ((5 - e.subjective_sleep_rating!) / 4) * 100;
+      return {
+        date: gDate,
+        subj: subjScore,
+        obj: objSleepRow.sleep_score,
+        diff: subjScore - objSleepRow.sleep_score
+      };
+    }).filter((x): x is {date:string, subj:number, obj:number, diff:number} => x !== null);
+
+  $: avgSleepGap = avg(sleepGapList.map(x => Math.abs(x.diff)));
+  $: sleepGapDirection = avg(sleepGapList.map(x => x.diff)); // positive = subjective higher than objective
+
+  // -- Garmin Metrics vs Mood --
+  $: daysWithHighSteps = stepsRows.filter(r => Number(r.total_steps) >= 10000).map(r => String(r.date));
+  $: daysWithLowStress = stressRows.filter(r => Number(r.overall_stress_level) < 25).map(r => String(r.date));
+  $: daysWithHighStepsMood = avgOfNullable(entries.filter(e => daysWithHighSteps.includes(String(e.timestamp).split('T')[0])).map(e => e.mood_score));
+  $: daysWithLowStressMood = avgOfNullable(entries.filter(e => daysWithLowStress.includes(String(e.timestamp).split('T')[0])).map(e => e.mood_score));
+
+  // -- Dosage Impact (Coffee example) --
+  // We look for activities named "Coffee" or similar and group by quantity.
+
+
   $: moodCountByCategory = (() => {
     if (!selectedCategory) return [];
     const catActivities = new Set(
@@ -444,26 +486,60 @@
   $: influenceMoodScores = (() => {
     const actMap = new Map<string, { with: number[]; without: number[] }>();
     
+    // Pass 1: Build the 'with' keys
     for (const e of entries) {
       if (e.mood_score === null || e.mood_score === undefined) continue;
       const score = Number(e.mood_score);
+      const eActivityIds = e.activity_ids || [];
+      const eDetailsMap = new Map((e.activity_details || []).map(d => [d.activity_id, d]));
+      
       for (const aid of activities) {
-        const name = aid.name;
-        if (!actMap.has(name)) actMap.set(name, { with: [], without: [] });
-        
-        if ((e.activity_ids || []).includes(aid.id)) {
+        if (eActivityIds.includes(aid.id)) {
+          const det = eDetailsMap.get(aid.id);
+          let name = aid.name;
+          if (det?.quantity_numeric != null) {
+            name = `${aid.name} (Qty: ${det.quantity_numeric})`;
+          } else if (det?.severity != null) {
+            name = `${aid.name} (Sev: ${det.severity})`;
+          }
+          if (!actMap.has(name)) actMap.set(name, { with: [], without: [] });
           actMap.get(name)!.with.push(score);
+        } else {
+          // ensure base activity exists in actMap even if never logged (original behavior)
+          if (!actMap.has(aid.name)) actMap.set(aid.name, { with: [], without: [] });
         }
       }
     }
     
+    // Pass 2: Populate 'without' for all discovered variants
     for (const e of entries) {
       if (e.mood_score === null || e.mood_score === undefined) continue;
       const score = Number(e.mood_score);
-      for (const aid of activities) {
-        const name = aid.name;
-        if (!(e.activity_ids || []).includes(aid.id)) {
-          actMap.get(name)!.without.push(score);
+      const eActivityIds = e.activity_ids || [];
+      const eDetailsMap = new Map((e.activity_details || []).map(d => [d.activity_id, d]));
+      
+      for (const key of actMap.keys()) {
+        // Did the user log THIS exact variant today?
+        // A simple way to check is to re-compute today's variant names
+        let didLogThisExactVariant = false;
+        for (const aid of activities) {
+          if (eActivityIds.includes(aid.id)) {
+            const det = eDetailsMap.get(aid.id);
+            let name = aid.name;
+            if (det?.quantity_numeric != null) {
+              name = `${aid.name} (Qty: ${det.quantity_numeric})`;
+            } else if (det?.severity != null) {
+              name = `${aid.name} (Sev: ${det.severity})`;
+            }
+            if (name === key) {
+              didLogThisExactVariant = true;
+              break;
+            }
+          }
+        }
+        
+        if (!didLogThisExactVariant) {
+          actMap.get(key)!.without.push(score);
         }
       }
     }
@@ -715,6 +791,51 @@
   <p style="color: var(--color-neutral-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Explore how activities, moods, and health metrics influence each other.</p>
   
   <div class="insights-grid">
+
+      <!-- Subjective vs Objective Sleep -->
+      <article class="insight-card">
+        <h4>Subjective vs Garmin Sleep</h4>
+        <p class="insight-desc">Do you feel as rested as Garmin says?</p>
+        <div style="margin-top: 1rem;">
+          {#if sleepGapList.length > 0}
+            <p><strong>Average Gap:</strong> {avgSleepGap?.toFixed(1)} points</p>
+            <p style="font-size: 0.9rem; color: var(--color-neutral-text-muted);">
+              {sleepGapDirection! > 0 ? "You typically feel MORE rested than Garmin thinks." : "You typically feel LESS rested than Garmin thinks."}
+            </p>
+            <div style="display: flex; gap: 4px; margin-top: 0.5rem; height: 40px; align-items: flex-end;">
+              {#each sleepGapList.slice(-20) as day}
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px;">
+                  <div style="background: #10b981; height: {day.subj}%; border-radius: 2px;" title="Subj: {day.subj.toFixed(0)}"></div>
+                  <div style="background: #3b82f6; height: {day.obj}%; border-radius: 2px;" title="Garmin: {day.obj}"></div>
+                </div>
+              {/each}
+            </div>
+            <p style="font-size: 0.7rem; color: #999; margin-top: 4px; text-align: center;">Last {Math.min(20, sleepGapList.length)} logged days (Green=Subjective, Blue=Garmin)</p>
+          {:else}
+            <p style="color: #999;">Not enough subjective sleep ratings to compare.</p>
+          {/if}
+        </div>
+      </article>
+
+      <!-- Garmin vs Mood -->
+      <article class="insight-card">
+        <h4>Garmin vs Subjective Mood</h4>
+        <p class="insight-desc">How objective health impacts mood (lower mood score is better)</p>
+        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.8rem;">
+          <div>
+            <strong>Days >10k Steps:</strong> 
+            <span>{daysWithHighStepsMood ? daysWithHighStepsMood.toFixed(2) : 'N/A'} avg mood</span>
+          </div>
+          <div>
+            <strong>Days &lt;25 Stress:</strong> 
+            <span>{daysWithLowStressMood ? daysWithLowStressMood.toFixed(2) : 'N/A'} avg mood</span>
+          </div>
+          <div style="font-size: 0.8rem; color: #999; margin-top: 0.5rem;">
+            Baseline avg mood: {avgMood ? avgMood.toFixed(2) : 'N/A'}
+          </div>
+        </div>
+      </article>
+
       <!-- Influence on Mood -->
       <article class="insight-card">
         <h4>Influence on Mood</h4>
