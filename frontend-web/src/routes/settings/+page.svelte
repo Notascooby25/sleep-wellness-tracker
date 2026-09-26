@@ -5,6 +5,7 @@
     subscribeThisDevice,
     listSubscriptions,
     removeSubscription,
+    testSubscription,
     listReminders,
     createReminder,
     updateReminder,
@@ -100,6 +101,15 @@
       subscriptionError = `Could not remove device: ${error}`;
     }
   };
+
+  const testDevice = async (id: number) => {
+    subscriptionError = '';
+    try {
+      await testSubscription(id);
+    } catch (error) {
+      subscriptionError = `Could not send test push: ${error}`;
+    }
+  };
 </script>
 
 <section class="hero">
@@ -113,10 +123,13 @@
 
   <h4 style="margin:0 0 0.4rem;font-size:0.92rem;">Notification devices</h4>
   {#if !pushIsSupported}
-    <p class="notif-warn">Your browser does not support push notifications.</p>
+    <p class="notif-warn">Your browser does not support push notifications. Note: Android requires accessing the app via HTTPS (or localhost) for push to work.</p>
   {:else}
     <div class="reminder-row">
       <button on:click={enableThisDevice} disabled={subscribeBusy}>{subscribeBusy ? 'Enabling…' : 'Enable notifications on this device'}</button>
+    </div>
+    <div style="margin: 0.6rem 0 0.6rem 0; font-size: 0.84rem; color: #163c61; background: #eef5fc; border-radius: 8px; padding: 0.5rem 0.6rem;">
+      <strong>Android users:</strong> If you use Brave, you must disable Brave Shields for this site. Also, ensure your browser's Battery Optimization is set to "Unrestricted" in Android settings.
     </div>
     {#if notifPermission === 'denied'}
       <p class="notif-warn">Notifications are blocked — allow them in your browser's site settings.</p>
@@ -128,6 +141,7 @@
       {#each subscriptions as sub}
         <li>
           <span>{sub.device_label || 'Unnamed device'}</span>
+          <button class="btn-clear" on:click={() => testDevice(sub.id)}>Test</button>
           <button class="btn-clear" on:click={() => removeDevice(sub.id)}>Remove</button>
         </li>
       {/each}

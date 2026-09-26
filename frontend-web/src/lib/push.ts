@@ -55,6 +55,7 @@ export async function subscribeThisDevice(): Promise<void> {
   if (permission !== 'granted') throw new Error('Notification permission was not granted.');
 
   const registration = (await registerServiceWorker()) || (await navigator.serviceWorker.ready);
+  await registration.update();
   const { public_key } = await getJson<{ public_key: string }>('/push/public-key');
 
   const existing = await registration.pushManager.getSubscription();
@@ -75,6 +76,7 @@ export async function subscribeThisDevice(): Promise<void> {
 
 export const listSubscriptions = () => getJson<PushSubscriptionRow[]>('/push/subscriptions');
 export const removeSubscription = (id: number) => deleteJson(`/push/subscriptions/${id}`);
+export const testSubscription = (id: number) => postJson(`/push/subscriptions/${id}/test`, {});
 
 export const listReminders = () => getJson<ReminderSchedule[]>('/push/reminders');
 export const createReminder = (payload: { time_of_day: string; message: string | null; enabled: boolean }) =>

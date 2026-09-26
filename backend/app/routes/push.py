@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.push_sender import send_single_push
 
 router = APIRouter(prefix="/push", tags=["push"])
 logger = logging.getLogger("app.push")
@@ -58,6 +59,15 @@ def unsubscribe(subscription_id: int, db: Session = Depends(get_db)):
     db.delete(subscription)
     db.commit()
     return
+
+
+@router.post("/subscriptions/{subscription_id}/test", status_code=202)
+def test_subscription(subscription_id: int, db: Session = Depends(get_db)):
+    subscription = db.query(models.PushSubscription).filter(models.PushSubscription.id == subscription_id).first()
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    send_single_push(db, subscription, "Test notification successful!")
+    return {"status": "sent"}
 
 
 @router.get("/reminders", response_model=list[schemas.ReminderScheduleResponse])
