@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import or_
 
 from . import auth
 from .database import SessionLocal
@@ -168,7 +169,10 @@ def _reminder_scheduler_loop() -> None:
                     db.query(models.ReminderSchedule)
                     .filter(models.ReminderSchedule.enabled.is_(True))
                     .filter(models.ReminderSchedule.time_of_day == current_hhmm)
-                    .filter(models.ReminderSchedule.last_fired_date != today)
+                    .filter(or_(
+                        models.ReminderSchedule.last_fired_date != today,
+                        models.ReminderSchedule.last_fired_date.is_(None)
+                    ))
                     .all()
                 )
                 if due_reminders:
