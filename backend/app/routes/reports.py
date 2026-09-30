@@ -32,8 +32,11 @@ def get_acupuncture_sessions(db: Session = Depends(get_db)):
 def get_headache_summary(
     start_date: dt.date | None = Query(None),
     end_date: dt.date | None = Query(None),
+    exclude_activities: list[str] = Query([]),
     db: Session = Depends(get_db)
 ):
+    excluded_set = {x.lower().strip() for x in exclude_activities}
+    
     query = db.query(models.Mood).options(
         selectinload(models.Mood.activities),
         selectinload(models.Mood.activity_details)
@@ -53,10 +56,6 @@ def get_headache_summary(
     ).all()
     symptom_ids = {a.id for a in symptom_acts}
     
-    total_days = len(set(m.timestamp.date() for m in moods)) if moods else 0
-    if start_date and end_date and not moods:
-        pass
-        
     symptom_days = set()
     symptom_severities = []
     
@@ -78,7 +77,7 @@ def get_headache_summary(
                         if d.activity_id == a.id and d.severity is not None:
                             symptom_severities.append(d.severity)
                 else:
-                    if a.name:
+                    if a.name and a.name.lower().strip() not in excluded_set:
                         day_activities.add(a.name)
                         
         if has_symptom:
@@ -91,15 +90,14 @@ def get_headache_summary(
 
     num_symptom_days = len(symptom_days)
     
-    # Calculate total clean days. If we have a strict start and end date, we use that for total days.
-    # Otherwise, total days is just the number of unique days logged.
     if start_date and end_date:
         total_days = (end_date - start_date).days + 1
     else:
         total_days = len(moods_by_day)
         
     num_clean_days = total_days - num_symptom_days if total_days > num_symptom_days else 0
-    
+    clean_days = set(moods_by_day.keys()) - symptom_days
+
     triggers = []
     for act_name, symptom_count in activities_on_symptom_days.items():
         if symptom_count < 2:
@@ -121,11 +119,58 @@ def get_headache_summary(
     
     avg_severity = sum(symptom_severities) / len(symptom_severities) if symptom_severities else None
     
+    biometric_factors = []
+    
+    def analyze_metric(model_class, date_col, val_col, name):
+        q = db.query(date_col, val_col).filter(val_col.isnot(None))
+        if start_date:
+            q = q.filter(date_col >= start_date)
+        if end_date:
+            q = q.filter(date_col <= end_date)
+        
+        rows = q.all()
+        if not rows:
+            return
+            
+        symp_vals = []
+        clean_vals = []
+        for r_date, r_val in rows:
+            if r_date in symptom_days:
+                symp_vals.append(float(r_val))
+            elif r_date in clean_days or (num_symptom_days > 0 and num_clean_days > 0 and r_date not in symptom_days): 
+                clean_vals.append(float(r_val))
+                    
+        if len(symp_vals) > 0 and len(clean_vals) > 0:
+            avg_symp = sum(symp_vals) / len(symp_vals)
+            avg_clean = sum(clean_vals) / len(clean_vals)
+            diff = avg_symp - avg_clean
+            
+            is_significant = False
+            if name == "Sleep Score" and diff < -4:
+                is_significant = True
+            elif name == "Stress Level" and diff > 3:
+                is_significant = True
+            elif name == "Resting Heart Rate" and diff > 2:
+                is_significant = True
+                
+            if is_significant or abs(diff) > (avg_clean * 0.05 if avg_clean else 1):
+                biometric_factors.append({
+                    "metric": name,
+                    "symptom_avg": round(avg_symp, 1),
+                    "clean_avg": round(avg_clean, 1),
+                    "difference": round(diff, 1)
+                })
+
+    analyze_metric(models.GarminSleepDaily, models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.sleep_score, "Sleep Score")
+    analyze_metric(models.GarminStressDaily, models.GarminStressDaily.stress_date, models.GarminStressDaily.overall_stress_level, "Stress Level")
+    analyze_metric(models.GarminRestingHeartRateDaily, models.GarminRestingHeartRateDaily.heart_rate_date, models.GarminRestingHeartRateDaily.resting_heart_rate, "Resting Heart Rate")
+
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,
         "total_days": total_days,
         "symptom_days": num_symptom_days,
         "average_severity": round(avg_severity, 2) if avg_severity else None,
-        "triggers": triggers[:5]
+        "triggers": triggers[:5],
+        "biometrics": biometric_factors
     }

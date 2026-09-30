@@ -5,16 +5,25 @@
   let sessions: string[] = [];
   let startDate: string = '';
   let endDate: string = '';
+  
+  let allActivities: string[] = [];
+  let excludeActivities: string[] = ['Acupuncture', 'Eye Mask'];
+  let excludeInput = '';
+  
   let summary: any = null;
   let loading = true;
   let error = '';
 
-  const loadSessions = async () => {
+  const loadInitial = async () => {
     try {
-      const res = await getJson<{ sessions: string[] }>('/reports/acupuncture-sessions');
-      sessions = res?.sessions || [];
+      const [sessRes, actRes] = await Promise.all([
+        getJson<{ sessions: string[] }>('/reports/acupuncture-sessions'),
+        getJson<any[]>('/activities/')
+      ]);
+      sessions = sessRes?.sessions || [];
+      allActivities = actRes ? actRes.map(a => a.name).filter(Boolean).sort() : [];
+      
       if (sessions.length > 0) {
-        // Set default to day after last session
         const lastSession = new Date(sessions[0]);
         lastSession.setDate(lastSession.getDate() + 1);
         startDate = lastSession.toISOString().slice(0, 10);
@@ -27,14 +36,15 @@
       }
       await loadSummary();
     } catch (err) {
-      error = "Failed to load sessions.";
+      error = "Failed to load initial data.";
     }
   };
 
   const loadSummary = async () => {
     loading = true;
     try {
-      const query = `?start_date=${startDate}&end_date=${endDate}`;
+      const excludes = excludeActivities.map(a => `exclude_activities=${encodeURIComponent(a)}`).join('&');
+      const query = `?start_date=${startDate}&end_date=${endDate}${excludes ? '&' + excludes : ''}`;
       summary = await getJson<any>(`/reports/headache-summary${query}`);
     } catch (err) {
       error = "Failed to load summary.";
@@ -43,8 +53,21 @@
     }
   };
 
+  const addExclude = () => {
+    if (excludeInput && !excludeActivities.includes(excludeInput)) {
+      excludeActivities = [...excludeActivities, excludeInput];
+      excludeInput = '';
+      loadSummary();
+    }
+  };
+
+  const removeExclude = (act: string) => {
+    excludeActivities = excludeActivities.filter(a => a !== act);
+    loadSummary();
+  };
+
   onMount(() => {
-    loadSessions();
+    loadInitial();
   });
 </script>
 
@@ -88,6 +111,33 @@
   {/if}
 </section>
 
+<section class="card filters">
+  <h3>Exclude Activities</h3>
+  <p style="font-size: 0.85rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
+    Ignore activities that have no bearing on headaches (e.g. Eye Mask, Earplugs).
+  </p>
+  
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+    <select bind:value={excludeInput} style="flex: 1;">
+      <option value="">Select an activity to exclude...</option>
+      {#each allActivities as act}
+        {#if !excludeActivities.includes(act)}
+          <option value={act}>{act}</option>
+        {/if}
+      {/each}
+    </select>
+    <button on:click={addExclude} class="btn-primary" style="padding: 0 1rem; border-radius: 4px; background: #3c79c5; color: white; border: none;">Add</button>
+  </div>
+
+  <div class="pills">
+    {#each excludeActivities as exc}
+      <span class="pill" on:click={() => removeExclude(exc)}>
+        {exc} &times;
+      </span>
+    {/each}
+  </div>
+</section>
+
 {#if loading}
   <p style="text-align:center;">Loading report...</p>
 {:else if error}
@@ -114,10 +164,37 @@
     {/if}
   </section>
 
+  {#if summary.biometrics && summary.biometrics.length > 0}
   <section class="card">
-    <h3>Potential Triggers</h3>
+    <h3>Contributing Biometrics (Garmin)</h3>
     <p style="font-size: 0.9rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
-      These activities occurred significantly more often on days you had a headache/migraine compared to symptom-free days.
+      These physical metrics showed a significant difference on headache days.
+    </p>
+    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid #ddd;">
+          <th style="padding: 0.5rem;">Metric</th>
+          <th style="padding: 0.5rem;">On Symptom Days</th>
+          <th style="padding: 0.5rem;">On Clean Days</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each summary.biometrics as bio}
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 0.5rem; font-weight: bold;">{bio.metric}</td>
+            <td style="padding: 0.5rem; color: #b42318;">{bio.symptom_avg}</td>
+            <td style="padding: 0.5rem; color: #086c3a;">{bio.clean_avg}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+  {/if}
+
+  <section class="card">
+    <h3>Potential Activity Triggers</h3>
+    <p style="font-size: 0.9rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
+      These activities occurred significantly more often on days you had a headache/migraine.
     </p>
     
     {#if summary.triggers && summary.triggers.length > 0}
@@ -152,4 +229,8 @@
   .stat-value { font-size: 2rem; font-weight: 800; color: #1e4b76; }
   .stat-label { font-size: 0.8rem; font-weight: 600; color: #496685; text-transform: uppercase; margin-top: 0.5rem; }
   table th { font-size: 0.8rem; color: #8091a7; text-transform: uppercase; }
+  
+  .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.2rem 0.6rem; font-size: 0.8rem; color: #1e4b76; cursor: pointer; }
+  .pill:hover { background: #fee4e2; border-color: #fca5a5; color: #b42318; }
 </style>
