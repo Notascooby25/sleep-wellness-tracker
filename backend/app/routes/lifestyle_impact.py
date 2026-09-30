@@ -174,3 +174,30 @@ def get_lifestyle_impact(
         "threshold": _safe_round(threshold, 4),
         "sample_days": len(metric_values),
     }
+
+
+@router.get("/advice")
+def get_daily_advice(db: Session = Depends(get_db)):
+    latest_sleep = db.query(models.GarminSleepDaily).order_by(models.GarminSleepDaily.sleep_date.desc()).first()
+    impact = get_lifestyle_impact(metric="sleep_score", days=60, db=db)
+    
+    positive_acts = impact.get("positive_impact", [])
+    
+    advice_msg = "Keep logging your activities to receive personalized predictive advice!"
+    if latest_sleep and latest_sleep.sleep_score is not None:
+        score = latest_sleep.sleep_score
+        if score < 75:
+            if positive_acts:
+                top = [act["activity"] for act in positive_acts[:2]]
+                acts_str = " and ".join(f"'{a}'" for a in top)
+                advice_msg = f"Your last sleep score was {score}. Historically, activities like {acts_str} improve your sleep. Try prioritizing them today to boost your recovery!"
+            else:
+                advice_msg = f"Your last sleep score was {score}. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
+        else:
+            if positive_acts:
+                top = [act["activity"] for act in positive_acts[:1]]
+                advice_msg = f"Great sleep score of {score}! You're well recovered. Keep up the good habits like '{top[0]}'."
+            else:
+                advice_msg = f"Great sleep score of {score}! You're primed for a highly productive day."
+                
+    return {"advice": advice_msg}

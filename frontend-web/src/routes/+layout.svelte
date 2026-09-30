@@ -6,6 +6,7 @@
   import { registerServiceWorker } from '$lib/push';
 
   const links = [
+    { href: '/dashboard', label: 'Dashboard' },
     { href: '/mood-entry', label: 'Mood Entry' },
     { href: '/mood-log', label: 'Mood Log' },
     { href: '/garmin-log', label: 'Garmin Log' },

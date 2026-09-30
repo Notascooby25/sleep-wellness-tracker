@@ -4,29 +4,7 @@
   import { getJson, postJson } from '$lib/api';
   import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry, PositionOption } from '$lib/types';
 
-  type SleepLatest = {
-    date: string;
-    total_sleep_minutes?: number;
-    sleep_score?: number;
-  };
 
-  type BatteryLatest = {
-    date: string;
-    morning_value?: number;
-    end_of_day_value?: number;
-  };
-
-  type HrvLatest = {
-    date: string;
-    weekly_avg?: number;
-    baseline_low?: number;
-    baseline_high?: number;
-  };
-
-  type StressLatest = {
-    date: string;
-    overall_stress_level?: number;
-  };
 
   type ImageUploadResponse = {
     image_url: string;
@@ -54,10 +32,6 @@
   let time = localIso.slice(11, 16);
   let status = '';
   let busy = false;
-  let latestSleep: SleepLatest | null = null;
-  let latestBattery: BatteryLatest | null = null;
-  let latestHrv: HrvLatest | null = null;
-  let latestStress: StressLatest | null = null;
   let activeCategoryId: number | null = null;
   let currentStreakDays = 0;
   let imageUrls: string[] = [];
@@ -395,22 +369,14 @@
   const load = async () => {
     loadError = false;
     try {
-      const [cats, acts, sleepWrap, batteryWrap, moodRows, hrvWrap, stressWrap, positionOptions] = await Promise.all([
+      const [cats, acts, moodRows, positionOptions] = await Promise.all([
         getJson<Category[]>('/categories/'),
         getJson<Activity[]>('/activities/'),
-        getJson<GarminLatestWrap<SleepLatest>>('/garmin/sleep/latest'),
-        getJson<GarminLatestWrap<BatteryLatest>>('/garmin/body-battery/latest'),
         getJson<MoodEntry[]>('/mood/?limit=365&offset=0'),
-        getJson<GarminLatestWrap<HrvLatest>>('/garmin/hrv/latest'),
-        getJson<GarminLatestWrap<StressLatest>>('/garmin/stress/latest'),
         getJson<PositionOption[]>('/categories/position-options/').catch(() => null)
       ]);
       categories = cats;
       activities = acts;
-      latestSleep = sleepWrap?.data || null;
-      latestBattery = batteryWrap?.data || null;
-      latestHrv = hrvWrap?.data || null;
-      latestStress = stressWrap?.data || null;
       currentStreakDays = computeMoodStreak(moodRows);
       if (positionOptions && positionOptions.length > 0) {
         POSITION_OPTIONS = positionOptions.map((option) => option.label);
@@ -471,41 +437,6 @@
     if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload);
   });
 
-  // ── Readiness score ───────────────────────────────────────────────────────
-  // Weighted: 40% sleep quality, 30% HRV vs personal baseline, 30% low stress
-  $: readinessScore = (() => {
-    const parts: Array<{ w: number; v: number }> = [];
-    if (latestSleep?.sleep_score != null) {
-      parts.push({ w: 0.4, v: latestSleep.sleep_score });
-    }
-    if (latestHrv?.weekly_avg != null) {
-      // Normalise using personal baseline band if available, else clamp 20–80 ms
-      let norm: number;
-      if (latestHrv.baseline_low != null && latestHrv.baseline_high != null && latestHrv.baseline_high > latestHrv.baseline_low) {
-        const band = latestHrv.baseline_high - latestHrv.baseline_low;
-        norm = Math.min(100, Math.max(0, ((latestHrv.weekly_avg - latestHrv.baseline_low) / band) * 100));
-      } else {
-        norm = Math.min(100, Math.max(0, ((latestHrv.weekly_avg - 20) / 60) * 100));
-      }
-      parts.push({ w: 0.3, v: norm });
-    }
-    if (latestStress?.overall_stress_level != null) {
-      parts.push({ w: 0.3, v: 100 - latestStress.overall_stress_level });
-    }
-    if (!parts.length) return null;
-    const totalWeight = parts.reduce((s, p) => s + p.w, 0);
-    return Math.round(parts.reduce((s, p) => s + p.w * p.v, 0) / totalWeight);
-  })();
-
-  $: readinessColor = readinessScore === null ? '#8091a7'
-    : readinessScore >= 70 ? '#086c3a'
-    : readinessScore >= 50 ? '#854d0e'
-    : '#b42318';
-
-  $: readinessBg = readinessScore === null ? '#e8f0f9'
-    : readinessScore >= 70 ? '#dcfae6'
-    : readinessScore >= 50 ? '#fef3c7'
-    : '#fee4e2';
 </script>
 
 <section class="hero">
@@ -513,21 +444,10 @@
   <p>Log your mood and activity context.</p>
 </section>
 
-{#if latestSleep || latestBattery || currentStreakDays >= 0}
+{#if currentStreakDays > 0}
 <section class="card garmin-snap">
-  <span class="snap-label">Quick snapshot</span>
-  {#if latestSleep}
-    <span class="snap-pill">Sleep {fmtMinutes(latestSleep.total_sleep_minutes)} · score {latestSleep.sleep_score ?? '-'}/100</span>
-  {/if}
-  {#if latestBattery}
-    <span class="snap-pill">Body battery AM {latestBattery.morning_value ?? '-'} · EOD {latestBattery.end_of_day_value ?? '-'}</span>
-  {/if}
-  {#if readinessScore !== null}
-    <span class="snap-pill readiness-pill" style="background:{readinessBg};border-color:{readinessColor};color:{readinessColor};">
-      Readiness {readinessScore}/100
-    </span>
-  {/if}
-  <span class="snap-pill streak-pill">Streak {currentStreakDays} {currentStreakDays === 1 ? 'day' : 'days'}</span>
+  <span class="snap-label">Logging Streak</span>
+  <span class="snap-pill streak-pill">{currentStreakDays} {currentStreakDays === 1 ? 'day' : 'days'}</span>
 </section>
 {/if}
 
@@ -735,7 +655,6 @@
   .garmin-snap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .snap-label { font-size: 0.78rem; font-weight: 700; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; }
   .snap-pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: #1e4b76; }
-  .readiness-pill { font-weight: 700; }
   .streak-pill { background: #fff3c4; border-color: #f4d47a; color: #6b4c03; font-weight: 700; }
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
