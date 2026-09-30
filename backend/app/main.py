@@ -237,4 +237,4 @@ app.include_router(push.router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-app.include_router(reports.router)
+app.include_router(reports.router, prefix="/reports", tags=["reports"])
