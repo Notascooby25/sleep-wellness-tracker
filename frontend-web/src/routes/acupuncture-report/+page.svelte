@@ -111,33 +111,6 @@
   {/if}
 </section>
 
-<section class="card filters">
-  <h3>Exclude Activities</h3>
-  <p style="font-size: 0.85rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
-    Ignore activities that have no bearing on headaches (e.g. Eye Mask, Earplugs).
-  </p>
-  
-  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-    <select bind:value={excludeInput} style="flex: 1;">
-      <option value="">Select an activity to exclude...</option>
-      {#each allActivities as act}
-        {#if !excludeActivities.includes(act)}
-          <option value={act}>{act}</option>
-        {/if}
-      {/each}
-    </select>
-    <button on:click={addExclude} class="btn-primary" style="padding: 0 1rem; border-radius: 4px; background: #3c79c5; color: white; border: none;">Add</button>
-  </div>
-
-  <div class="pills">
-    {#each excludeActivities as exc}
-      <span class="pill" on:click={() => removeExclude(exc)}>
-        {exc} &times;
-      </span>
-    {/each}
-  </div>
-</section>
-
 {#if loading}
   <p style="text-align:center;">Loading report...</p>
 {:else if error}
@@ -221,6 +194,33 @@
     {/if}
   </section>
 {/if}
+
+<section class="card filters">
+  <h3>Exclude Activities</h3>
+  <p style="font-size: 0.85rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
+    Ignore activities that have no bearing on headaches (e.g. Eye Mask, Earplugs).
+  </p>
+  
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+    <select bind:value={excludeInput} style="flex: 1;">
+      <option value="">Select an activity to exclude...</option>
+      {#each allActivities as act}
+        {#if !excludeActivities.includes(act)}
+          <option value={act}>{act}</option>
+        {/if}
+      {/each}
+    </select>
+    <button on:click={addExclude} class="btn-primary" style="padding: 0 1rem; border-radius: 4px; background: #3c79c5; color: white; border: none;">Add</button>
+  </div>
+
+  <div class="pills">
+    {#each excludeActivities as exc}
+      <span class="pill" on:click={() => removeExclude(exc)} role="button" tabindex="0" on:keydown={(e) => { if (e.key === 'Enter') removeExclude(exc); }}>
+        {exc} &times;
+      </span>
+    {/each}
+  </div>
+</section>
 
 <style>
   .filters { background: #f9fbff; }
