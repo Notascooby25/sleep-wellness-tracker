@@ -100,6 +100,7 @@ class ActivityBase(BaseModel):
     is_archived: Optional[bool] = False  # New field to indicate if the activity is archived
     deprecated_at: Optional[datetime] = None
     supports_position: Optional[bool] = False
+    ignore_in_reports: Optional[bool] = False
 
 class ActivityCreate(ActivityBase):
     pass
@@ -111,6 +112,7 @@ class ActivityUpdate(BaseModel):
     is_archived: Optional[bool] = None  # Allow updating the archived status
     deprecated_at: Optional[datetime] = None
     supports_position: Optional[bool] = None
+    ignore_in_reports: Optional[bool] = False
 
 class ActivityResponse(ActivityBase):
     id: int

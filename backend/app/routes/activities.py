@@ -61,6 +61,8 @@ def update_activity(activity_id: int, payload: schemas.ActivityUpdate, db: Sessi
 
     if "supports_position" in payload.model_fields_set:
         act.supports_position = bool(payload.supports_position)
+    if "ignore_in_reports" in payload.model_fields_set:
+        act.ignore_in_reports = bool(payload.ignore_in_reports)
 
     db.commit()
     db.refresh(act)

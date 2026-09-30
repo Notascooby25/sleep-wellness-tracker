@@ -1,3 +1,4 @@
+from sqlalchemy import text
 # File: backend/app/models.py
 from sqlalchemy import (
     Column,
@@ -33,6 +34,7 @@ class Category(Base):
     require_rating = Column(Integer, nullable=False, default=1)  # 1=true (required), 0=false (optional)
     rating_label = Column(String(80), nullable=True)  # e.g., "Pain/Discomfort Level", "Mood"
     supports_position = Column(Boolean, default=False, nullable=False)  # default for new activities in this category
+    ignore_in_reports = Column(Boolean, default=False, nullable=False, server_default=text("FALSE"))
 
     activities = relationship("Activity", back_populates="category", cascade="all, delete-orphan")
 
@@ -52,6 +54,7 @@ class Activity(Base):
     is_archived = Column(Boolean, default=False, nullable=False)  # New column to mark activities as archived
     deprecated_at = Column(DateTime(timezone=True), nullable=True)
     supports_position = Column(Boolean, default=False, nullable=False)
+    ignore_in_reports = Column(Boolean, default=False, nullable=False, server_default=text("FALSE"))
 
     category = relationship("Category", back_populates="activities")
     moods = relationship("Mood", secondary=mood_activities, back_populates="activities")

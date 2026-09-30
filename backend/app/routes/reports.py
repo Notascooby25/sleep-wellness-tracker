@@ -32,10 +32,10 @@ def get_acupuncture_sessions(db: Session = Depends(get_db)):
 def get_headache_summary(
     start_date: dt.date | None = Query(None),
     end_date: dt.date | None = Query(None),
-    exclude_activities: list[str] = Query([]),
+    
     db: Session = Depends(get_db)
 ):
-    excluded_set = {x.lower().strip() for x in exclude_activities}
+    
     
     query = db.query(models.Mood).options(
         selectinload(models.Mood.activities),
@@ -79,7 +79,7 @@ def get_headache_summary(
                         if det.activity_id == a.id and det.severity is not None:
                             symptom_severities.append(det.severity)
                 else:
-                    if a.name and a.name.lower().strip() not in excluded_set:
+                    if a.name and not a.ignore_in_reports:
                         day_activities_map[date].add(a.name)
                         
         if has_symptom:

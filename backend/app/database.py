@@ -85,6 +85,12 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE activities ADD COLUMN deprecated_at TIMESTAMP WITH TIME ZONE")
             )
 
+        if "ignore_in_reports" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.ignore_in_reports column for legacy database")
+            conn.execute(
+                text("ALTER TABLE activities ADD COLUMN ignore_in_reports BOOLEAN NOT NULL DEFAULT FALSE")
+            )
+
         if "supports_position" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.supports_position column for legacy database")
             conn.execute(

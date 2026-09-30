@@ -1,18 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getJson } from '$lib/api';
+  import { getJson, putJson } from '$lib/api';
 
   let sessions: string[] = [];
   let startDate: string = '';
   let endDate: string = '';
   
-  let allActivities: string[] = [];
-  let excludeActivities: string[] = ['Acupuncture', 'Eye Mask'];
+  let allActivities: any[] = [];
   let excludeInput = '';
   
   let summary: any = null;
   let loading = true;
   let error = '';
+
+  $: excludedActivities = allActivities.filter(a => a.ignore_in_reports);
 
   const loadInitial = async () => {
     try {
@@ -21,7 +22,7 @@
         getJson<any[]>('/activities/')
       ]);
       sessions = sessRes?.sessions || [];
-      allActivities = actRes ? actRes.map(a => a.name).filter(Boolean).sort() : [];
+      allActivities = actRes ? actRes.sort((a, b) => (a.name || '').localeCompare(b.name || '')) : [];
       
       if (sessions.length > 0) {
         const lastSession = new Date(sessions[0]);
@@ -43,8 +44,7 @@
   const loadSummary = async () => {
     loading = true;
     try {
-      const excludes = excludeActivities.map(a => `exclude_activities=${encodeURIComponent(a)}`).join('&');
-      const query = `?start_date=${startDate}&end_date=${endDate}${excludes ? '&' + excludes : ''}`;
+      const query = `?start_date=${startDate}&end_date=${endDate}`;
       summary = await getJson<any>(`/reports/headache-summary${query}`);
     } catch (err) {
       error = "Failed to load summary.";
@@ -53,28 +53,26 @@
     }
   };
 
-  const addExclude = () => {
-    if (excludeInput && !excludeActivities.includes(excludeInput)) {
-      excludeActivities = [...excludeActivities, excludeInput];
-      localStorage.setItem('headache_exclude_activities', JSON.stringify(excludeActivities));
+  const addExclude = async () => {
+    if (!excludeInput) return;
+    const act = allActivities.find(a => a.id.toString() === excludeInput);
+    if (act) {
+      act.ignore_in_reports = true;
+      allActivities = [...allActivities];
       excludeInput = '';
       loadSummary();
+      await putJson(`/activities/${act.id}`, { ignore_in_reports: true });
     }
   };
 
-  const removeExclude = (act: string) => {
-    excludeActivities = excludeActivities.filter(a => a !== act);
-    localStorage.setItem('headache_exclude_activities', JSON.stringify(excludeActivities));
+  const removeExclude = async (act: any) => {
+    act.ignore_in_reports = false;
+    allActivities = [...allActivities];
     loadSummary();
+    await putJson(`/activities/${act.id}`, { ignore_in_reports: false });
   };
 
   onMount(() => {
-    const saved = localStorage.getItem('headache_exclude_activities');
-    if (saved) {
-      try {
-        excludeActivities = JSON.parse(saved);
-      } catch (e) {}
-    }
     loadInitial();
   });
 </script>
@@ -206,15 +204,15 @@
 <section class="card filters">
   <h3>Exclude Activities</h3>
   <p style="font-size: 0.85rem; color: #666; margin-top: -0.5rem; margin-bottom: 1rem;">
-    Ignore activities that have no bearing on headaches (e.g. Eye Mask, Earplugs).
+    Permanently ignore activities that have no bearing on headaches (e.g. Eye Mask, Earplugs).
   </p>
   
   <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
     <select bind:value={excludeInput} style="flex: 1;">
       <option value="">Select an activity to exclude...</option>
       {#each allActivities as act}
-        {#if !excludeActivities.includes(act)}
-          <option value={act}>{act}</option>
+        {#if !act.ignore_in_reports}
+          <option value={act.id}>{act.name}</option>
         {/if}
       {/each}
     </select>
@@ -222,9 +220,9 @@
   </div>
 
   <div class="pills">
-    {#each excludeActivities as exc}
+    {#each excludedActivities as exc}
       <span class="pill" on:click={() => removeExclude(exc)} role="button" tabindex="0" on:keydown={(e) => { if (e.key === 'Enter') removeExclude(exc); }}>
-        {exc} &times;
+        {exc.name} &times;
       </span>
     {/each}
   </div>
