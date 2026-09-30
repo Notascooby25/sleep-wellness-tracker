@@ -13,9 +13,11 @@ This repo is **public**. Never commit IPs, hostnames, account or user IDs, or se
 1. **Implement** exactly the step: code, tests, config and docs. Match the surrounding style.
    - Any new global styles or colors must be extracted to `tokens.css`.
    - Ensure touch targets remain accessible (min 44px) per `DESIGN.md`.
-2. **Test.** 
-   - Check Svelte compilation: `cd frontend-web && npm run check` and `npm run build`.
-   - Check Python syntax/linting: `cd backend && ruff check app`.
+2. **Test and Verify (MANDATORY).** 
+   - **Frontend:** Always run `cd frontend-web && npm run check` and ensure it passes with 0 errors.
+   - **Backend:** Always run `cd backend && ruff check --select E4,E7,E9,F app` to mirror the CI pipeline exactly.
+   - **Routing & Endpoints:** If you added a new API route, you MUST verify in `main.py` that `app.include_router()` includes the correct `prefix` and `tags`.
+   - **Local API Testing:** Write a quick temporary python script to hit your new endpoint locally (using a dummy DB URL if needed) to ensure it returns 200 OK and no 404s/500s.
 3. **Commit and push** at the end of every step:
    ```bash
    git add <explicit paths>
