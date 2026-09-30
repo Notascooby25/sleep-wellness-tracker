@@ -56,6 +56,7 @@
   const addExclude = () => {
     if (excludeInput && !excludeActivities.includes(excludeInput)) {
       excludeActivities = [...excludeActivities, excludeInput];
+      localStorage.setItem('headache_exclude_activities', JSON.stringify(excludeActivities));
       excludeInput = '';
       loadSummary();
     }
@@ -63,10 +64,17 @@
 
   const removeExclude = (act: string) => {
     excludeActivities = excludeActivities.filter(a => a !== act);
+    localStorage.setItem('headache_exclude_activities', JSON.stringify(excludeActivities));
     loadSummary();
   };
 
   onMount(() => {
+    const saved = localStorage.getItem('headache_exclude_activities');
+    if (saved) {
+      try {
+        excludeActivities = JSON.parse(saved);
+      } catch (e) {}
+    }
     loadInitial();
   });
 </script>
