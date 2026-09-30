@@ -193,6 +193,44 @@ class GarminStepsDaily(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class GarminRespirationDaily(Base):
+    __tablename__ = "garmin_respiration_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    respiration_date = Column(Date, unique=True, nullable=False, index=True)
+    lowest_respiration_value = Column(Numeric(5, 2), nullable=True)
+    highest_respiration_value = Column(Numeric(5, 2), nullable=True)
+    sleep_avg_respiration_value = Column(Numeric(5, 2), nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class GarminSpO2Daily(Base):
+    __tablename__ = "garmin_spo2_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    spo2_date = Column(Date, unique=True, nullable=False, index=True)
+    average_spo2 = Column(Numeric(5, 2), nullable=True)
+    lowest_spo2 = Column(Numeric(5, 2), nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class GarminTrainingStatusDaily(Base):
+    __tablename__ = "garmin_training_status_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status_date = Column(Date, unique=True, nullable=False, index=True)
+    training_status = Column(String(80), nullable=True)
+    load_status = Column(String(80), nullable=True)
+    vo2_max_precise_value = Column(Numeric(5, 2), nullable=True)
+    payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class GarminActivity(Base):
     __tablename__ = "garmin_activities"
 

@@ -166,3 +166,34 @@ class ReminderScheduleResponse(ReminderScheduleBase):
 
     class Config:
         from_attributes = True
+
+
+# -------------------------
+# GARMIN BIOMETRICS SCHEMAS
+# -------------------------
+
+class GarminRespirationDailyRead(BaseModel):
+    respiration_date: date
+    lowest_respiration_value: Optional[float] = None
+    highest_respiration_value: Optional[float] = None
+    sleep_avg_respiration_value: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class GarminSpO2DailyRead(BaseModel):
+    spo2_date: date
+    average_spo2: Optional[float] = None
+    lowest_spo2: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class GarminTrainingStatusDailyRead(BaseModel):
+    status_date: date
+    training_status: Optional[str] = None
+    load_status: Optional[str] = None
+    vo2_max_precise_value: Optional[float] = None
+
+    class Config:
+        from_attributes = True
