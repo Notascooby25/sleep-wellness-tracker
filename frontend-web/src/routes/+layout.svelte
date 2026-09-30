@@ -12,6 +12,7 @@
     { href: '/garmin-log', label: 'Garmin Log' },
     { href: '/garmin-lifestyle-impact', label: 'Lifestyle Impact' },
     { href: '/analytics', label: 'Analytics' },
+    { href: '/acupuncture-report', label: 'Acupuncture Report' },
     { href: '/settings', label: 'Settings' }
   ];
 

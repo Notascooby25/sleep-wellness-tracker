@@ -10,7 +10,7 @@ from sqlalchemy import or_
 
 from . import auth
 from .database import SessionLocal
-from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes, push
+from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes, push, reports
 from .services.garmin_sync import (
     sync_activities_if_due,
     sync_sleep_if_due,
@@ -237,3 +237,4 @@ app.include_router(push.router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+app.include_router(reports.router)
