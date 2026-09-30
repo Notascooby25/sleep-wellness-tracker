@@ -55,7 +55,7 @@
 
   const addExclude = async () => {
     if (!excludeInput) return;
-    const act = allActivities.find(a => a.id.toString() === excludeInput);
+    const act = allActivities.find(a => a.id.toString() === excludeInput.toString());
     if (act) {
       act.ignore_in_reports = true;
       allActivities = [...allActivities];
