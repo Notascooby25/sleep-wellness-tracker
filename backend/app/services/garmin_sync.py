@@ -929,13 +929,13 @@ def _sync_training_status_dates(client: Any, db: Session, dates: List[dt.date]) 
     return _sync_metric_dates(client, db, dates, "training_status", _fetch_training_status_payload, _upsert_training_status_daily)
 
 def sync_respiration_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _sync_if_due(db, "respiration", force, backfill_days, _sync_respiration_dates)
+    return _run_metric_sync(db, "respiration", force, backfill_days, _sync_respiration_dates)
 
 def sync_spo2_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _sync_if_due(db, "spo2", force, backfill_days, _sync_spo2_dates)
+    return _run_metric_sync(db, "spo2", force, backfill_days, _sync_spo2_dates)
 
 def sync_training_status_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _sync_if_due(db, "training_status", force, backfill_days, _sync_training_status_dates)
+    return _run_metric_sync(db, "training_status", force, backfill_days, _sync_training_status_dates)
 
 
 
