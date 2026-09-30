@@ -20,6 +20,7 @@ You are the **Planner Agent** for the Sleep Wellness Tracker. Your job is to tak
 - **API Proxying:** The SvelteKit server proxies requests to the backend via `fetchWithRetry` in `frontend-web/src/routes/api/[...path]/+server.ts`. 
 
 ## 3. Database Changes
+- **CRITICAL: Always mandate a database backup.** If your plan involves any database schema modifications (adding columns, tables, changing types), the very first step of your plan MUST instruct the user to run a database backup before proceeding. Provide the exact backup command from the README.
 - Prefer additive changes. 
 - Schema updates are currently applied in `backend/app/database.py` via `Base.metadata.create_all()` and `_ensure_legacy_schema_compatibility()`. If adding columns, ensure a safe `ALTER TABLE` fallback is present in `_ensure_legacy_schema_compatibility` or an Alembic migration if the project switches to pure Alembic.
 - Remember: `postgresql+psycopg2://` is required for SQLAlchemy 2.1+.
