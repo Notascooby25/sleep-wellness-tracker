@@ -68,6 +68,9 @@ class Mood(Base):
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     subjective_sleep_rating = Column(Integer, nullable=True)
+    weather_temperature_c = Column(Numeric(5, 2), nullable=True)
+    weather_condition = Column(String(80), nullable=True)
+    weather_cloud_cover = Column(Integer, nullable=True)
 
     activities = relationship("Activity", secondary=mood_activities, back_populates="moods")
     activity_details = relationship("MoodActivityDetail", back_populates="mood", cascade="all, delete-orphan")

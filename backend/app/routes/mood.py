@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import re
+import urllib.request
+import urllib.error
 from pathlib import Path
 from uuid import uuid4
 
@@ -140,6 +142,9 @@ def _serialize_mood(mood: models.Mood) -> dict:
         "created_at": mood.created_at,
         "activity_ids": [a.id for a in mood.activities],
         "subjective_sleep_rating": getattr(mood, "subjective_sleep_rating", None),
+        "weather_temperature_c": float(mood.weather_temperature_c) if getattr(mood, "weather_temperature_c", None) is not None else None,
+        "weather_condition": getattr(mood, "weather_condition", None),
+        "weather_cloud_cover": getattr(mood, "weather_cloud_cover", None),
         "activity_details": [
             {
                 "activity_id": d.activity_id,
@@ -226,10 +231,68 @@ def list_mood_entries(
     rows = rows_query.all()
     return [_serialize_mood(row) for row in rows]
 
+WMO_CODES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Slight snow fall",
+    73: "Moderate snow fall",
+    75: "Heavy snow fall",
+    77: "Snow grains",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Slight snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+def _fetch_weather_for_timestamp(lat: float, lon: float, timestamp: dt.datetime) -> dict | None:
+    ts_utc = timestamp.astimezone(dt.timezone.utc)
+    hour_str = ts_utc.strftime("%Y-%m-%dT%H:00")
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,cloud_cover,weather_code&start_hour={hour_str}&end_hour={hour_str}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "SleepWellnessTracker/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            hourly = data.get("hourly", {})
+            if hourly and hourly.get("temperature_2m") and hourly["temperature_2m"][0] is not None:
+                temp = hourly["temperature_2m"][0]
+                cloud = hourly.get("cloud_cover", [None])[0]
+                code = hourly.get("weather_code", [None])[0]
+                condition = WMO_CODES.get(code, f"Code {code}") if code is not None else None
+                return {
+                    "temperature_c": temp,
+                    "cloud_cover": cloud,
+                    "condition": condition,
+                }
+    except Exception as e:
+        logger.warning(f"Failed to fetch weather from Open-Meteo: {e}")
+    return None
+
 @router.post("", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
-    # payload.notes is populated whether client sent "note" or "notes"
     image_urls = _normalize_image_urls(payload.image_url, payload.image_urls)
+    
+    weather_data = None
+    if payload.latitude is not None and payload.longitude is not None:
+        weather_data = _fetch_weather_for_timestamp(payload.latitude, payload.longitude, payload.timestamp)
+        
     db_mood = models.Mood(
         mood_score=payload.mood_score,
         notes=payload.notes,
@@ -237,6 +300,9 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
         image_urls=image_urls or None,
         timestamp=payload.timestamp,
         subjective_sleep_rating=payload.subjective_sleep_rating,
+        weather_temperature_c=weather_data["temperature_c"] if weather_data else None,
+        weather_condition=weather_data["condition"] if weather_data else None,
+        weather_cloud_cover=weather_data["cloud_cover"] if weather_data else None,
     )
     db.add(db_mood)
     db.flush()
@@ -277,6 +343,13 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     m.image_urls = image_urls or None
     m.timestamp = payload.timestamp
     m.subjective_sleep_rating = payload.subjective_sleep_rating
+
+    if payload.latitude is not None and payload.longitude is not None:
+        weather_data = _fetch_weather_for_timestamp(payload.latitude, payload.longitude, payload.timestamp)
+        if weather_data:
+            m.weather_temperature_c = weather_data["temperature_c"]
+            m.weather_condition = weather_data["condition"]
+            m.weather_cloud_cover = weather_data["cloud_cover"]
 
     activities = []
     if payload.activity_ids:

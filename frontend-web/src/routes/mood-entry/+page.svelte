@@ -67,6 +67,8 @@
   let galleryInputEl: HTMLInputElement | null = null;
   let cameraInputEl: HTMLInputElement | null = null;
   let loadError = false;
+  let latitude: number | null = null;
+  let longitude: number | null = null;
 
   const formatUploadedAt = (iso: string | undefined) => {
     if (!iso) return '';
@@ -435,7 +437,9 @@
         timestamp,
         activity_ids: Array.from(selected),
         activity_details: buildActivityDetails(),
-        subjective_sleep_rating: subjectiveSleepRating
+        subjective_sleep_rating: subjectiveSleepRating,
+        latitude,
+        longitude
       };
       await postJson('/mood/', payload);
       status = 'Entry saved.';
@@ -455,6 +459,12 @@
   onMount(() => {
     load();
     window.addEventListener('beforeunload', handleBeforeUnload);
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+      }, () => {});
+    }
   });
 
   onDestroy(() => {

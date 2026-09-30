@@ -38,6 +38,11 @@ export type MoodEntry = {
   activity_ids: number[];
   activity_details?: ActivityDetailInput[];
   subjective_sleep_rating?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  weather_temperature_c?: number | null;
+  weather_condition?: string | null;
+  weather_cloud_cover?: number | null;
   created_at?: string;
 };
 

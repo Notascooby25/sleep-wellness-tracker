@@ -139,6 +139,24 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE moods ADD COLUMN subjective_sleep_rating INTEGER")
             )
 
+        if "weather_temperature_c" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.weather_temperature_c column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN weather_temperature_c NUMERIC(5, 2)")
+            )
+
+        if "weather_condition" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.weather_condition column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN weather_condition VARCHAR(80)")
+            )
+
+        if "weather_cloud_cover" not in mood_columns and inspector.has_table("moods"):
+            logger.warning("Adding missing moods.weather_cloud_cover column for legacy database")
+            conn.execute(
+                text("ALTER TABLE moods ADD COLUMN weather_cloud_cover INTEGER")
+            )
+
         position_column = detail_columns.get("position")
         if position_column and inspector.has_table("mood_activity_details"):
             position_type = str(position_column.get("type", "")).upper()

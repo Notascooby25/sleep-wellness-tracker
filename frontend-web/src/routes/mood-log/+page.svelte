@@ -289,7 +289,18 @@
               </tr>
             {:else}
               <tr>
-                <td data-label="Date" style="white-space:nowrap;">{fmtDate(entry.timestamp)}</td>
+                <td data-label="Date" style="white-space:nowrap;">
+                  {fmtDate(entry.timestamp)}
+                  {#if entry.weather_temperature_c !== null && entry.weather_temperature_c !== undefined}
+                    <div style="font-size: 0.75rem; color: #496685; margin-top: 0.2rem; display: flex; align-items: center; gap: 0.2rem;">
+                      <span>{(entry.weather_cloud_cover ?? 0) > 60 ? '☁️' : (entry.weather_condition?.toLowerCase().includes('rain') ? '🌧️' : '☀️')}</span>
+                      <span>{Math.round(entry.weather_temperature_c)}°C</span>
+                      {#if entry.weather_condition}
+                        <span style="opacity: 0.8;">· {entry.weather_condition}</span>
+                      {/if}
+                    </div>
+                  {/if}
+                </td>
                 <td data-label="Mood">{entry.mood_score ?? 'n/a'}</td>
                 <td data-label="Photos">
                   {#if entryImages(entry).length}

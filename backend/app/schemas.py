@@ -25,6 +25,9 @@ class MoodBase(BaseModel):
     # None means "do not touch existing details"; an empty list means "clear them".
     activity_details: Optional[List[MoodActivityDetailInput]] = None
     subjective_sleep_rating: Optional[int] = None
+    weather_temperature_c: Optional[Decimal] = None
+    weather_condition: Optional[str] = None
+    weather_cloud_cover: Optional[int] = None
 
     class Config:
         populate_by_name = True
@@ -34,11 +37,13 @@ class MoodBase(BaseModel):
 
 
 class MoodCreate(MoodBase):
-    pass
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class MoodUpdate(MoodBase):
-    pass
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class MoodRead(MoodBase):
