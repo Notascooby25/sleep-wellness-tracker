@@ -5,6 +5,7 @@
 
 # Version Control Rules
 - At the end of every task or major step that involves modifying files, you MUST use the `run_command` tool to stage all changes, commit them with a descriptive commit message explaining the reason for the changes, and push them to the current branch on GitHub.
+- **CRITICAL:** Before any commit or push, you MUST verify the changes run successfully in a local test environment. If the local environment lacks a database, you must mock it with SQLite (`sqlite:///test.db`) and run the API tests. Do NOT push untested backend code.
 - Example command: `git add -A && git commit -m "feat: <description of changes>" && git push`
 
 # NUC and Deployment Instructions

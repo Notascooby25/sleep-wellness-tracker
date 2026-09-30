@@ -17,7 +17,11 @@ This repo is **public**. Never commit IPs, hostnames, account or user IDs, or se
    - **Frontend:** Always run `cd frontend-web && npm run check` and ensure it passes with 0 errors.
    - **Backend:** Always run `cd backend && ruff check --select E4,E7,E9,F app` to mirror the CI pipeline exactly.
    - **Routing & Endpoints:** If you added a new API route, you MUST verify in `main.py` that `app.include_router()` includes the correct `prefix` and `tags`.
-   - **Local API Testing:** Write a quick temporary python script to hit your new endpoint locally (using a dummy DB URL if needed) to ensure it returns 200 OK and no 404s/500s.
+   - **Local API Testing (STRICT REQUIREMENT):** You MUST NOT rely purely on static type checking or visual review. If you make changes to database models, schemas, or endpoints, you MUST verify they work at runtime. 
+     - Create a `.env` file from `.env.example` if it doesn't exist.
+     - If a PostgreSQL database is unavailable, modify the connection string in your local `.env` to use SQLite (e.g., `DATABASE_URL=sqlite:///test.db`) so the backend can start locally.
+     - Run `pytest test_api.py` or write a temporary Python script to test the endpoints and confirm they return 200 OK and valid JSON without throwing `500 Internal Server Error`.
+     - **NEVER** push changes that touch the backend without successfully testing them locally at runtime.
 3. **Commit and push** at the end of every step:
    ```bash
    git add <explicit paths>
