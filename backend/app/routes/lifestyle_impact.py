@@ -11,7 +11,6 @@ from ..database import get_db
 
 router = APIRouter(prefix="/lifestyle-impact", tags=["lifestyle-impact"])
 
-_SLEEP_CATEGORY_TOKENS = ("lifestyle", "before sleep", "during sleep", "pre-sleep", "presleep")
 
 _METRIC_CONFIG = {
     "sleep_score": {
@@ -72,13 +71,6 @@ def _mark_highest(entries: list[dict]) -> list[dict]:
     return entries
 
 
-def _is_sleep_category(name: str | None) -> bool:
-    if not name:
-        return False
-    lowered = name.strip().lower()
-    return any(token in lowered for token in _SLEEP_CATEGORY_TOKENS)
-
-
 @router.get("")
 def get_lifestyle_impact(
     metric: str = Query(..., pattern="^(sleep_score|overnight_hrv|overnight_stress|resting_heart_rate|steps)$"),
@@ -132,18 +124,9 @@ def get_lifestyle_impact(
     activity_dates: dict[str, set[dt.date]] = defaultdict(set)
     for mood in mood_rows:
         mood_date = mood.timestamp.date()
-        detail_map = {d.activity_id: d for d in mood.activity_details}
         for activity in mood.activities:
-            if not _is_sleep_category(activity.category.name if activity.category else None):
-                continue
             name = (activity.name or "").strip()
             if name:
-                det = detail_map.get(activity.id)
-                if det:
-                    if det.quantity_numeric is not None:
-                        name = f"{name} (Qty: {det.quantity_numeric:g})"
-                    elif det.severity is not None:
-                        name = f"{name} (Sev: {det.severity})"
                 activity_dates[name].add(mood_date)
 
     positive: list[dict] = []
