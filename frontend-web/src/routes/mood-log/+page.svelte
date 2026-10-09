@@ -15,6 +15,7 @@
   // Edit state
   let editId: number | null = null;
   let editScore: number | null = null;
+  let editSleepRating: number | null = null;
   let editNotes = '';
   let editTimestamp = '';
   let editActivityIds = new Set<number>();
@@ -106,6 +107,7 @@
   const startEdit = (entry: MoodEntry) => {
     editId = entry.id ?? null;
     editScore = entry.mood_score;
+    editSleepRating = entry.subjective_sleep_rating ?? null;
     editNotes = entry.notes ?? '';
     editTimestamp = toLocalInput(entry.timestamp);
     editActivityIds = new Set(entry.activity_ids || []);
@@ -118,6 +120,8 @@
 
   const cancelEdit = () => {
     editId = null;
+    editScore = null;
+    editSleepRating = null;
     editActivityIds = new Set<number>();
     editActivityPositions = new Map<number, string[]>();
     editImageUrls = [];
@@ -165,6 +169,7 @@
       const ts = new Date(editTimestamp).toISOString();
       await putJson(`/mood/${editId}`, {
         mood_score: editScore,
+        subjective_sleep_rating: editSleepRating,
         notes: editNotes.trim() || null,
         image_url: editImageUrls[0] ?? null,
         image_urls: editImageUrls,
@@ -177,11 +182,7 @@
           }))
           .filter((detail) => detail.position.length > 0)
       });
-      editId = null;
-      editActivityIds = new Set<number>();
-      editActivityPositions = new Map<number, string[]>();
-      editImageUrls = [];
-      editActivityFilter = '';
+      cancelEdit();
       await load();
     } catch (error) {
       status = `Save failed: ${error}`;
@@ -230,7 +231,7 @@
         <thead>
           <tr>
             <th>Date</th>
-            <th>Mood</th>
+            <th>Scores</th>
             <th>Photos</th>
             <th>Notes</th>
             <th>Activities</th>
@@ -244,8 +245,15 @@
                 <td data-label="Date">
                   <input type="datetime-local" bind:value={editTimestamp} style="font-size:0.82rem;" />
                 </td>
-                <td data-label="Mood">
-                  <input type="number" min="1" max="5" bind:value={editScore} style="width:4rem;" />
+                <td data-label="Scores">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#496685; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                      Mood: <input type="number" min="1" max="5" bind:value={editScore} style="width:4rem;" />
+                    </label>
+                    <label style="font-size:0.75rem; color:#496685; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                      Sleep: <input type="number" min="1" max="5" bind:value={editSleepRating} style="width:4rem;" />
+                    </label>
+                  </div>
                 </td>
                 <td data-label="Photos">-</td>
                 <td data-label="Notes">
@@ -301,7 +309,12 @@
                     </div>
                   {/if}
                 </td>
-                <td data-label="Mood">{entry.mood_score ?? 'n/a'}</td>
+                <td data-label="Scores">
+                  <div>Mood: {entry.mood_score ?? '-'}</div>
+                  {#if entry.subjective_sleep_rating != null}
+                    <div style="font-size:0.8rem; color:#496685; margin-top:0.2rem;">Sleep: {entry.subjective_sleep_rating}</div>
+                  {/if}
+                </td>
                 <td data-label="Photos">
                   {#if entryImages(entry).length}
                     <div class="entry-photo-list">
