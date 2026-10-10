@@ -929,13 +929,46 @@ def _sync_training_status_dates(client: Any, db: Session, dates: List[dt.date]) 
     return _sync_metric_dates(client, db, dates, "training_status", _fetch_training_status_payload, _upsert_training_status_daily)
 
 def sync_respiration_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _run_metric_sync(db, "respiration", force, backfill_days, _sync_respiration_dates)
+    return _run_metric_sync(
+        db,
+        force=force,
+        state_key="respiration_daily",
+        metric_name="respiration",
+        backfill_days=7,
+        backfill_days_override=backfill_days,
+        sync_dates_fn=_sync_respiration_dates,
+        latest_field="respiration_date",
+        window_open=_recovery_window_open,
+        skipped_reason="outside_respiration_sync_window",
+    )
 
 def sync_spo2_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _run_metric_sync(db, "spo2", force, backfill_days, _sync_spo2_dates)
+    return _run_metric_sync(
+        db,
+        force=force,
+        state_key="spo2_daily",
+        metric_name="spo2",
+        backfill_days=7,
+        backfill_days_override=backfill_days,
+        sync_dates_fn=_sync_spo2_dates,
+        latest_field="spo2_date",
+        window_open=_recovery_window_open,
+        skipped_reason="outside_spo2_sync_window",
+    )
 
 def sync_training_status_if_due(db: Session, force: bool = False, backfill_days: Optional[int] = None) -> Dict[str, Any]:
-    return _run_metric_sync(db, "training_status", force, backfill_days, _sync_training_status_dates)
+    return _run_metric_sync(
+        db,
+        force=force,
+        state_key="training_status_daily",
+        metric_name="training_status",
+        backfill_days=7,
+        backfill_days_override=backfill_days,
+        sync_dates_fn=_sync_training_status_dates,
+        latest_field="training_status_date",
+        window_open=_day_close_window_open,
+        skipped_reason="outside_training_status_sync_window",
+    )
 
 
 
