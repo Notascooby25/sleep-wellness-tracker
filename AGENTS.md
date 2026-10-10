@@ -11,6 +11,7 @@
 # NUC and Deployment Instructions
 - NUC host: `192.168.68.126`. It is a shared production box also running `audio-scrobbler-app` and `UK-Expense-Tracker`. Treat it as multi-tenant, not a sandbox.
 - Watchtower polls GHCR every 5 minutes and auto-updates images.
+- **Production Compose Files:** When managing containers on the NUC, ALWAYS check which compose file is actively used by production containers (e.g., `docker inspect <container> | grep com.docker.compose.project.config_files`). Do NOT blindly run `docker-compose up -d` as it defaults to the development `docker-compose.yml`, which can mount local development volumes and cause apparent data loss. Always use `-f docker-compose.prod.yml` if it's the active production configuration.
 - Destructive-command caution: Always check the blast radius (`docker volume ls`, `docker ps -a`) before any delete/wipe/teardown on the NUC to avoid accidentally wiping shared volumes (e.g. Postgres data).
 - Resave secrets after editing: Whenever you touch `.env`, proactively remind the user to re-save it.
 
