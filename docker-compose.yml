@@ -22,7 +22,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: sleep-wellness-tracker-backend:latest
+    image: ghcr.io/notascooby25/sleep-wellness-tracker-backend:latest
     container_name: sleep_backend
     env_file: .env
     environment:
@@ -43,7 +43,7 @@ services:
     build:
       context: ./frontend-web
       dockerfile: Dockerfile
-    image: sleep-wellness-tracker-frontend-web:latest
+    image: ghcr.io/notascooby25/sleep-wellness-tracker-frontend-web:latest
     container_name: sleep_frontend_web
     env_file: .env
     environment:
