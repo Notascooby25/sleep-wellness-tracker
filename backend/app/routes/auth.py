@@ -26,6 +26,7 @@ def login(payload: dict, response: Response):
         key=auth.SESSION_COOKIE_NAME,
         value=token,
         max_age=auth.SESSION_MAX_AGE_SECONDS,
+        expires=auth.SESSION_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
         # Not "secure": the app is reachable over both plain HTTP (LAN) and HTTPS
