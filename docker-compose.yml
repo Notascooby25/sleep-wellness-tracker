@@ -50,10 +50,11 @@ services:
       - API_BASE=http://backend:8000
       - API_BASE_FALLBACKS=${API_BASE_FALLBACKS:-}
       - BODY_SIZE_LIMIT=15M
+      - ORIGIN=${ORIGIN:-}
     depends_on:
       - backend
     ports:
-      - "8510:3000"
+      - "127.0.0.1:8510:3000"
 
 volumes:
   db_data:
