@@ -11,7 +11,7 @@ logger = logging.getLogger("app.push_sender")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_CLAIMS_SUB = os.environ.get("VAPID_CLAIMS_SUB", "").strip()
-DEFAULT_REMINDER_MESSAGE = "Update your tracker"
+DEFAULT_REMINDER_MESSAGE = "Evening check-in: How did today feel? 🌿"
 
 PUSH_CONFIGURED = bool(VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY and VAPID_CLAIMS_SUB)
 

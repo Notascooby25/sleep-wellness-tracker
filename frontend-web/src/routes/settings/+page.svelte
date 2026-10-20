@@ -47,6 +47,23 @@
     load();
   });
 
+  const addPositivePreset = async () => {
+    busyReminders = true;
+    reminderError = '';
+    try {
+      await createReminder({
+        time_of_day: '21:30',
+        message: 'Evening check-in 🌿 Had a good health day? Tap to log a green score.',
+        enabled: true
+      });
+      await load();
+    } catch (error) {
+      reminderError = `Could not add preset reminder: ${error}`;
+    } finally {
+      busyReminders = false;
+    }
+  };
+
   const addReminder = async () => {
     busyReminders = true;
     reminderError = '';
@@ -168,6 +185,14 @@
     <input type="time" bind:value={newTime} style="width:auto;" />
     <input type="text" bind:value={newMessage} placeholder="Custom message (optional)" style="flex:1;min-width:160px;" />
     <button on:click={addReminder} disabled={busyReminders}>Add reminder</button>
+  </div>
+  <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: #f0f7f3; border: 1px solid #cce8d8; border-radius: 8px; padding: 0.6rem 0.8rem;">
+    <span style="font-size: 0.84rem; color: #1f5e3d;">
+      💡 <strong>Positive Habit Preset:</strong> Remind yourself at 21:30 to celebrate good health and log a green score.
+    </span>
+    <button type="button" on:click={addPositivePreset} disabled={busyReminders} style="font-size: 0.82rem; padding: 0.35rem 0.75rem; background: #2e8b57; color: white; border: none; border-radius: 6px; cursor: pointer;">
+      + Add 21:30 Evening Check-In
+    </button>
   </div>
 </section>
 
