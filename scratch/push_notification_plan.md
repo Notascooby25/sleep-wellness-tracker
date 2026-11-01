@@ -2,7 +2,7 @@
 
 ## 1. Context
 Push notifications on Android Progressive Web Apps (PWAs) often fail silently due to environmental constraints rather than code bugs. The primary culprits are usually:
-1. **Insecure Contexts:** Android Chrome/Brave strictly requires HTTPS for Service Workers and the Push API. Local IPs (e.g., `http://192.168.x.x`) fail silently.
+1. **Insecure Contexts:** Android Chrome/Brave strictly requires HTTPS for Service Workers and the Push API. Local IPs (e.g., `http://<local-address>`) fail silently.
 2. **Browser Blocking (Brave):** Brave Shields aggressively blocks notification requests and payloads by default.
 3. **OS Battery Optimization:** Android often kills background browser processes unless they are given unrestricted battery usage.
 4. **Lack of Priority Headers:** Android's FCM (Firebase Cloud Messaging) handles push wakeups better if the push payload explicitly defines a high urgency and a time-to-live (TTL).
@@ -29,4 +29,4 @@ We will add a "Test Push" feature for immediate feedback, add priority headers t
 - No database schema changes are required.
 - The standard `docker compose build && docker compose up -d` will deploy the changes.
 - Ensure your `.env` has valid VAPID keys generated (the UI already catches the 503 error if they are missing).
-- **Crucial:** You must be accessing the app via a secure context (like Tailscale with HTTPS enabled, or a reverse proxy with SSL). If you access it via `http://192.168.68.126`, Android will not allow notifications.
+- **Crucial:** You must be accessing the app via a secure context (like Tailscale with HTTPS enabled, or a reverse proxy with SSL). If you access it via `http://<local-address>`, Android will not allow notifications.

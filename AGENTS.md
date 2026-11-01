@@ -1,15 +1,21 @@
+# Set-up answers
+- **What it is and who uses it:** a personal sleep, mood and wellness tracker for the owner.
+- **GitHub:** public. **Real data:** on the production server only, never in this repo.
+- **How it goes live:** merging to `main` builds images and Watchtower updates production. **Master copy:** GitHub.
+- **Preview:** `scripts/preview.sh`. **Process:** full (`safe-change` skill).
+
 # How to Work on This Repo
 - Every time you have an issue, bug, or update to make: Follow `agents/planner_agent.md` to plan it and wait for the user's approval, then follow `agents/implementation_agent.md` to implement it.
 - Before any code change, review the project documentation (`PRODUCT.md` and `DESIGN.md`).
 - If the user explicitly says to skip planning for a small fix, skip the plan, but still follow the testing, commit and safety rules in those files.
 
 # Version Control Rules
-- At the end of every task or major step that involves modifying files, you MUST use the `run_command` tool to stage all changes, commit them with a descriptive commit message explaining the reason for the changes, and push them to the current branch on GitHub.
-- **CRITICAL:** Before any commit or push, you MUST verify the changes run successfully in a local test environment. If the local environment lacks a database, you must mock it with SQLite (`sqlite:///test.db`) and run the API tests. Do NOT push untested backend code.
-- Example command: `git add -A && git commit -m "feat: <description of changes>" && git push`
+- Follow the shared `safe-change` skill for every change. Commit and push to a working branch by explicit path, never to `main`. The owner merges, or gives the go-ahead for that specific merge.
+- **CRITICAL:** Before any commit or push, you MUST verify the changes run successfully locally. Backend tests need a real Postgres: start a throwaway one, then run `cd backend && TEST_DATABASE_URL=<url> pytest tests -q`. Do NOT push untested backend code.
+- **Preview:** `scripts/preview.sh up` runs a private copy of the branch with a copy of live data (`--phone` opens it to home Wi-Fi); `scripts/preview.sh down` stops it and deletes the copy.
 
 # NUC and Deployment Instructions
-- NUC host: `192.168.68.126`. It is a shared production box also running `audio-scrobbler-app` and `UK-Expense-Tracker`. Treat it as multi-tenant, not a sandbox.
+- The NUC host is a shared production box also running `audio-scrobbler-app` and `UK-Expense-Tracker`. Treat it as multi-tenant, not a sandbox.
 - Watchtower polls GHCR every 5 minutes and auto-updates images.
 - **Production Compose Files:** When managing containers on the NUC, ALWAYS check which compose file is actively used by production containers (e.g., `docker inspect <container> | grep com.docker.compose.project.config_files`). Do NOT blindly run `docker-compose up -d` as it defaults to the development `docker-compose.yml`, which can mount local development volumes and cause apparent data loss. Always use `-f docker-compose.prod.yml` if it's the active production configuration.
 - Destructive-command caution: Always check the blast radius (`docker volume ls`, `docker ps -a`) before any delete/wipe/teardown on the NUC to avoid accidentally wiping shared volumes (e.g. Postgres data).

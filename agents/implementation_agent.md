@@ -19,24 +19,24 @@ This repo is **public**. Never commit IPs, hostnames, account or user IDs, or se
    - **Routing & Endpoints:** If you added a new API route, you MUST verify in `main.py` that `app.include_router()` includes the correct `prefix` and `tags`.
    - **Local API Testing (STRICT REQUIREMENT):** You MUST NOT rely purely on static type checking or visual review. If you make changes to database models, schemas, or endpoints, you MUST verify they work at runtime. 
      - Create a `.env` file from `.env.example` if it doesn't exist.
-     - If a PostgreSQL database is unavailable, modify the connection string in your local `.env` to use SQLite (e.g., `DATABASE_URL=sqlite:///test.db`) so the backend can start locally.
-     - Run `pytest test_api.py` or write a temporary Python script to test the endpoints and confirm they return 200 OK and valid JSON without throwing `500 Internal Server Error`.
+     - Start a throwaway Postgres, then run `cd backend && TEST_DATABASE_URL=<url> pytest tests -q`. Production uses Postgres, and SQLite hides errors.
+     - Add to `backend/tests/` when you add behaviour, and confirm endpoints return 200 OK and valid JSON without throwing `500 Internal Server Error`.
      - **NEVER** push changes that touch the backend without successfully testing them locally at runtime.
-3. **Commit and push** at the end of every step:
+3. **Commit and push to the working branch, never to `main`,** at the end of every step:
    ```bash
    git add <explicit paths>
    git commit -m "feat/fix/style: <description>"
    git push
    ```
-   - **Every push to `main` redeploys production** (CI → GHCR → Watchtower takes about 5 minutes).
+   - **A merge to `main` redeploys production** (CI → GHCR → Watchtower takes about 5 minutes), so the owner merges, or gives the go-ahead for that merge.
 4. **Report** in a few lines:
    - what changed
    - the commit hash
-   - whether the push redeploys
+   - what was not checked
 
 After the last step, say: `Implementation complete. Awaiting next plan.`
 
-## 3. After a deploying push
+## 3. After a merge goes live
 - Watchtower picks up the new images within about 5 minutes.
 - The ground truth is `docker exec <container> env` and `docker ps` on the host.
 - The production directory is hand-managed. Do not assume you can `docker compose up` directly on the host without manual intervention from Andy.
