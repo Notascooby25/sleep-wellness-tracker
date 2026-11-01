@@ -73,7 +73,7 @@ How it behaves:
 - **Secrets are included** for the app folders (`.env`, `.env.production` and its `.bak-*` copies, `secrets.toml`, `garmin_tokens.json`) with the source permissions preserved. These app-folder copies go to the NAS only, never to Google.
 - **Safety guards.** A mirror whose source is missing or empty is skipped and reported (it will not empty the NAS copy). A run that would delete more than `MAX_DELETE` (200) files aborts that target. One failing target doesn't stop the others. The script exits non-zero if anything failed; an optional `NAS_HEALTHCHECK_URL` pings healthchecks.io (`/fail` on failure). It takes a lock (`/srv/shared/backups/.synology_sync.lock`), so runs can't overlap.
 - **Config lives outside git** in `~/.config/nas-sync.env` on the NUC (`chmod 600`): `NAS_USER`, `NAS_HOST`, `NAS_PORT` (8022), `NAS_TARGET`. Optional: `SSH_KEY`, `NAS_HEALTHCHECK_URL`.
-- **NAS permissions:** `nuc-server` is mode 700 (owner only), so other NAS users can't reach the copied secrets even where a file is 644 on the NUC. DSM admins still can.
+- **NAS permissions:** `nuc-server` is mode 700 (owner only), so other NAS users can't reach the copied secrets. DSM admins still can.
 - **Dry run:** `./scripts/push_srv_to_synology.sh --dry-run` shows exactly what would change and changes nothing.
 
 ## 4. What changed on 2026-09-20
@@ -162,15 +162,11 @@ cd /srv/audio-scrobbler-app && scripts/restore_drill.sh nas      # also: local, 
 cd /srv/sleepwell && ./scripts/test_restore_dump.sh              # sleepwell DB, throwaway container
 ```
 
-## 8. Known gaps and follow-ups
+## 8. Deployment note
 
-- **No NAS-side pruning of `shared/backups`.** It grows roughly 70 MB/day (about 25 GB/year). Fine for the 2.4 TB volume, but it needs a retention rule eventually.
-- **Other secret files are still mode 644 on the NUC:** `UK-Expense-Tracker/.streamlit/secrets.toml` and `shared/garmin-tokens/garmin_tokens.json` (root-owned). Both are read by containers via bind mounts, so they were left alone rather than risk breaking those apps. They are protected on the NAS by its 700 folder.
 - **Every merge to sleepwell's `main` runs the image build and watchtower redeploys the app,** apart from docs-only merges, which don't. Pull requests never use `[skip ci]`, because required checks would then wait forever.
-- **No alerting on the NAS job** unless `NAS_HEALTHCHECK_URL` is set in `~/.config/nas-sync.env` (a separate healthchecks.io check, every 6h, 1h grace). Set it; without it a dead NAS or rotated key is silent for all three apps.
-- **The sleepwell checkout is load-bearing for every app.** The NAS mirror and the Google copy of all three apps run from `/srv/sleepwell/scripts/`, updated by manual `git pull`. A broken or wiped checkout stops them all; the two heartbeats in [section 9](#9-monitoring-what-tells-you-when-something-stops) are what make that visible. The NUC checkout also carries local edits (`docker-compose.prod.yml`, a mode change on `push_backups_to_synology.sh`), so `pull.ff=only` will refuse a pull that touches those files: do not delete `push_backups_to_synology.sh` upstream until the NUC copy is reset.
-- **The raw duplicate Google cron lines** (`rclone copy` at 00:20/12:20 for `/srv/shared/backups`) were superseded by `sync_backups_to_google.sh`, which adds locking, excludes, pruning and the freshness heartbeat; remove that one line from the NUC crontab. (The `mood-images/sleep-wellness` raw line is a separate destination and stays.) Mood archives are therefore uploaded twice to Google (also inside `backups/sleep-wellness/mood-images/`); harmless redundancy in the same failure domain.
-- **Cleanup dates:** delete `nuc-server/_old-layout/` after about 2026-10-20; delete `push_backups_to_synology.sh` once the new job has run cleanly for a few cycles.
+
+Open follow-ups for this setup are kept in the owner's private notes, not in this public repo.
 
 ## 9. Monitoring: what tells you when something stops
 
