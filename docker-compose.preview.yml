@@ -1,0 +1,74 @@
+# A private copy of the app on the owner's PC, for trying a branch before it
+# goes live. Started by scripts/preview.sh, never by hand. Built from the
+# production Dockerfiles, with no auto-updater, Garmin sync or notification keys.
+#
+# The backend sits on an internal-only network, so it cannot reach Garmin or
+# anything else outside. Only the frontend publishes a port.
+name: sleep-wellness-preview
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: preview
+      POSTGRES_USER: preview
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unset}
+    volumes:
+      - preview_db_data:/var/lib/postgresql/data
+    networks:
+      - preview_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preview -d preview"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://preview:${POSTGRES_PASSWORD:-unset}@db:5432/preview
+      APP_PASSWORD: ${APP_PASSWORD:-}
+      APP_SESSION_SECRET: ${APP_SESSION_SECRET:-}
+      GARMIN_AUTOSYNC_ENABLED: "false"
+      MOOD_IMAGE_DIR: /app/uploads/mood_images
+      MOOD_IMAGE_REQUIRE_MOUNT: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ${PREVIEW_DATA_DIR:-/nonexistent}/images:/app/uploads/mood_images:Z
+    networks:
+      - preview_internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend_web:
+    build:
+      context: ./frontend-web
+    environment:
+      API_BASE: http://backend:8000
+      BODY_SIZE_LIMIT: 15M
+      HOST: 0.0.0.0
+      PORT: "3000"
+      ORIGIN: ${PREVIEW_ORIGIN:-http://localhost:18510}
+    ports:
+      - "${PREVIEW_BIND:-127.0.0.1}:18510:3000"
+    networks:
+      - preview_internal
+      - preview_edge
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  preview_db_data:
+
+networks:
+  preview_internal:
+    internal: true
+  preview_edge:
