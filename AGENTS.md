@@ -10,7 +10,7 @@
 - If the user explicitly says to skip planning for a small fix, skip the plan, but still follow the testing, commit and safety rules in those files.
 
 # Version Control Rules
-- Follow the shared `safe-change` skill for every change. Commit and push to a working branch by explicit path, never to `main`. The owner merges, or gives the go-ahead for that specific merge.
+- Follow the shared `safe-change` skill for every change. Commit and push to a working branch by explicit path, never to `main`. The owner merges, or gives the go-ahead for that specific merge. Never use `[skip ci]` in a pull request, because required checks would then wait forever. Docs-only merges don't redeploy.
 - **CRITICAL:** Before any commit or push, you MUST verify the changes run successfully locally. Backend tests need a real Postgres: start a throwaway one, then run `cd backend && TEST_DATABASE_URL=<url> pytest tests -q`. Do NOT push untested backend code.
 - **Preview:** `scripts/preview.sh up` runs a private copy of the branch with a copy of live data (`--phone` opens it to home Wi-Fi); `scripts/preview.sh down` stops it and deletes the copy.
 
