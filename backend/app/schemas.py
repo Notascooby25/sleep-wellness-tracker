@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -115,6 +115,10 @@ class ActivityUpdate(BaseModel):
     deprecated_at: Optional[datetime] = None
     supports_position: Optional[bool] = None
     ignore_in_reports: Optional[bool] = False
+
+class ActivityReportSettings(BaseModel):
+    report_role: Optional[Literal["possible_cause", "describes_night", "symptom", "reaction", "habit"]] = None
+    hidden_pages: Optional[List[str]] = None
 
 class ActivityResponse(ActivityBase):
     id: int
