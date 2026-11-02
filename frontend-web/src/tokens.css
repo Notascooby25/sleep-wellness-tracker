@@ -8,4 +8,8 @@
   --color-neutral-border: #d9e2ef;
   --color-bg-start: #f9fbff;
   --color-bg-end: #f2f6fc;
+  --color-better: #2a7d4f;
+  --color-worse: #b23b3b;
+  --color-confidence: #5b8fd0;
+  --color-confidence-off: #e3ebf6;
 }

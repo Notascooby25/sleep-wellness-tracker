@@ -294,3 +294,27 @@ def test_advice_ignores_weak_results(signed_in, world, monkeypatch):
     maybe = find(impact(signed_in, days=84)["items"], "Maybe")
     assert maybe["confidence"] == "weak"
     assert signed_in.get("/lifestyle-impact/advice").json()["advice"] == FALLBACKS_LOW
+
+
+def test_same_name_items_merged(signed_in, world):
+    # An old copy (deprecated, other tab) and the current copy of the same item count as one.
+    old = world.item("Exercise", category="Lifestyle", deprecated_at=dt.datetime(2026, 9, 1, tzinfo=UTC))
+    world.item("Walk", category="Lifestyle")
+    current = world.item("Exercise")
+    for day in range(1, 21):
+        if day <= 6:
+            world.log(d(day), ["Walk"])
+            world.db.add(models.Mood(timestamp=dt.datetime.combine(d(day), dt.time(12), tzinfo=UTC), activities=[old]))
+        elif day <= 12:
+            world.log(d(day), ["Reading"])
+            world.db.add(models.Mood(timestamp=dt.datetime.combine(d(day), dt.time(21), tzinfo=UTC), activities=[current]))
+        else:
+            world.log(d(day), ["Reading", "Walk"])
+        world.sleep(d(day + 1), 85 if day <= 12 else 65)
+    world.done()
+
+    body = impact(signed_in)
+    rows = [r for r in body["items"] + body["too_early"] if r["activity"] == "Exercise"]
+    assert len(rows) == 1
+    assert rows[0]["activity_id"] == current.id
+    assert rows[0]["with_nights"] == 12

@@ -127,25 +127,32 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
             item_nights[activity.id].add(night)
             logged_categories[night].add(activity.category_id)
 
+    # Old (deprecated) and current copies of an item share a name; treat them as one item.
+    by_name: dict[str, list[models.Activity]] = defaultdict(list)
+    for activity in activities.values():
+        by_name[(activity.name or "").strip().lower()].append(activity)
+
     candidates: list[tuple[int | None, str, set[dt.date], set[dt.date]]] = []
     left_out: list[dict] = []
-    for activity_id, activity in activities.items():
-        name = (activity.name or "").strip()
-        if is_hidden_on(activity, LIFESTYLE_PAGE):
-            left_out.append({"activity_id": activity_id, "activity": name, "reason": "hidden"})
+    for copies in by_name.values():
+        primary = max(copies, key=lambda a: (a.deprecated_at is None, a.id))
+        name = (primary.name or "").strip()
+        if is_hidden_on(primary, LIFESTYLE_PAGE):
+            left_out.append({"activity_id": primary.id, "activity": name, "reason": "hidden"})
             continue
-        role = effective_role(activity)
+        role = effective_role(primary)
         if role != "possible_cause":
-            if role_was_set_by_owner(activity):
-                left_out.append({"activity_id": activity_id, "activity": name, "reason": role})
+            if role_was_set_by_owner(primary):
+                left_out.append({"activity_id": primary.id, "activity": name, "reason": role})
             continue
-        with_set = item_nights[activity_id]
+        with_set = set().union(*(item_nights[a.id] for a in copies))
+        category_ids = {a.category_id for a in copies}
         without_set = {
             night
             for night, categories in logged_categories.items()
-            if activity.category_id in categories and night not in with_set
+            if categories & category_ids and night not in with_set
         }
-        candidates.append((activity_id, name, with_set, without_set))
+        candidates.append((primary.id, name, with_set, without_set))
 
     workout_rows = (
         db.query(models.GarminActivity.start_time)

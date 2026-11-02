@@ -56,7 +56,7 @@ Autosync can be enabled/disabled via the `GARMIN_AUTOSYNC_ENABLED` environment v
 ### 📊 Analytics & Lifestyle Impact
 - **Analytics dashboard** — visualise trends across sleep, mood, and Garmin metrics over time
 - **Garmin Log** — chronological view of raw synced Garmin data
-- **Garmin Lifestyle Impact** — cross-reference your Garmin biometrics with logged activities to explore how lifestyle choices relate to your sleep quality, HRV, stress, and body battery
+- **Garmin Lifestyle Impact** — compares nights with and without each logged item (and Garmin workouts) for sleep score, last-night HRV, overnight stress, resting heart rate and next-day steps. Results are ranked by how confident the app is, and each item's role (possible cause, habit, describes the night, reaction to a symptom) can be set from its row
 
 ### 📤 Data Export
 - Export your tracked data via the backend API for use in external tools
