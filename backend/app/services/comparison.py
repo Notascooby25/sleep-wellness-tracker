@@ -25,15 +25,18 @@ class Comparison:
 
 
 def _permutation_p(with_values: list[float], without_values: list[float], iterations: int, seed: int) -> float:
-    observed = abs(statistics.fmean(with_values) - statistics.fmean(without_values))
     pooled = list(with_values) + list(without_values)
-    n_with = len(with_values)
+    n_with, n_without = len(with_values), len(without_values)
+    total = sum(pooled)
+
+    def gap(with_sum: float) -> float:
+        return abs(with_sum / n_with - (total - with_sum) / n_without)
+
+    observed = gap(sum(with_values))
     rng = random.Random(seed)
     as_extreme = 0
     for _ in range(iterations):
-        rng.shuffle(pooled)
-        gap = abs(statistics.fmean(pooled[:n_with]) - statistics.fmean(pooled[n_with:]))
-        if gap >= observed - 1e-12:
+        if gap(sum(rng.sample(pooled, n_with))) >= observed - 1e-9:
             as_extreme += 1
     return (as_extreme + 1) / (iterations + 1)
 
