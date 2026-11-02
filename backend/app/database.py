@@ -91,6 +91,14 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE activities ADD COLUMN ignore_in_reports BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
+        if "report_role" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.report_role column for legacy database")
+            conn.execute(text("ALTER TABLE activities ADD COLUMN report_role VARCHAR(32)"))
+
+        if "hidden_pages" not in activity_columns and inspector.has_table("activities"):
+            logger.warning("Adding missing activities.hidden_pages column for legacy database")
+            conn.execute(text("ALTER TABLE activities ADD COLUMN hidden_pages JSON"))
+
         if "supports_position" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.supports_position column for legacy database")
             conn.execute(

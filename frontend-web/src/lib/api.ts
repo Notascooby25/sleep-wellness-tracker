@@ -88,11 +88,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   // For writes, invalidate only GET cache entries for the same resource group.
-  // activities and categories are treated as one group since they are related.
+  // activities and categories are treated as one group since they are related;
+  // an item's report role also changes the impact and report results.
   const firstSegment = path.split('/').filter(Boolean)[0] || '';
   const invalidatePrefixes =
     firstSegment === 'activities' || firstSegment === 'categories'
-      ? ['GET:/activities', 'GET:/categories']
+      ? ['GET:/activities', 'GET:/categories', 'GET:/lifestyle-impact', 'GET:/reports']
       : [`GET:/${firstSegment}`];
 
   for (const key of getCache.keys()) {
