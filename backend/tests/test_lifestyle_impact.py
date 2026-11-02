@@ -254,3 +254,43 @@ def test_twins_flagged(signed_in, world):
     items = impact(signed_in)["items"]
     assert find(items, "Cold")["logged_with"] == ["Bathroom"]
     assert find(items, "Bathroom")["logged_with"] == ["Cold"]
+
+
+FALLBACKS_LOW = "Your last sleep score was 60. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
+
+
+def _advice_world(world, alcohol_nights):
+    for day in range(1, 21):
+        drank = day % 2 == 0 and day <= alcohol_nights * 2
+        world.log(d(day), ["Alcohol"] if drank else ["Reading"] if day % 4 == 1 else ["Journaling"])
+        world.sleep(d(day + 1), 60 if drank else 85)
+    world.sleep(d(22), 60)
+    world.done()
+
+
+def test_advice_warns_about_confident_harm(signed_in, world, monkeypatch):
+    _advice_world(world, alcohol_nights=10)
+    from app.routes import lifestyle_impact
+
+    monkeypatch.setattr(lifestyle_impact, "_today", lambda: END)
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert advice.startswith("Your last sleep score was 60. On nights after Alcohol")
+    assert "points lower" in advice and "skipping" in advice
+
+
+def test_advice_ignores_weak_results(signed_in, world, monkeypatch):
+    with_scores = [70, 98, 64, 96, 62, 92]
+    without_scores = [70, 80, 72, 78, 71, 79]
+    for i in range(6):
+        world.log(d(2 * i + 1), ["Maybe"])
+        world.sleep(d(2 * i + 2), with_scores[i])
+        world.log(d(2 * i + 2), ["Reading"])
+        world.sleep(d(2 * i + 3), without_scores[i])
+    world.sleep(d(14), 60)
+    world.done()
+    from app.routes import lifestyle_impact
+
+    monkeypatch.setattr(lifestyle_impact, "_today", lambda: END)
+    maybe = find(impact(signed_in, days=84)["items"], "Maybe")
+    assert maybe["confidence"] == "weak"
+    assert signed_in.get("/lifestyle-impact/advice").json()["advice"] == FALLBACKS_LOW

@@ -98,7 +98,7 @@ def _round_effect(effect: float, metric: str) -> float:
 
 def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.date | None = None) -> dict:
     higher_is_better = _METRICS[metric]["higher_is_better"]
-    end_date = end_date or dt.datetime.now(UK_TZ).date()
+    end_date = end_date or _today()
     start_date = end_date - dt.timedelta(days=days - 1)
     values_by_night, metric_label = _metric_by_night(db, metric, start_date, end_date)
     window_values = list(values_by_night.values())
@@ -228,28 +228,39 @@ def get_lifestyle_impact(
     return compute_lifestyle_impact(db, metric, days, end_date)
 
 
+def _today() -> dt.date:
+    return dt.datetime.now(UK_TZ).date()
+
+
+def _advice_from_item(score: int, item: dict) -> str:
+    name, size = item["activity"], abs(item["effect"])
+    if item["better"]:
+        return (
+            f"Your last sleep score was {score}. On nights after {name}, your sleep score has been "
+            f"about {size:.0f} points higher. Worth making time for it tonight."
+        )
+    return (
+        f"Your last sleep score was {score}. On nights after {name}, your sleep score has been "
+        f"about {size:.0f} points lower. Worth skipping it tonight."
+    )
+
+
 @router.get("/advice")
 def get_daily_advice(db: Session = Depends(get_db)):
     latest_sleep = db.query(models.GarminSleepDaily).order_by(models.GarminSleepDaily.sleep_date.desc()).first()
-    impact = compute_lifestyle_impact(db, "sleep_score", 84)
-
-    positive_acts = [item for item in impact["items"] if item["better"]]
+    impact = compute_lifestyle_impact(db, "sleep_score", 84, _today())
+    evidence = [
+        item for item in impact["items"] if item["confidence"] in ("strong", "some") and item["activity_id"] is not None
+    ]
 
     advice_msg = "Keep logging your activities to receive personalized predictive advice!"
     if latest_sleep and latest_sleep.sleep_score is not None:
         score = latest_sleep.sleep_score
-        if score < 75:
-            if positive_acts:
-                top = [act["activity"] for act in positive_acts[:2]]
-                acts_str = " and ".join(f"'{a}'" for a in top)
-                advice_msg = f"Your last sleep score was {score}. Historically, activities like {acts_str} improve your sleep. Try prioritizing them today to boost your recovery!"
-            else:
-                advice_msg = f"Your last sleep score was {score}. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
+        if evidence:
+            advice_msg = _advice_from_item(score, evidence[0])
+        elif score < 75:
+            advice_msg = f"Your last sleep score was {score}. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
         else:
-            if positive_acts:
-                top = [act["activity"] for act in positive_acts[:1]]
-                advice_msg = f"Great sleep score of {score}! You're well recovered. Keep up the good habits like '{top[0]}'."
-            else:
-                advice_msg = f"Great sleep score of {score}! You're primed for a highly productive day."
+            advice_msg = f"Great sleep score of {score}! You're primed for a highly productive day."
 
     return {"advice": advice_msg}
