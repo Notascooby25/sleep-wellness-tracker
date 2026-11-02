@@ -79,3 +79,19 @@ def test_unexcluding_on_headache_page_clears_excluding_role(signed_in, clean_db)
     body = signed_in.put(f"/activities/{act['id']}", json={"ignore_in_reports": False}).json()
     assert body["ignore_in_reports"] is False
     assert body["report_role"] is None
+
+
+def test_unknown_hidden_page_rejected(signed_in, clean_db):
+    act = _make_activity(signed_in)
+    response = signed_in.put(f"/activities/{act['id']}/report-settings", json={"hidden_pages": ["x" * 5000]})
+    assert response.status_code == 422
+
+
+def test_table_wipe_refuses_non_test_database():
+    from tests.conftest import _assert_throwaway_database
+
+    import pytest
+
+    with pytest.raises(RuntimeError):
+        _assert_throwaway_database("postgresql://sleepuser:pw@db:5432/sleepdb")
+    _assert_throwaway_database("postgresql://postgres:test@localhost:55432/sleeptest")
