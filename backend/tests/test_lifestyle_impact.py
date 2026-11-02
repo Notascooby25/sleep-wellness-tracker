@@ -318,3 +318,36 @@ def test_same_name_items_merged(signed_in, world):
     assert len(rows) == 1
     assert rows[0]["activity_id"] == current.id
     assert rows[0]["with_nights"] == 12
+
+
+def test_role_on_current_copy_used_when_only_old_copy_logged(signed_in, world):
+    old = world.item("Exercise", category="Lifestyle", deprecated_at=dt.datetime(2026, 9, 1, tzinfo=UTC))
+    current = world.item("Exercise", report_role="habit")
+    for day in range(1, 13):
+        world.db.add(models.Mood(timestamp=dt.datetime.combine(d(day), dt.time(12), tzinfo=UTC), activities=[old]))
+        world.sleep(d(day + 1), 70)
+    world.done()
+
+    body = impact(signed_in)
+    assert {"activity_id": current.id, "activity": "Exercise", "reason": "habit"} in body["left_out"]
+    assert "Exercise" not in names(body["items"]) + names(body["too_early"])
+
+
+def test_two_current_items_with_same_name_stay_separate(signed_in, world):
+    health_pain = world.item("Pain", category="Health")
+    bedtime_pain = world.item("Pain", category="Before Sleep")
+    world.item("Reading")
+    world.item("Walk", category="Health")
+    for day in range(1, 25):
+        acts = [world.activities["Reading"], world.activities["Walk"]]
+        if day % 3 == 0:
+            acts.append(health_pain)
+        elif day % 3 == 1:
+            acts.append(bedtime_pain)
+        world.db.add(models.Mood(timestamp=dt.datetime.combine(d(day), dt.time(21), tzinfo=UTC), activities=acts))
+        world.sleep(d(day + 1), 60 if day % 3 == 0 else 80)
+    world.done()
+
+    body = impact(signed_in)
+    pain_ids = {r["activity_id"] for r in body["items"] + body["too_early"] if r["activity"] == "Pain"}
+    assert pain_ids == {health_pain.id, bedtime_pain.id}

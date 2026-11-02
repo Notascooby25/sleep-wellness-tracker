@@ -52,14 +52,29 @@ def compare(
     without_mean = statistics.fmean(without_values)
     p_value = _permutation_p(with_values, without_values, iterations, seed)
 
-    if p_value < 0.05 and min(with_n, without_n) >= STRONG_MIN_NIGHTS:
-        confidence = "strong"
-    elif p_value < 0.20:
-        confidence = "some"
-    else:
-        confidence = "weak"
-
+    confidence = level_for(p_value, with_n, without_n)
     return Comparison(with_n, without_n, with_mean, without_mean, with_mean - without_mean, p_value, confidence)
+
+
+def level_for(p_value: float, with_n: int, without_n: int) -> str:
+    if p_value < 0.05 and min(with_n, without_n) >= STRONG_MIN_NIGHTS:
+        return "strong"
+    if p_value < 0.20:
+        return "some"
+    return "weak"
+
+
+def bh_adjust(p_values: list[float]) -> list[float]:
+    """Benjamini-Hochberg adjustment, so testing many items at once doesn't manufacture findings."""
+    m = len(p_values)
+    order = sorted(range(m), key=lambda i: p_values[i])
+    adjusted = [0.0] * m
+    running_min = 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        running_min = min(running_min, p_values[i] * m / rank)
+        adjusted[i] = running_min
+    return adjusted
 
 
 def is_negligible(effect: float, all_values: list[float]) -> bool:

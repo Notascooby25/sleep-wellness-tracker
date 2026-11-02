@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .. import models
 from ..database import get_db
-from ..services.comparison import CONFIDENCE_ORDER, MIN_NIGHTS, compare, is_negligible
+from ..services.comparison import CONFIDENCE_ORDER, MIN_NIGHTS, bh_adjust, compare, is_negligible, level_for
 from ..services.insight_dates import UK_TZ, is_late_workout, night_for_entry, night_for_workout
 from ..services.item_roles import (
     LIFESTYLE_PAGE,
@@ -96,6 +96,36 @@ def _round_effect(effect: float, metric: str) -> float:
     return round(effect) if metric == "steps" else round(effect, 1)
 
 
+def _group_old_and_current_copies(
+    db: Session, logged: dict[int, models.Activity]
+) -> list[tuple[models.Activity, list[models.Activity]]]:
+    """Fold deprecated copies of an item into its single current copy, which owns the role.
+
+    Two current items that happen to share a name stay separate.
+    """
+    names = {(a.name or "").strip().lower() for a in logged.values()}
+    same_named: dict[str, list[models.Activity]] = defaultdict(list)
+    for activity in db.query(models.Activity).options(selectinload(models.Activity.category)).all():
+        key = (activity.name or "").strip().lower()
+        if key in names:
+            same_named[key].append(activity)
+
+    primary_of: dict[int, models.Activity] = {}
+    for copies in same_named.values():
+        current = [a for a in copies if a.deprecated_at is None]
+        fallback = max(current or copies, key=lambda a: a.id)
+        for activity in copies:
+            primary_of[activity.id] = activity if activity.deprecated_at is None and len(current) > 1 else fallback
+
+    members: dict[int, list[models.Activity]] = defaultdict(list)
+    primaries: dict[int, models.Activity] = {}
+    for activity_id, activity in logged.items():
+        primary = primary_of.get(activity_id, activity)
+        primaries[primary.id] = primary
+        members[primary.id].append(activity)
+    return [(primaries[pid], copies) for pid, copies in members.items()]
+
+
 def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.date | None = None) -> dict:
     higher_is_better = _METRICS[metric]["higher_is_better"]
     end_date = end_date or _today()
@@ -127,15 +157,11 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
             item_nights[activity.id].add(night)
             logged_categories[night].add(activity.category_id)
 
-    # Old (deprecated) and current copies of an item share a name; treat them as one item.
-    by_name: dict[str, list[models.Activity]] = defaultdict(list)
-    for activity in activities.values():
-        by_name[(activity.name or "").strip().lower()].append(activity)
+    groups = _group_old_and_current_copies(db, activities)
 
     candidates: list[tuple[int | None, str, set[dt.date], set[dt.date]]] = []
     left_out: list[dict] = []
-    for copies in by_name.values():
-        primary = max(copies, key=lambda a: (a.deprecated_at is None, a.id))
+    for primary, copies in groups:
         name = (primary.name or "").strip()
         if is_hidden_on(primary, LIFESTYLE_PAGE):
             left_out.append({"activity_id": primary.id, "activity": name, "reason": "hidden"})
@@ -171,7 +197,7 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
         if nights:
             candidates.append((None, label, nights, all_nights - nights))
 
-    items: list[dict] = []
+    tested = []
     too_early: list[dict] = []
     for activity_id, name, with_set, without_set in candidates:
         with_nights = sorted(night for night in with_set if night in values_by_night)
@@ -182,6 +208,12 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
         if result.confidence == "too_early":
             too_early.append({"activity_id": activity_id, "activity": name, "with_nights": result.with_n})
             continue
+        tested.append((activity_id, name, with_nights, result))
+
+    adjusted = bh_adjust([result.p_value for *_, result in tested])
+    items: list[dict] = []
+    for (activity_id, name, with_nights, result), q_value in zip(tested, adjusted):
+        result.confidence = level_for(q_value, result.with_n, result.without_n)
         if is_negligible(result.effect, window_values):
             continue
         items.append(
