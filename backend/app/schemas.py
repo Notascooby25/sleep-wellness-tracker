@@ -101,6 +101,8 @@ class ActivityBase(BaseModel):
     deprecated_at: Optional[datetime] = None
     supports_position: Optional[bool] = False
     ignore_in_reports: Optional[bool] = False
+    report_role: Optional[str] = None
+    hidden_pages: Optional[List[str]] = None
 
 class ActivityCreate(ActivityBase):
     pass

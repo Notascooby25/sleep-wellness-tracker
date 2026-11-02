@@ -31,6 +31,42 @@ def client():
     return TestClient(app)
 
 
+_CLEANED_TABLES = (
+    "mood_activity_details",
+    "mood_activities",
+    "moods",
+    "activities",
+    "categories",
+    "garmin_sleep_daily",
+    "garmin_hrv_daily",
+    "garmin_stress_daily",
+    "garmin_resting_heart_rate_daily",
+    "garmin_steps_daily",
+    "garmin_activities",
+)
+
+
+@pytest.fixture
+def db():
+    from app.database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def clean_db():
+    from sqlalchemy import text
+
+    from app.database import engine
+
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {', '.join(_CLEANED_TABLES)} RESTART IDENTITY CASCADE"))
+
+
 @pytest.fixture
 def signed_in(client):
     response = client.post("/auth/login", json={"password": "test-password"})

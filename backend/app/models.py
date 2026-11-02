@@ -54,6 +54,8 @@ class Activity(Base):
     deprecated_at = Column(DateTime(timezone=True), nullable=True)
     supports_position = Column(Boolean, default=False, nullable=False)
     ignore_in_reports = Column(Boolean, default=False, nullable=False, server_default=text("FALSE"))
+    report_role = Column(String(32), nullable=True)
+    hidden_pages = Column(JSON, nullable=True)
 
     category = relationship("Category", back_populates="activities")
     moods = relationship("Mood", secondary=mood_activities, back_populates="activities")
