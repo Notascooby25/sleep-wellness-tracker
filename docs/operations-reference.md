@@ -47,6 +47,16 @@ sudo docker compose -f docker-compose.prod.yml pull backend frontend_web
 sudo docker compose -f docker-compose.prod.yml up -d --force-recreate backend frontend_web
 ```
 
+**Watchtower says `Scanned=0`**
+
+Each app on the NUC has its own Watchtower with its own scope. Sleepwell's only updates containers labelled `com.centurylinklabs.watchtower.scope=sleep-wellness-tracker`. If `docker logs sleep_watchtower` shows `Scanned=0`, the app containers have lost that label, so nothing is being updated. Check with:
+
+```bash
+docker inspect sleep_backend sleep_frontend_web --format '{{.Name}} scope=[{{index .Config.Labels "com.centurylinklabs.watchtower.scope"}}]'
+```
+
+Both labels come from `docker-compose.prod.yml`. Recreate the containers from that file to put them back. A healthy log shows `Scanned=2`.
+
 **GHCR authentication**
 
 GHCR pulls need `/root/.docker/config.json` on the NUC. Watchtower reads it from a bind mount. If Watchtower logs show `auth: "not present"`:

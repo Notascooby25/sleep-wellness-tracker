@@ -28,6 +28,8 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/notascooby25/sleep-wellness-tracker-backend:latest}
     container_name: sleep_backend
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.scope=sleep-wellness-tracker
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
@@ -56,6 +58,8 @@ services:
     image: ${FRONTEND_WEB_IMAGE:-ghcr.io/notascooby25/sleep-wellness-tracker-frontend-web:latest}
     container_name: sleep_frontend_web
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.scope=sleep-wellness-tracker
     env_file: .env
     environment:
       - API_BASE=http://backend:8000
@@ -66,7 +70,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8510:3000"
+      - "127.0.0.1:8510:3000"
     logging:
       driver: json-file
       options:
@@ -77,12 +81,15 @@ services:
     image: containrrr/watchtower:latest
     container_name: sleep_watchtower
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.scope=sleep-wellness-tracker
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/.docker/config.json:/config.json:ro
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_SCOPE=sleep-wellness-tracker
       - DOCKER_API_VERSION=${DOCKER_API_VERSION:-1.41}
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
     command: sleep_backend sleep_frontend_web
