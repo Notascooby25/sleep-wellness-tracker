@@ -20,8 +20,13 @@ def night_for_entry(logged_at: dt.datetime, before_sleep: bool) -> dt.date:
 
 
 def night_for_workout(start_time: dt.datetime) -> dt.date:
-    return start_time.astimezone(UK_TZ).date() + _ONE_DAY
+    local = start_time.astimezone(UK_TZ)
+    day = local.date()
+    if local.hour < 4:
+        return day
+    return day + _ONE_DAY
 
 
 def is_late_workout(start_time: dt.datetime) -> bool:
-    return start_time.astimezone(UK_TZ).hour >= 18
+    local_hour = start_time.astimezone(UK_TZ).hour
+    return local_hour >= 18 or local_hour < 4
