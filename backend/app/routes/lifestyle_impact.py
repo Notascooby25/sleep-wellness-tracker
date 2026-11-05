@@ -76,7 +76,19 @@ def _metric_by_night(db: Session, metric: str, start: dt.date, end: dt.date) -> 
         values = {
             day: value
             for day, payload in rows
-            if (value := _dig(payload, ("hrvSummary", "lastNightAvg"), ("hrvSummary", "lastNightAverage"), ("lastNightAvg",)))
+            if (
+                value := _dig(
+                    payload,
+                    ("hrvSummary", "lastNightAvg"),
+                    ("hrvSummary", "lastNightAverage"),
+                    ("hrvSummary", "lastNight"),
+                    ("hrvStatus", "lastNightAvg"),
+                    ("hrvStatus", "lastNightAverage"),
+                    ("hrvStatus", "lastNight"),
+                    ("lastNightAvg",),
+                    ("lastNightAverage",),
+                )
+            )
             is not None
         }
         return values, label
@@ -192,10 +204,23 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
     workout_nights = {night_for_workout(start) for (start,) in workout_rows}
     late_nights = {night_for_workout(start) for (start,) in workout_rows if is_late_workout(start)}
     all_nights = set(values_by_night)
+
+    earliest_activity = (
+        db.query(models.GarminActivity.start_time)
+        .filter(models.GarminActivity.start_time.isnot(None))
+        .order_by(models.GarminActivity.activity_date.asc(), models.GarminActivity.start_time.asc())
+        .first()
+    )
+    if earliest_activity is not None:
+        earliest_tracked_night = night_for_workout(earliest_activity[0])
+        eligible_workout_nights = {night for night in all_nights if night >= earliest_tracked_night}
+    else:
+        eligible_workout_nights = set()
+
     for label, nights in ((WORKOUT_LABEL, workout_nights), (LATE_WORKOUT_LABEL, late_nights)):
         nights = {night for night in nights if in_window(night)}
         if nights:
-            candidates.append((None, label, nights, all_nights - nights))
+            candidates.append((None, label, nights, eligible_workout_nights - nights))
 
     tested = []
     too_early: list[dict] = []

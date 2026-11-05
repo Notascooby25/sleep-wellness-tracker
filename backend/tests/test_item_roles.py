@@ -26,12 +26,13 @@ def test_default_roles_follow_category():
     assert default_role_for_category(None) == "possible_cause"
 
 
-def test_ignored_activity_counts_as_habit():
+def test_ignored_activity_does_not_affect_effective_role():
     from app import models
     from app.services.item_roles import effective_role
 
     activity = models.Activity(name="x", ignore_in_reports=True, report_role=None)
-    assert effective_role(activity) == "habit"
+    activity.category = models.Category(name="Before Sleep")
+    assert effective_role(activity) == "possible_cause"
 
 
 def test_owner_role_beats_default():
@@ -43,13 +44,13 @@ def test_owner_role_beats_default():
     assert effective_role(activity) == "reaction"
 
 
-def test_set_role_via_api_also_sets_ignore_flag(signed_in, clean_db):
+def test_set_role_via_api_does_not_touch_ignore_flag(signed_in, clean_db):
     act = _make_activity(signed_in)
     url = f"/activities/{act['id']}/report-settings"
 
     body = signed_in.put(url, json={"report_role": "habit"}).json()
     assert body["report_role"] == "habit"
-    assert body["ignore_in_reports"] is True
+    assert body["ignore_in_reports"] is False
 
     body = signed_in.put(url, json={"report_role": None}).json()
     assert body["report_role"] is None
@@ -72,13 +73,13 @@ def test_unknown_role_rejected(signed_in, clean_db):
     assert response.status_code == 422
 
 
-def test_unexcluding_on_headache_page_clears_excluding_role(signed_in, clean_db):
+def test_unexcluding_on_headache_page_does_not_touch_report_role(signed_in, clean_db):
     act = _make_activity(signed_in)
     signed_in.put(f"/activities/{act['id']}/report-settings", json={"report_role": "habit"})
 
     body = signed_in.put(f"/activities/{act['id']}", json={"ignore_in_reports": False}).json()
     assert body["ignore_in_reports"] is False
-    assert body["report_role"] is None
+    assert body["report_role"] == "habit"
 
 
 def test_unknown_hidden_page_rejected(signed_in, clean_db):

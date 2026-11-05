@@ -76,33 +76,33 @@ def _ensure_legacy_schema_compatibility() -> None:
         if "is_archived" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.is_archived column for legacy database")
             conn.execute(
-                text("ALTER TABLE activities ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE")
+                text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
         if "deprecated_at" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.deprecated_at column for legacy database")
             conn.execute(
-                text("ALTER TABLE activities ADD COLUMN deprecated_at TIMESTAMP WITH TIME ZONE")
+                text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS deprecated_at TIMESTAMP WITH TIME ZONE")
             )
 
         if "ignore_in_reports" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.ignore_in_reports column for legacy database")
             conn.execute(
-                text("ALTER TABLE activities ADD COLUMN ignore_in_reports BOOLEAN NOT NULL DEFAULT FALSE")
+                text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS ignore_in_reports BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
         if "report_role" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.report_role column for legacy database")
-            conn.execute(text("ALTER TABLE activities ADD COLUMN report_role VARCHAR(32)"))
+            conn.execute(text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS report_role VARCHAR(32)"))
 
         if "hidden_pages" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.hidden_pages column for legacy database")
-            conn.execute(text("ALTER TABLE activities ADD COLUMN hidden_pages JSON"))
+            conn.execute(text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS hidden_pages JSON"))
 
         if "supports_position" not in activity_columns and inspector.has_table("activities"):
             logger.warning("Adding missing activities.supports_position column for legacy database")
             conn.execute(
-                text("ALTER TABLE activities ADD COLUMN supports_position BOOLEAN NOT NULL DEFAULT FALSE")
+                text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS supports_position BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
         if inspector.has_table("activities"):
@@ -114,19 +114,19 @@ def _ensure_legacy_schema_compatibility() -> None:
         if "require_rating" not in category_columns:
             logger.warning("Adding missing categories.require_rating column for legacy database")
             conn.execute(
-                text("ALTER TABLE categories ADD COLUMN require_rating INTEGER NOT NULL DEFAULT 1")
+                text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS require_rating INTEGER NOT NULL DEFAULT 1")
             )
 
         if "rating_label" not in category_columns:
             logger.warning("Adding missing categories.rating_label column for legacy database")
             conn.execute(
-                text("ALTER TABLE categories ADD COLUMN rating_label VARCHAR(80)")
+                text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS rating_label VARCHAR(80)")
             )
 
         if "supports_position" not in category_columns:
             logger.warning("Adding missing categories.supports_position column for legacy database")
             conn.execute(
-                text("ALTER TABLE categories ADD COLUMN supports_position BOOLEAN NOT NULL DEFAULT FALSE")
+                text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS supports_position BOOLEAN NOT NULL DEFAULT FALSE")
             )
 
         if inspector.has_table("position_options"):
@@ -138,37 +138,37 @@ def _ensure_legacy_schema_compatibility() -> None:
         if "image_url" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.image_url column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN image_url VARCHAR(1024)")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS image_url VARCHAR(1024)")
             )
 
         if "image_urls" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.image_urls column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN image_urls JSON")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS image_urls JSON")
             )
 
         if "subjective_sleep_rating" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.subjective_sleep_rating column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN subjective_sleep_rating INTEGER")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS subjective_sleep_rating INTEGER")
             )
 
         if "weather_temperature_c" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.weather_temperature_c column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN weather_temperature_c NUMERIC(5, 2)")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS weather_temperature_c NUMERIC(5, 2)")
             )
 
         if "weather_condition" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.weather_condition column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN weather_condition VARCHAR(80)")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS weather_condition VARCHAR(80)")
             )
 
         if "weather_cloud_cover" not in mood_columns and inspector.has_table("moods"):
             logger.warning("Adding missing moods.weather_cloud_cover column for legacy database")
             conn.execute(
-                text("ALTER TABLE moods ADD COLUMN weather_cloud_cover INTEGER")
+                text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS weather_cloud_cover INTEGER")
             )
 
         position_column = detail_columns.get("position")

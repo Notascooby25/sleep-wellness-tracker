@@ -28,14 +28,12 @@ def is_before_sleep(category_name: str | None) -> bool:
 def effective_role(activity: models.Activity) -> str:
     if activity.report_role:
         return activity.report_role
-    if activity.ignore_in_reports:
-        return "habit"
     category = activity.category
     return default_role_for_category(category.name if category is not None else None)
 
 
 def role_was_set_by_owner(activity: models.Activity) -> bool:
-    return bool(activity.report_role) or bool(activity.ignore_in_reports)
+    return bool(activity.report_role)
 
 
 def is_hidden_on(activity: models.Activity, page: str) -> bool:

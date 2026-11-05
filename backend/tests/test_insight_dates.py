@@ -33,3 +33,17 @@ def test_workouts():
     assert night_for_workout(evening) == dt.date(2026, 10, 13)
     assert is_late_workout(evening) is True
     assert is_late_workout(at(2026, 10, 12, 16, 30)) is False
+
+
+def test_midnight_workout_belongs_to_night_underway():
+    # 01:30 BST on Sunday 2026-10-11 (00:30 UTC) belongs to Saturday night's sleep (sleep_date 2026-10-11)
+    workout_time = at(2026, 10, 11, 0, 30)
+    assert night_for_workout(workout_time) == dt.date(2026, 10, 11)
+    assert is_late_workout(workout_time) is True
+
+
+def test_early_morning_workout_belongs_to_following_night():
+    # 05:30 BST on Sunday 2026-10-11 (04:30 UTC) belongs to Sunday night's sleep (sleep_date 2026-10-12)
+    workout_time = at(2026, 10, 11, 4, 30)
+    assert night_for_workout(workout_time) == dt.date(2026, 10, 12)
+    assert is_late_workout(workout_time) is False

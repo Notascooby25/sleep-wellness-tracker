@@ -90,20 +90,25 @@ def test_unlogged_evening_is_not_a_without_night(signed_in, world):
 def test_night_items_and_habits_left_out(signed_in, world):
     world.item("Woke During Night", category="During Sleep")
     world.item("Meditation", report_role="habit")
-    world.item("Old exclusion", ignore_in_reports=True)
+    world.item("Stretching", report_role="habit")
     world.item("Hidden here", hidden_pages=["lifestyle_impact"])
+    world.item("Headache only exclusion", ignore_in_reports=True)
     for day in range(1, 21):
-        world.log(d(day), ["Meditation", "Old exclusion", "Hidden here"] if day % 2 else ["Reading"])
+        world.log(
+            d(day),
+            ["Meditation", "Stretching", "Hidden here", "Headache only exclusion"] if day % 2 else ["Reading"],
+        )
         world.log(d(day + 1), ["Woke During Night"], hour=7)
         world.sleep(d(day + 1), 60 if day % 2 else 80)
     world.done()
 
     body = impact(signed_in)
     shown = names(body["items"]) + names(body["too_early"])
-    for name in ("Woke During Night", "Meditation", "Old exclusion", "Hidden here"):
+    for name in ("Woke During Night", "Meditation", "Stretching", "Hidden here"):
         assert name not in shown
+    assert "Headache only exclusion" in shown
     reasons = {row["activity"]: row["reason"] for row in body["left_out"]}
-    assert reasons == {"Meditation": "habit", "Old exclusion": "habit", "Hidden here": "hidden"}
+    assert reasons == {"Meditation": "habit", "Stretching": "habit", "Hidden here": "hidden"}
 
 
 def test_too_early_group(signed_in, world):
@@ -165,6 +170,19 @@ def test_hrv_uses_last_night(signed_in, world):
     assert alcohol["effect"] == pytest.approx(-30)
 
 
+def test_hrv_extracts_from_hrv_status_payload(signed_in, world):
+    for day in range(1, 21):
+        world.log(d(day), ["Alcohol"] if day % 2 == 0 else ["Reading"])
+        last_night = 50 if day % 2 == 0 else 80
+        world.db.add(models.GarminHRVDaily(
+            hrv_date=d(day + 1), weekly_avg=70, payload={"hrvStatus": {"lastNightAvg": last_night}}
+        ))
+    world.done()
+
+    alcohol = find(impact(signed_in, metric="overnight_hrv")["items"], "Alcohol")
+    assert alcohol["effect"] == pytest.approx(-30)
+
+
 def test_stress_uses_sleep_stress(signed_in, world):
     for day in range(1, 21):
         world.log(d(day), ["Alcohol"] if day % 2 == 0 else ["Reading"])
@@ -217,6 +235,24 @@ def test_workouts_included(signed_in, world):
     assert workout["activity_id"] is None
     assert workout["with_nights"] == 6
     assert find(body["too_early"], "Late workout (after 6pm)")["with_nights"] == 3
+
+
+def test_workouts_not_falsely_penalized_before_tracking_began(signed_in, world):
+    for day in range(1, 26):
+        world.sleep(d(day + 1), 60 if 10 <= day <= 15 else 80)
+    for day in range(10, 16):
+        world.db.add(models.GarminActivity(
+            garmin_activity_id=f"w{day}", activity_date=d(day),
+            start_time=dt.datetime.combine(d(day), dt.time(10), tzinfo=UTC), duration_seconds=1800,
+        ))
+    world.done()
+
+    body = impact(signed_in, days=28)
+    workout = find(body["items"], "Workout")
+    assert workout["with_nights"] == 6
+    # 10 nights after tracking began (days 16..25); days 1..9 before tracking began are excluded
+    assert workout["without_nights"] == 10
+    assert workout["effect"] == pytest.approx(-20)
 
 
 def test_missing_fields_and_empty_period(signed_in, world):
