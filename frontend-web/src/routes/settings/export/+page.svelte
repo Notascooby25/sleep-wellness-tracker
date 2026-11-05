@@ -169,27 +169,45 @@
       }
 
       const totalBytes = Number(response.headers.get('content-length') || '0');
-      const reader = response.body?.getReader();
-      const chunks: Uint8Array[] = [];
-      let receivedBytes = 0;
+      let blob: Blob;
 
-      if (reader && totalBytes > 0) {
+      if (response.body) {
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let receivedBytes = 0;
+
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           if (value) {
             chunks.push(value);
             receivedBytes += value.byteLength;
-            downloadProgressPct = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+            if (totalBytes > 0) {
+              downloadProgressPct = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+            }
           }
+        }
+        const mimeType = includeImages ? 'application/zip' : 'text/csv;charset=utf-8';
+        blob = new Blob(chunks as BlobPart[], {
+          type: response.headers.get('content-type') || mimeType
+        });
+      } else {
+        blob = await response.blob();
+      }
+
+      const disposition = response.headers.get('content-disposition');
+      let filename = includeImages ? `export_${startDate}_${endDate}.zip` : `export_${startDate}_${endDate}.csv`;
+      if (disposition) {
+        const match = disposition.match(/filename=["']?([^"';]+)["']?/i);
+        if (match && match[1]) {
+          filename = match[1].trim();
         }
       }
 
-      const blob = chunks.length ? new Blob(chunks as BlobPart[]) : await response.blob();
       const href = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = href;
-      a.download = includeImages ? `export_${startDate}_${endDate}.zip` : `export_${startDate}_${endDate}.csv`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
