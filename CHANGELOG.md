@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.20.2 (2026-11-05)
+
+**Lifestyle impact improvements and independent headache tracking.** Updating an item's role or hiding it on the Lifestyle Impact page now only affects that page, leaving potential triggers untouched on the headache report. Midnight workouts (between midnight and 04:00) now correctly count towards the night underway and are tagged as late workouts. Fixed summertime local timestamp handling on Garmin workouts so evening workouts are not recorded an hour early. Added support for alternative Garmin HRV payload structures, bounded workout comparisons to active tracking periods, and protected database startup migrations with `IF NOT EXISTS` for worker safety.
+
 ## 4.20.1 (2026-11-05)
 
 **Readable exports and reliable CSV downloads.** Fixed an issue where downloading CSV data exports from Settings could fail with a stream error (`body stream is locked`). In the Mood Log Tools page, data exports (CSV, JSON, and full backups) now include human-readable activity and category names alongside database IDs so backup files are easy to read and understand.
