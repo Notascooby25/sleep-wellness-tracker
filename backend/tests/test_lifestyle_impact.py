@@ -90,20 +90,25 @@ def test_unlogged_evening_is_not_a_without_night(signed_in, world):
 def test_night_items_and_habits_left_out(signed_in, world):
     world.item("Woke During Night", category="During Sleep")
     world.item("Meditation", report_role="habit")
-    world.item("Old exclusion", ignore_in_reports=True)
+    world.item("Stretching", report_role="habit")
     world.item("Hidden here", hidden_pages=["lifestyle_impact"])
+    world.item("Headache only exclusion", ignore_in_reports=True)
     for day in range(1, 21):
-        world.log(d(day), ["Meditation", "Old exclusion", "Hidden here"] if day % 2 else ["Reading"])
+        world.log(
+            d(day),
+            ["Meditation", "Stretching", "Hidden here", "Headache only exclusion"] if day % 2 else ["Reading"],
+        )
         world.log(d(day + 1), ["Woke During Night"], hour=7)
         world.sleep(d(day + 1), 60 if day % 2 else 80)
     world.done()
 
     body = impact(signed_in)
     shown = names(body["items"]) + names(body["too_early"])
-    for name in ("Woke During Night", "Meditation", "Old exclusion", "Hidden here"):
+    for name in ("Woke During Night", "Meditation", "Stretching", "Hidden here"):
         assert name not in shown
+    assert "Headache only exclusion" in shown
     reasons = {row["activity"]: row["reason"] for row in body["left_out"]}
-    assert reasons == {"Meditation": "habit", "Old exclusion": "habit", "Hidden here": "hidden"}
+    assert reasons == {"Meditation": "habit", "Stretching": "habit", "Hidden here": "hidden"}
 
 
 def test_too_early_group(signed_in, world):

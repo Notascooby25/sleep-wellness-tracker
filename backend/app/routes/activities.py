@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
-from ..services.item_roles import EXCLUDING_ROLES
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -64,9 +63,6 @@ def update_activity(activity_id: int, payload: schemas.ActivityUpdate, db: Sessi
         act.supports_position = bool(payload.supports_position)
     if "ignore_in_reports" in payload.model_fields_set:
         act.ignore_in_reports = bool(payload.ignore_in_reports)
-        # Un-excluding on the headache page must also undo a role that excludes it.
-        if not act.ignore_in_reports and act.report_role in EXCLUDING_ROLES:
-            act.report_role = None
 
     db.commit()
     db.refresh(act)
@@ -82,7 +78,6 @@ def update_report_settings(
 
     if "report_role" in payload.model_fields_set:
         act.report_role = payload.report_role
-        act.ignore_in_reports = payload.report_role in EXCLUDING_ROLES
     if "hidden_pages" in payload.model_fields_set:
         act.hidden_pages = sorted(set(payload.hidden_pages or [])) or None
 
