@@ -5,6 +5,7 @@ from .. import models
 ROLES = ("possible_cause", "describes_night", "symptom", "reaction", "habit")
 EXCLUDING_ROLES = {"describes_night", "symptom", "reaction", "habit"}
 LIFESTYLE_PAGE = "lifestyle_impact"
+ACUPUNCTURE_PAGE = "acupuncture_report"
 
 _DEFAULT_BY_CATEGORY = {
     "during sleep": "describes_night",
@@ -30,6 +31,10 @@ def effective_role(activity: models.Activity) -> str:
         return activity.report_role
     category = activity.category
     return default_role_for_category(category.name if category is not None else None)
+
+
+def is_symptom(activity: models.Activity) -> bool:
+    return effective_role(activity) == "symptom"
 
 
 def role_was_set_by_owner(activity: models.Activity) -> bool:

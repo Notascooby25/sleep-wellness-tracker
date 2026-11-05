@@ -110,6 +110,21 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("UPDATE activities SET supports_position = TRUE WHERE name = ANY(:names)"),
                 {"names": position_activity_names},
             )
+            conn.execute(
+                text("""
+                    UPDATE activities
+                    SET report_role = 'symptom'
+                    WHERE report_role IS NULL
+                      AND (
+                        LOWER(name) LIKE '%headache%'
+                        OR LOWER(name) LIKE '%migraine%'
+                        OR LOWER(name) LIKE '%jaw%'
+                        OR category_id IN (
+                            SELECT id FROM categories WHERE LOWER(TRIM(name)) = 'headache issues'
+                        )
+                      )
+                """)
+            )
 
         if "require_rating" not in category_columns:
             logger.warning("Adding missing categories.require_rating column for legacy database")

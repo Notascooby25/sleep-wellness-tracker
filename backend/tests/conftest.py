@@ -43,6 +43,7 @@ _CLEANED_TABLES = (
     "garmin_resting_heart_rate_daily",
     "garmin_steps_daily",
     "garmin_activities",
+    "garmin_hydration_daily",
 )
 
 

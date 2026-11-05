@@ -116,7 +116,7 @@ secret=$(sed -n 's/^APP_SESSION_SECRET=//p' "$DATA/preview.secrets.env")
 check "session secret generated" test -n "$secret"
 check "session secret never printed" hasnt "$T/out.txt" "$secret"
 pw=$(sed -n 's/^APP_PASSWORD=//p' "$DATA/preview.secrets.env")
-check "throwaway password shown once to sign in" grep -qF "$pw" "$T/out.txt"
+check "throwaway password shown once to sign in" grep -qF -- "$pw" "$T/out.txt"
 
 echo "private to this PC unless the phone is asked for"
 setup

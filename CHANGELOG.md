@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.21.0 (2026-11-05)
+
+**Headache and symptom tracking you can trust.** The Acupuncture & Symptom Report now uses the same trustworthy comparison method and Quiet Sanctuary design introduced for sleep impact. It identifies symptom days automatically from activities marked as symptoms (including migraines, headaches, and jaw pain) and compares them against symptom-free days.
+
+Triggers are divided into causes from the day and evening before (including Garmin workouts and biometrics like sleep score, overnight stress, HRV, resting heart rate, and hydration) and same-day events (kept separate so treatments like painkillers are not mistaken for causes). Each result shows confidence bars (Strong, Some evidence, Weak) backed by statistical permutation testing and multiple-testing corrections. Items with fewer than 5 days wait in "Too early to tell", and items you choose to exclude appear as restoreable chips under "Left out of this page".
+
 ## 4.20.2 (2026-11-05)
 
 **Lifestyle impact improvements and independent headache tracking.** Updating an item's role or hiding it on the Lifestyle Impact page now only affects that page, leaving potential triggers untouched on the headache report. Midnight workouts (between midnight and 04:00) now correctly count towards the night underway and are tagged as late workouts. Fixed summertime local timestamp handling on Garmin workouts so evening workouts are not recorded an hour early. Added support for alternative Garmin HRV payload structures, bounded workout comparisons to active tracking periods, and protected database startup migrations with `IF NOT EXISTS` for worker safety.
