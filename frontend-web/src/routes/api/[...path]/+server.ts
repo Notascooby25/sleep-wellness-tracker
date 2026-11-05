@@ -131,6 +131,14 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
     if (upstreamContentType) {
       responseHeaders.set('content-type', upstreamContentType);
     }
+    const upstreamContentLength = upstream.headers.get('content-length');
+    if (upstreamContentLength) {
+      responseHeaders.set('content-length', upstreamContentLength);
+    }
+    const upstreamContentDisposition = upstream.headers.get('content-disposition');
+    if (upstreamContentDisposition) {
+      responseHeaders.set('content-disposition', upstreamContentDisposition);
+    }
     const upstreamSetCookies =
       typeof upstream.headers.getSetCookie === 'function'
         ? upstream.headers.getSetCookie()

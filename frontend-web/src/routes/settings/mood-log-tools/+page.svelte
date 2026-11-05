@@ -10,13 +10,19 @@
     image_urls: string[];
     timestamp: string;
     activity_ids: number[];
+    activity_names?: string[];
+  };
+
+  type EnrichedMoodEntry = MoodEntry & {
+    activity_names?: string[];
+    category_names?: string[];
   };
 
   type BackupPayload = {
     version: string;
     exported_at: string;
     timezone: string;
-    entries: MoodEntry[];
+    entries: EnrichedMoodEntry[];
     activities: Activity[];
     categories: Category[];
   };
@@ -127,6 +133,29 @@
     return [text];
   };
 
+  const parseActivityNames = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item).trim()).filter((item) => item.length > 0);
+    }
+    if (typeof value !== 'string') return [];
+    const text = value.trim();
+    if (!text) return [];
+
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter((item) => item.length > 0);
+      }
+    } catch {
+      // Not JSON array, continue with comma split.
+    }
+
+    return text
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0);
+  };
+
   const normalizeImportRow = (row: Record<string, unknown>): ImportRow => {
     const moodRaw = row.mood_score ?? row.rating ?? null;
     const moodNum = moodRaw === null || moodRaw === '' ? null : Number(moodRaw);
@@ -136,7 +165,8 @@
       notes: (row.notes ?? row.note ?? null) as string | null,
       image_urls: parseImageUrls(row.image_urls ?? row.image_url ?? []),
       timestamp: String(row.timestamp ?? ''),
-      activity_ids: parseActivityIds(row.activity_ids ?? row.activities ?? [])
+      activity_ids: parseActivityIds(row.activity_ids ?? row.activities ?? []),
+      activity_names: parseActivityNames(row.activity_names ?? [])
     };
   };
 
@@ -229,8 +259,40 @@
     cleanupCategoryIds = Array.from(select.selectedOptions).map((o) => Number(o.value));
   };
 
+  $: activityMap = new Map<number, Activity>(activities.map((a) => [a.id, a]));
+  $: categoryMap = new Map<number, Category>(categories.map((c) => [c.id, c]));
+
+  const getActivityNames = (ids: number[]): string[] => {
+    return (ids || [])
+      .map((id) => activityMap.get(id)?.name?.trim() || '')
+      .filter((name) => name.length > 0);
+  };
+
+  const getCategoryNames = (ids: number[]): string[] => {
+    const names = new Set<string>();
+    for (const id of ids || []) {
+      const act = activityMap.get(id);
+      if (act && act.category_id !== null && act.category_id !== undefined) {
+        const cat = categoryMap.get(act.category_id);
+        if (cat?.name?.trim()) {
+          names.add(cat.name.trim());
+        }
+      }
+    }
+    return Array.from(names);
+  };
+
+  const enrichEntry = (entry: MoodEntry): EnrichedMoodEntry => {
+    const actIds = entry.activity_ids || [];
+    return {
+      ...entry,
+      activity_names: getActivityNames(actIds),
+      category_names: getCategoryNames(actIds)
+    };
+  };
+
   const exportJson = (): string => {
-    return JSON.stringify({ entries }, null, 2);
+    return JSON.stringify({ entries: entries.map(enrichEntry) }, null, 2);
   };
 
   const exportBackup = (): string => {
@@ -238,7 +300,7 @@
       version: 'mood-backup-v1',
       exported_at: new Date().toISOString(),
       timezone: 'Europe/London',
-      entries,
+      entries: entries.map(enrichEntry),
       activities,
       categories
     };
@@ -246,12 +308,31 @@
   };
 
   const exportCsv = (): string => {
-    const header = ['timestamp', 'mood_score', 'notes', 'activity_ids', 'image_urls'];
+    const header = [
+      'timestamp',
+      'mood_score',
+      'notes',
+      'activity_names',
+      'category_names',
+      'activity_ids',
+      'image_urls'
+    ];
     const body = entries.map((e) => {
+      const actIds = e.activity_ids || [];
+      const actNames = getActivityNames(actIds).join(', ');
+      const catNames = getCategoryNames(actIds).join(', ');
       const notes = e.notes || '';
       const imageUrls = JSON.stringify(e.image_urls?.length ? e.image_urls : e.image_url ? [e.image_url] : []);
-      const activityIds = JSON.stringify(e.activity_ids || []);
-      return [e.timestamp, e.mood_score === null ? '' : String(e.mood_score), notes, activityIds, imageUrls]
+      const activityIds = JSON.stringify(actIds);
+      return [
+        e.timestamp,
+        e.mood_score === null ? '' : String(e.mood_score),
+        notes,
+        actNames,
+        catNames,
+        activityIds,
+        imageUrls
+      ]
         .map(csvEscape)
         .join(',');
     });
@@ -333,6 +414,16 @@
             if (localId !== undefined) {
               mappedIds.push(localId);
               remappedActivities += 1;
+            }
+          }
+
+          if (row.activity_names && row.activity_names.length > 0) {
+            for (const name of row.activity_names) {
+              const localId = localActivityIdByName.get(name.trim().toLowerCase());
+              if (localId !== undefined && !mappedIds.includes(localId)) {
+                mappedIds.push(localId);
+                remappedActivities += 1;
+              }
             }
           }
 
