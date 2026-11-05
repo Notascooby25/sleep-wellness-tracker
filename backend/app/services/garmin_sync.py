@@ -173,6 +173,31 @@ def _parse_datetime(value: Any) -> Optional[dt.datetime]:
     return None
 
 
+def _parse_local_datetime(value: Any) -> Optional[dt.datetime]:
+    if value is None:
+        return None
+
+    if isinstance(value, dt.datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UK_TZ).astimezone(dt.timezone.utc)
+
+    if isinstance(value, (int, float)):
+        return _parse_datetime(value)
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            if parsed.tzinfo:
+                return parsed.astimezone(dt.timezone.utc)
+            return parsed.replace(tzinfo=UK_TZ).astimezone(dt.timezone.utc)
+        except Exception:
+            return None
+
+    return None
+
+
 def _normalize_activity_type(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -217,30 +242,35 @@ def _normalize_activities_payload(payload: Any) -> List[Dict[str, Any]]:
 def _extract_activity_start(payload: Dict[str, Any]) -> Optional[dt.datetime]:
     nested = payload.get("summaryDTO") if isinstance(payload.get("summaryDTO"), dict) else {}
 
-    start = _parse_datetime(
-        _get_value(
-            payload,
-            "startTimeGMT",
-            "startTimeLocal",
-            "startTime",
-            "startDate",
-            "beginTimestamp",
-            "startTimeInMillis",
-            "startTimeInSeconds",
+    # 1. GMT / UTC timestamps:
+    for source in (payload, nested):
+        start = _parse_datetime(
+            _get_value(
+                source,
+                "startTimeGMT",
+                "startTimestampGMT",
+                "beginTimestamp",
+                "startTimeInMillis",
+                "startTimeInSeconds",
+            )
         )
-    )
-    if start:
-        return start
+        if start:
+            return start
 
-    return _parse_datetime(
-        _get_value(
-            nested,
-            "startTimeGMT",
-            "startTimeLocal",
-            "startTimeInMillis",
-            "startTimeInSeconds",
+    # 2. Local timestamps (attached to UK_TZ Europe/London, then converted to UTC):
+    for source in (payload, nested):
+        start = _parse_local_datetime(
+            _get_value(
+                source,
+                "startTimeLocal",
+                "startTime",
+                "startDate",
+            )
         )
-    )
+        if start:
+            return start
+
+    return None
 
 
 def _filter_activity_rows(rows: List[Dict[str, Any]], start_date: dt.date, end_date: dt.date) -> List[Dict[str, Any]]:
