@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.1 (2026-11-05)
+
+**Fix acupuncture report activity settings and left-out item restoration.** Fixed an issue where selecting "Hide from this page only" on the Acupuncture & Symptom Report failed with a 422 error by allowing `acupuncture_report` in the activity settings validation schema. Fixed the "Left out of this page" section so default morning and night feedback items (such as "Woke up tired") do not falsely flood the chip list unless explicitly customized, and clicking the × button on excluded chips successfully restores and removes them.
+
 ## 4.21.0 (2026-11-05)
 
 **Headache and symptom tracking you can trust.** The Acupuncture & Symptom Report now uses the same trustworthy comparison method and Quiet Sanctuary design introduced for sleep impact. It identifies symptom days automatically from activities marked as symptoms (including migraines, headaches, and jaw pain) and compares them against symptom-free days.
