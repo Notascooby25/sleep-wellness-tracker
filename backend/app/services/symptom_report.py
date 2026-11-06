@@ -141,12 +141,12 @@ def compute_headache_summary(
     left_out_dict: dict[int, dict] = {}
     too_early: list[dict] = []
 
-    # Include any explicitly hidden or habit activities across database so user can restore them
+    # Include any explicitly hidden or habit/describes_night activities across database so user can restore them
     explicit_left_out = (
         db.query(models.Activity)
         .filter(
             models.Activity.deprecated_at.is_(None),
-            (models.Activity.report_role == "habit") | (models.Activity.hidden_pages.isnot(None)),
+            (models.Activity.report_role.in_(["habit", "describes_night"])) | (models.Activity.hidden_pages.isnot(None)),
         )
         .all()
     )
@@ -154,8 +154,8 @@ def compute_headache_summary(
         name = (act.name or "").strip()
         if is_hidden_on(act, ACUPUNCTURE_PAGE):
             left_out_dict[act.id] = {"activity_id": act.id, "activity": name, "reason": "hidden"}
-        elif act.report_role == "habit":
-            left_out_dict[act.id] = {"activity_id": act.id, "activity": name, "reason": "habit"}
+        elif act.report_role in ("habit", "describes_night"):
+            left_out_dict[act.id] = {"activity_id": act.id, "activity": name, "reason": act.report_role}
 
     candidates_day_before: list[tuple[int | None, str, set[dt.date], set[dt.date], str]] = []
     candidates_same_day: list[tuple[int | None, str, set[dt.date], set[dt.date], str]] = []
@@ -167,11 +167,12 @@ def compute_headache_summary(
             continue
         role = effective_role(primary)
         if role == "habit":
-            if role_was_set_by_owner(primary) or primary.report_role:
+            if role_was_set_by_owner(primary):
                 left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "habit"}
             continue
         if role == "describes_night":
-            left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "describes_night"}
+            if role_was_set_by_owner(primary):
+                left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "describes_night"}
             continue
         if role == "symptom":
             continue

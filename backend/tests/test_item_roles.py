@@ -67,6 +67,20 @@ def test_hide_on_page_via_api(signed_in, clean_db):
     assert body["report_role"] == "reaction"
 
 
+def test_hide_on_acupuncture_page_via_api(signed_in, clean_db):
+    act = _make_activity(signed_in)
+    url = f"/activities/{act['id']}/report-settings"
+
+    body = signed_in.put(url, json={"hidden_pages": ["acupuncture_report"]}).json()
+    assert body["hidden_pages"] == ["acupuncture_report"]
+
+    body = signed_in.put(url, json={"hidden_pages": ["lifestyle_impact", "acupuncture_report"]}).json()
+    assert body["hidden_pages"] == ["acupuncture_report", "lifestyle_impact"]
+
+    body = signed_in.put(url, json={"hidden_pages": []}).json()
+    assert body["hidden_pages"] is None
+
+
 def test_unknown_role_rejected(signed_in, clean_db):
     act = _make_activity(signed_in)
     response = signed_in.put(f"/activities/{act['id']}/report-settings", json={"report_role": "banana"})

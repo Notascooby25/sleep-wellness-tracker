@@ -118,7 +118,7 @@ class ActivityUpdate(BaseModel):
 
 class ActivityReportSettings(BaseModel):
     report_role: Optional[Literal["possible_cause", "describes_night", "symptom", "reaction", "habit"]] = None
-    hidden_pages: Optional[List[Literal["lifestyle_impact", "headache_report"]]] = Field(default=None, max_length=5)
+    hidden_pages: Optional[List[Literal["lifestyle_impact", "acupuncture_report", "headache_report"]]] = Field(default=None, max_length=5)
 
 class ActivityResponse(ActivityBase):
     id: int
