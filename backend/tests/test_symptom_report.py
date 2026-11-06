@@ -1,5 +1,4 @@
 import datetime as dt
-import pytest
 from app import models
 from app.services.symptom_report import compute_headache_summary
 
@@ -167,3 +166,37 @@ def test_hidden_and_habit_left_out(clean_db, db):
     left_out = {item["activity"]: item["reason"] for item in res["left_out"]}
     assert left_out.get("Earplugs") == "hidden"
     assert left_out.get("Eye Mask") == "habit"
+
+
+def test_category_default_describes_night_not_in_left_out(clean_db, db):
+    cat_morning = _get_or_create_category(db, "Morning / Waking Feedback")
+    cat_gen = _get_or_create_category(db, "Misc")
+
+    # Item with default category role (describes_night) but no owner override
+    woke_tired = models.Activity(name="Woke up tired", category_id=cat_morning.id, report_role=None)
+    # Item with explicit owner role
+    explicit_desc = models.Activity(name="Restless", category_id=cat_gen.id, report_role="describes_night")
+    db.add_all([woke_tired, explicit_desc])
+    db.flush()
+
+    # Log woke_tired on day 1 so it appears in the analysed window
+    m = models.Mood(timestamp=dt.datetime(2026, 10, 2, 8, 0, tzinfo=dt.timezone.utc), mood_score=6)
+    db.add(m)
+    db.flush()
+    m.activities.append(woke_tired)
+    db.commit()
+
+    res = compute_headache_summary(db, start_date=dt.date(2026, 10, 1), end_date=dt.date(2026, 10, 10))
+    left_out = {item["activity"]: item["reason"] for item in res["left_out"]}
+
+    # Default category item should NOT be in left_out
+    assert "Woke up tired" not in left_out
+    # Explicit owner override item SHOULD be in left_out
+    assert left_out.get("Restless") == "describes_night"
+
+    # When owner clears report_role on explicit item, it disappears from left_out
+    explicit_desc.report_role = None
+    db.commit()
+    res2 = compute_headache_summary(db, start_date=dt.date(2026, 10, 1), end_date=dt.date(2026, 10, 10))
+    left_out2 = {item["activity"]: item["reason"] for item in res2["left_out"]}
+    assert "Restless" not in left_out2
