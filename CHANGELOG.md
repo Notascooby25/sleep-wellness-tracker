@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.2 (2026-11-07)
+
+**Require Last Night's Sleep rating on Morning Feedback.** When selecting activities under the "Morning / Waking Feedback" category, the sleep rating is now required before saving. An inline reminder appears above the Save Entry button if a rating is still missing, and attempting to save without a rating shows a clear guidance message and automatically scrolls smoothly up to the rating pills.
+
 ## 4.21.1 (2026-11-05)
 
 **Fix acupuncture report activity settings and left-out item restoration.** Fixed an issue where selecting "Hide from this page only" on the Acupuncture & Symptom Report failed with a 422 error by allowing `acupuncture_report` in the activity settings validation schema. Fixed the "Left out of this page" section so default morning and night feedback items (such as "Woke up tired") do not falsely flood the chip list unless explicitly customized, and clicking the × button on excluded chips successfully restores and removes them.
