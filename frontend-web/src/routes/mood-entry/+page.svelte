@@ -365,6 +365,7 @@
   $: sleepRatingVisible =
     (morningCategoryId !== null && activeCategoryId === morningCategoryId) ||
     Array.from(selected).some((id) => activities.find((a) => a.id === id)?.category_id === morningCategoryId);
+  $: sleepRatingMissing = sleepRatingVisible && subjectiveSleepRating === null;
 
   const load = async () => {
     loadError = false;
@@ -391,6 +392,14 @@
   };
 
   const submitEntry = async () => {
+    if (sleepRatingMissing) {
+      status = 'Please choose a sleep rating (1 = great, 5 = poor) to save your morning entry.';
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById('sleep-rating-section');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
     busy = true;
     status = '';
     try {
@@ -483,8 +492,13 @@
   </div>
 
   {#if sleepRatingVisible}
-  <div style="margin-top:0.8rem;">
-    <div class="label">Last Night's Sleep <small style="color:#8091a7;">(optional; 1 = great, 5 = poor)</small></div>
+  <div style="margin-top:0.8rem;" id="sleep-rating-section">
+    <div class="label">
+      Last Night's Sleep
+      <small style="color: {sleepRatingMissing ? 'var(--color-worse, #b23b3b)' : '#8091a7'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
+        ({sleepRatingMissing ? 'required' : 'optional'}; 1 = great, 5 = poor)
+      </small>
+    </div>
     <div class="mood-pills">
       {#each [1,2,3,4,5] as score}
         <button
@@ -496,7 +510,7 @@
       {/each}
     </div>
     <p class="label" style="margin-top:0.3rem;">
-      {subjectiveSleepRating == null ? 'Tap a value or leave blank' : `Sleep rating: ${subjectiveSleepRating}`}
+      {subjectiveSleepRating == null ? (sleepRatingMissing ? 'Please tap a score from 1 to 5' : 'Tap a value or leave blank') : `Sleep rating: ${subjectiveSleepRating}`}
     </p>
   </div>
   {/if}
@@ -549,11 +563,17 @@
     {/if}
   </div>
 
-  <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+  {#if sleepRatingMissing}
+    <p class="sleep-required-notice">
+      Please select a rating for <strong>Last Night's Sleep</strong> above before saving.
+    </p>
+  {/if}
+
+  <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
     <button class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
     <button disabled={busy} on:click={load}>Refresh</button>
   </div>
-  {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if status}<p class="status-msg" class:status-error={status.includes('failed') || status.includes('Please choose')}>{status}</p>{/if}
   {#if loadError}<button class="btn-clear" on:click={load}>Retry loading</button>{/if}
 </section>
 
@@ -687,7 +707,19 @@
   }
   .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
   .btn-clear { background: transparent; border-color: #c7d9ef; color: #496685; font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
+  .sleep-required-notice {
+    font-size: 0.86rem;
+    color: #7a4f01;
+    background: #fff8e6;
+    border: 1px solid #f6d892;
+    border-radius: 10px;
+    padding: 0.45rem 0.75rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+    line-height: 1.35;
+  }
   .status-msg { font-size: 0.88rem; color: #22543d; background: #d4edda; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
+  .status-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
   .acts-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
   .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8f0f9; }
   .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid #e2eaf4; margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
