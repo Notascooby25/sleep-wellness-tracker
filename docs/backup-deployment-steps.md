@@ -70,11 +70,14 @@ cd /srv/sleepwell
 ```
 
 **What this script does:**
-1. Silently spins up a temporary PostgreSQL Docker container.
-2. Finds your latest `.dump` backup file.
-3. Restores the database into the temporary container.
-4. Queries the database to count the rows (ensuring your moods and activities are actually there).
-5. Cleans up and destroys the temporary container automatically.
+1. Checks the latest `.dump` exists, is not empty and is recent (under `DRILL_MAX_AGE_HOURS`, default 14 hours; this goes down to 8 once the dump runs every 6 hours).
+2. Silently spins up a temporary PostgreSQL Docker container, using the same major version as the live database (`PG_IMAGE` overrides this; it falls back to `postgres:15`).
+3. Restores the dump into the temporary container. Any `pg_restore` error fails the drill.
+4. Checks that the restored database has the same number of tables as the dump lists, and that moods and activities are not empty.
+5. If the live database container (`LIVE_CONTAINER`, default `sleep_db`) is running, compares the restored moods and activities counts with live (read-only). A restored count below `DRILL_MIN_LIVE_FRACTION` (default 0.9) of live fails the drill.
+6. Cleans up and destroys the temporary container automatically.
 
-If the script outputs `DR Test Passed successfully`, your backup architecture is 100% verified and working!
+If the script outputs `DR Test Passed successfully`, the newest dump has been restored into a real database and checked. It never writes to the live database. A failure prints an `ERROR:` line that says what was wrong.
+
+The drill's own behaviour is covered by `scripts/tests/test_restore_dump.sh`, which runs in CI.
 
