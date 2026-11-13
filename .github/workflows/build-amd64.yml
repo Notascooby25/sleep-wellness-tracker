@@ -50,7 +50,11 @@ jobs:
         run: pytest tests -q
 
       - name: Run script tests
-        run: bash scripts/tests/test_preview.sh
+        run: |
+          bash scripts/tests/test_preview.sh
+          bash scripts/tests/test_restore_dump.sh
+          bash scripts/tests/test_sync_backups_to_google.sh
+          bash scripts/tests/test_host_config_and_cron.sh
 
   lint:
     runs-on: ubuntu-latest

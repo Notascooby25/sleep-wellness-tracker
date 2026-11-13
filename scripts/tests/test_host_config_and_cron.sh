@@ -97,7 +97,7 @@ check "host-config log goes next to the others"    has "$CT" "host_config_cron.l
 cat > "$CT" <<EOF
 0 */12 * * * MAX_BACKUPS=14 /srv/sleepwell/scripts/run_db_backup_rotation.sh >> /x.log 2>&1
 20 0,12 * * * /usr/bin/rclone copy /srv/shared/backups gdrive-crypt:backups/sleep-wellness >> /r.log 2>&1
-30 */6 * * * /home/andyl/sleep-wellness-tracker/scripts/push_backups_to_synology.sh >> /old.log 2>&1
+30 */6 * * * $SD/push_backups_to_synology.sh >> /old.log 2>&1
 EOF
 inst
 check "unrelated jobs preserved"                   has "$CT" "run_db_backup_rotation.sh"

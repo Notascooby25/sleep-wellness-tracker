@@ -10,6 +10,10 @@ set -uo pipefail
 SP=$(cd "$(dirname "$0")" && pwd); . "$SP/lib.sh"
 SCRIPT="$(cd "$SP/.." && pwd)/sync_backups_to_google.sh"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+# CI runners (and some desktops) set XDG_CONFIG_HOME. The script honours it when looking for
+# rclone.conf, so a test that inherits it silently stops being hermetic. Poison it here so any
+# run that leaks it fails everywhere, not just on a runner.
+export XDG_CONFIG_HOME="$T/xdg-must-be-ignored"
 mkdir -p "$T/bin" "$T/home/.config/rclone"; : > "$T/home/.config/rclone/rclone.conf"
 
 # stubs: rclone logs its args (fails for the subcommand named in STUB_RCLONE_FAIL); curl logs the URL
@@ -36,7 +40,7 @@ fresh_fixture() {   # everything present and fresh
 }
 run() {   # run [VAR=val ...]  -> sets RC, leaves $T/out.txt, $T/pings.log, $T/rclone.log
     rm -f "$T/pings.log" "$T/rclone.log" "$T/out.txt"; : > "$T/pings.log"
-    env HOME="$T/home" BACKUP_DIR="$T/b" GOOGLE_ENV_FILE="$T/none.env" RCLONE_REMOTE=x:y "$@" "$SCRIPT" > "$T/out.txt" 2>&1
+    env -u XDG_CONFIG_HOME -u RCLONE_CONFIG -u LOG_DIR HOME="$T/home" BACKUP_DIR="$T/b" GOOGLE_ENV_FILE="$T/none.env" RCLONE_REMOTE=x:y "$@" "$SCRIPT" > "$T/out.txt" 2>&1
     RC=$?
 }
 

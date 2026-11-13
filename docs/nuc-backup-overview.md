@@ -139,7 +139,7 @@ ssh -i ~/.ssh/id_ed25519_synology -p 8022 <nas-user>@<nas-host> \
   "find /volume1/Backups/nuc-server/_versions -path '*<app>*' -name '<filename>'"
 ```
 
-- **sleepwell database:** `pg_restore` the newest `sleepdb_*.dump` (`test_restore_dump.sh` rehearses this; see `backup-runbook.md`).
+- **sleepwell database:** `pg_restore` the newest `sleepdb_*.dump` (`test_restore_dump.sh` rehearses this; see [backup-deployment-steps.md](backup-deployment-steps.md#4-run-a-disaster-recovery-drill-optional-but-recommended)).
 - **audio-scrobbler database:** follow its `docs/DISASTER_RECOVERY.md`. Dumps are also on the NAS in `audio-scrobbler-app/backups/`.
 - **expense tracker:** newest `expense_tracker_data_*.tar.gz` in `shared/backups/` (now includes the joint-account files), or the mirrored `UK-Expense-Tracker/data/`. Verify with `sha256sum -c` next to the archive, stop the container (`docker stop uk_expense_tracker`), `tar -xzf … -C /srv/UK-Expense-Tracker`, start it again. Older archives (before 2026-09-21) hold only the three main files.
 - Restored files may need their original owner/permissions re-applied (garmin tokens are root-owned on the NUC).
@@ -161,6 +161,8 @@ Prove the copies restore (not just that they were written):
 cd /srv/audio-scrobbler-app && scripts/restore_drill.sh nas      # also: local, gdrive
 cd /srv/sleepwell && ./scripts/test_restore_dump.sh              # sleepwell DB, throwaway container
 ```
+
+The sleepwell drill fails on any restore error, a table-count mismatch against the dump, empty key tables, a dump older than 14 hours, or restored row counts below 90% of live. Details and overrides are in [backup-deployment-steps.md](backup-deployment-steps.md#4-run-a-disaster-recovery-drill-optional-but-recommended).
 
 ## 8. Deployment note
 
