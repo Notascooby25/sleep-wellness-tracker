@@ -14,7 +14,8 @@
 #
 # The script runs pg_dump inside the running container and streams the output
 # to host files in OUTPUT_DIR: <db>_<timestamp>.dump (custom pg_dump format —
-# use pg_restore to restore) and <db>_<timestamp>.sql.gz for easy inspection.
+# use pg_restore to restore) on every run, and <db>_<timestamp>.sql.gz for easy
+# inspection at most once per 20 hours (PLAIN_SQL=daily|always|never, default daily).
 
 set -euo pipefail
 
@@ -29,6 +30,15 @@ CONTAINER="${CONTAINER:-sleep_db}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "[db_backup] $*"; }
+
+# The custom-format .dump (the real backup) is made on every run. The gzipped plain-SQL copy is
+# only for human inspection, so by default it is made at most once per 20 hours.
+#   PLAIN_SQL=daily (default) | always | never
+PLAIN_SQL="${PLAIN_SQL:-daily}"
+case "$PLAIN_SQL" in
+    daily|always|never) ;;
+    *) die "PLAIN_SQL must be daily, always or never (got: $PLAIN_SQL)" ;;
+esac
 
 # ── resolve container runtime ─────────────────────────────────────────────────
 
@@ -93,6 +103,22 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DUMP_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.dump"
 SQL_FILE="$OUTPUT_DIR/${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
 
+# A failed run must not leave half-written files behind.
+DUMP_TMP=""
+SQL_TMP=""
+trap 'rm -f -- "$DUMP_TMP" "$SQL_TMP"' EXIT
+
+make_plain=true
+skip_reason=""
+case "$PLAIN_SQL" in
+    never)
+        make_plain=false; skip_reason="PLAIN_SQL=never" ;;
+    daily)
+        if [[ -n "$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name '*.sql.gz' -mmin -1200 -print -quit)" ]]; then
+            make_plain=false; skip_reason="a plain-SQL copy younger than 20 hours already exists"
+        fi ;;
+esac
+
 # ── run pg_dump (custom format) ───────────────────────────────────────────────
 
 info "Creating custom-format dump: $DUMP_FILE"
@@ -106,23 +132,28 @@ mv "$DUMP_TMP" "$DUMP_FILE"
 
 # ── run pg_dump (plain SQL, gzipped) ─────────────────────────────────────────
 
-info "Creating plain-SQL dump: $SQL_FILE"
-SQL_TMP="$OUTPUT_DIR/.${POSTGRES_DB}_${TIMESTAMP}.sql.gz.tmp"
-PGPASSWORD="$POSTGRES_PASSWORD" "$EXEC" exec -e PGPASSWORD="$POSTGRES_PASSWORD" \
-    "$CONTAINER" \
-    pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-password \
-    | gzip -9 > "$SQL_TMP"
-[[ -s "$SQL_TMP" ]] || { rm -f "$SQL_TMP"; die "pg_dump (plain SQL) produced an empty file."; }
-mv "$SQL_TMP" "$SQL_FILE"
+if [[ "$make_plain" == true ]]; then
+    info "Creating plain-SQL dump: $SQL_FILE"
+    SQL_TMP="$OUTPUT_DIR/.${POSTGRES_DB}_${TIMESTAMP}.sql.gz.tmp"
+    PGPASSWORD="$POSTGRES_PASSWORD" "$EXEC" exec -e PGPASSWORD="$POSTGRES_PASSWORD" \
+        "$CONTAINER" \
+        pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-password \
+        | gzip -9 > "$SQL_TMP"
+    [[ -s "$SQL_TMP" ]] || { rm -f "$SQL_TMP"; die "pg_dump (plain SQL) produced an empty file."; }
+    mv "$SQL_TMP" "$SQL_FILE"
+else
+    info "Skipping plain-SQL copy ($skip_reason)."
+fi
 
 # ── report ────────────────────────────────────────────────────────────────────
 
 DUMP_SIZE="$(du -sh "$DUMP_FILE" | cut -f1)"
-SQL_SIZE="$(du -sh "$SQL_FILE" | cut -f1)"
 
 info "Backup complete."
 info "  Custom dump : $DUMP_FILE  ($DUMP_SIZE)"
-info "  SQL (gzip)  : $SQL_FILE  ($SQL_SIZE)"
+if [[ "$make_plain" == true ]]; then
+    info "  SQL (gzip)  : $SQL_FILE  ($(du -sh "$SQL_FILE" | cut -f1))"
+fi
 info ""
 info "To restore the custom dump on a fresh container:"
 info "(First copy the .dump file into the container with: $EXEC cp <dump> ${CONTAINER}:/tmp/)"

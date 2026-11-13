@@ -9,7 +9,7 @@
 #
 # Optional arguments:
 #   --backup-dir PATH  Backup directory (default: /srv/shared/backups)
-#   --max-backups N    Keep N most recent snapshots (default: 4)
+#   --max-backups N    Keep N most recent snapshots (default: 28, seven days of 6-hourly dumps)
 #   --dry-run          Show what would be deleted without deleting
 
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 BACKUP_DIR="/srv/shared/backups"
-MAX_BACKUPS=4
+MAX_BACKUPS=28
 DRY_RUN=false
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
