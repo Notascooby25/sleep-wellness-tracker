@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-MAX_BACKUPS="${MAX_BACKUPS:-4}"
+MAX_BACKUPS="${MAX_BACKUPS:-28}"   # snapshots to keep: 7 days at one every 6 hours
 BACKUP_DIR="${BACKUP_DIR:-/srv/shared/backups}"
 
 # Cron doesn't load .env, so read HEALTHCHECK_URL from it unless the caller already set one.
@@ -30,7 +30,7 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 MANIFEST_FILE="$BACKUP_DIR/manifest_${TIMESTAMP}.sha256"
 
 # ── backup garmin tokens ──
-GARMIN_TOKENS_DIR="/srv/shared/garmin-tokens"
+GARMIN_TOKENS_DIR="${GARMIN_TOKENS_DIR:-/srv/shared/garmin-tokens}"
 if [[ -d "$GARMIN_TOKENS_DIR" ]]; then
     GARMIN_ARCHIVE="$BACKUP_DIR/garmin_tokens_${TIMESTAMP}.tar.gz"
     tar -czf "$GARMIN_ARCHIVE" -C "$(dirname "$GARMIN_TOKENS_DIR")" "$(basename "$GARMIN_TOKENS_DIR")" || true
@@ -43,8 +43,8 @@ fi
   find "$BACKUP_DIR" -maxdepth 1 -type f \( -name '*.dump' -o -name '*.sql.gz' -o -name 'garmin_tokens_*.tar.gz' \) -print0 | sort -z | xargs -0 sha256sum 2>/dev/null || true
 
   # Include mood-image archives if present
-  if [[ -d "/srv/shared/backups/mood-images" ]]; then
-    find /srv/shared/backups/mood-images -type f -name '*.tar.gz' -print0 | sort -z | xargs -0 sha256sum 2>/dev/null || true
+  if [[ -d "$BACKUP_DIR/mood-images" ]]; then
+    find "$BACKUP_DIR/mood-images" -type f -name '*.tar.gz' -print0 | sort -z | xargs -0 sha256sum 2>/dev/null || true
   fi
 } > "$MANIFEST_FILE" || true
 

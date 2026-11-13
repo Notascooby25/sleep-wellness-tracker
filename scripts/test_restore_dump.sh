@@ -18,14 +18,14 @@
 #   LIVE_CONTAINER           live database container (default sleep_db)
 #   PG_IMAGE                 image for the throwaway container
 #                            (default postgres:<major version of the live container>, else postgres:15)
-#   DRILL_MAX_AGE_HOURS      newest dump must be younger than this (default 14)
+#   DRILL_MAX_AGE_HOURS      newest dump must be younger than this (default 8: dumps run every 6 hours)
 #   DRILL_MIN_LIVE_FRACTION  restored count / live count must be at least this (default 0.9)
 
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/srv/shared/backups}"
 LIVE_CONTAINER="${LIVE_CONTAINER:-sleep_db}"
-DRILL_MAX_AGE_HOURS="${DRILL_MAX_AGE_HOURS:-14}"
+DRILL_MAX_AGE_HOURS="${DRILL_MAX_AGE_HOURS:-8}"
 DRILL_MIN_LIVE_FRACTION="${DRILL_MIN_LIVE_FRACTION:-0.9}"
 DB_USER="sleepuser"
 DB_NAME="sleepdb"

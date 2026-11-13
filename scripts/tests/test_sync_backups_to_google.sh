@@ -62,11 +62,20 @@ check "-> names the stale producer"               has "$T/out.txt" "mood image a
 fresh_fixture; rm "$T/b/expense_tracker_data_20260921_030000.tar.gz"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
 check "no expense archive at all -> fails closed" test $RC -eq 1
 fresh_fixture; touch -d '30 hours ago' "$T/b/sleepdb_20260921T000000Z.dump"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
-check "DB dump 30h old (limit 26) -> exit 1"      test $RC -eq 1
+check "DB dump 30h old (limit 4) -> exit 1"       test $RC -eq 1
 fresh_fixture; rm -rf "$T/b/host-config"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
 check "host-config snapshot missing -> exit 1"    test $RC -eq 1
-fresh_fixture; touch -d '25 hours ago' "$T/b/sleepdb_20260921T000000Z.dump"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
-check "DB dump 25h old (within 26h) -> still ok"  test $RC -eq 0
+fresh_fixture; touch -d '3 hours ago' "$T/b/sleepdb_20260921T000000Z.dump"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
+check "DB dump 3h old (within the 4h default) -> still ok" test $RC -eq 0
+# 6-hourly dumps: a single missed run is seen by the next check as a dump about 6.6h old
+fresh_fixture; touch -d '400 minutes ago' "$T/b/sleepdb_20260921T000000Z.dump"; run GOOGLE_HEALTHCHECK_URL=https://hc.example/abc
+check "DB dump 6.6h old (one missed 6-hourly run) -> exit 1" test $RC -eq 1
+check "-> pings /fail"                            bash -c "[[ \$(cat '$T/pings.log') == 'https://hc.example/abc/fail' ]]"
+check "-> names the DB dump as stale"             has "$T/out.txt" "STALE: newest sleepwell DB dump is 6h old (limit 4h)"
+fresh_fixture; touch -d '400 minutes ago' "$T/b/sleepdb_20260921T000000Z.dump"; run FRESH_DB_HOURS=0
+check "FRESH_DB_HOURS=0 still disables the DB check" test $RC -eq 0
+fresh_fixture; touch -d '400 minutes ago' "$T/b/sleepdb_20260921T000000Z.dump"; run FRESH_DB_HOURS=26
+check "FRESH_DB_HOURS=26 override (the old default) still works" test $RC -eq 0
 fresh_fixture; touch -d '2 hours ago' "$T/b/sleepdb_old.dump"; touch -d '40 hours ago' "$T/b/sleepdb_20260919T000000Z.dump"; run
 check "newest of several is what counts"          test $RC -eq 0
 

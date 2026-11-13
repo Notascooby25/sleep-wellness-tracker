@@ -11,7 +11,8 @@
 #
 # Config: optional ~/.config/google-sync.env (chmod 600, not in git):
 #   GOOGLE_HEALTHCHECK_URL   healthchecks.io ping URL (pings <url>/fail on failure)
-#   FRESH_DB_HOURS           default 26  (sleepdb_*.dump, made every 12h)
+#   FRESH_DB_HOURS           default 4   (sleepdb_*.dump, made every 6h at :00; this job runs at :35,
+#                                         so a healthy dump is under 1h old and one missed run is ~6.6h)
 #   FRESH_MOOD_HOURS         default 13  (mood-images/mood_images_*.tar.gz, every 6h)
 #   FRESH_EXPENSE_HOURS      default 26  (expense_tracker_data_*.tar.gz, daily)
 #   FRESH_HOSTCONFIG_HOURS   default 26  (host-config/host_config_*.tar.gz, daily)
@@ -41,7 +42,7 @@ if [[ -f "$GOOGLE_ENV_FILE" ]]; then
 fi
 
 GOOGLE_HEALTHCHECK_URL="${env_url:-${GOOGLE_HEALTHCHECK_URL:-}}"
-FRESH_DB_HOURS="${env_fresh_db:-${FRESH_DB_HOURS:-26}}"
+FRESH_DB_HOURS="${env_fresh_db:-${FRESH_DB_HOURS:-4}}"
 FRESH_MOOD_HOURS="${env_fresh_mood:-${FRESH_MOOD_HOURS:-13}}"
 FRESH_EXPENSE_HOURS="${env_fresh_expense:-${FRESH_EXPENSE_HOURS:-26}}"
 FRESH_HOSTCONFIG_HOURS="${env_fresh_hostconfig:-${FRESH_HOSTCONFIG_HOURS:-26}}"

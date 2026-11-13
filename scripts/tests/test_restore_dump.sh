@@ -8,7 +8,9 @@
 set -uo pipefail
 SP=$(cd "$(dirname "$0")" && pwd); . "$SP/lib.sh"
 SCRIPT="$(cd "$SP/.." && pwd)/test_restore_dump.sh"
-T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+T=$(mktemp -d) || exit 1
+[[ -n "$T" && -d "$T" ]] || { echo "mktemp failed; refusing to run (stubs would be written to the real /bin)" >&2; exit 1; }
+trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin"
 
 # Stub docker. Every call is logged ("<subcommand> <args...>") to $T/docker.log.
@@ -68,7 +70,7 @@ fresh_fixture() {   # one recent, non-empty dump
 }
 run() {   # run [VAR=val ...]  -> sets RC, leaves $T/out.txt and $T/docker.log
     rm -f "$T/docker.log" "$T/out.txt"; : > "$T/docker.log"
-    env BACKUP_DIR="$T/b" DRILL_MAX_AGE_HOURS=14 \
+    env -u DRILL_MAX_AGE_HOURS BACKUP_DIR="$T/b" \
         STUB_LIVE="moods=1862,activities=144" \
         STUB_LIVE_VERSION="postgres (PostgreSQL) 15.19 (Debian 15.19-1.pgdg13+2)" \
         "$@" "$SCRIPT" > "$T/out.txt" 2>&1
@@ -104,11 +106,17 @@ fresh_fixture; : > "$T/b/sleepdb_20261113T120001Z.dump"; run
 check "empty dump -> exit 1"                       test $RC -eq 1
 check "empty dump -> no container started"         bash -c "! grep -q '^run ' '$T/docker.log'"
 fresh_fixture; touch -d '20 hours ago' "$T/b/sleepdb_20261113T120001Z.dump"; run
-check "dump 20h old (limit 14) -> exit 1"          test $RC -eq 1
+check "dump 20h old (default limit 8) -> exit 1"   test $RC -eq 1
 check "-> message says the dump is old"            has "$T/out.txt" "old"
 check "-> no container started"                    bash -c "! grep -q '^run ' '$T/docker.log'"
 fresh_fixture; touch -d '2 hours ago' "$T/b/sleepdb_20261113T120001Z.dump"; run
-check "dump 2h old (limit 14) -> exit 0"           test $RC -eq 0
+check "dump 2h old (default limit 8) -> exit 0"    test $RC -eq 0
+fresh_fixture; touch -d '7 hours ago' "$T/b/sleepdb_20261113T120001Z.dump"; run
+check "dump 7h old (inside the default 8h) -> exit 0" test $RC -eq 0
+fresh_fixture; touch -d '9 hours ago' "$T/b/sleepdb_20261113T120001Z.dump"; run
+check "dump 9h old (outside the default 8h) -> exit 1" test $RC -eq 1
+fresh_fixture; touch -d '9 hours ago' "$T/b/sleepdb_20261113T120001Z.dump"; run DRILL_MAX_AGE_HOURS=14
+check "DRILL_MAX_AGE_HOURS=14 override lets a 9h dump pass" test $RC -eq 0
 
 echo "== sanity checks on the restored database"
 fresh_fixture; run STUB_MOODS=0
