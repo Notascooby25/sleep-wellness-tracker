@@ -1,6 +1,6 @@
 # Backup System Upgrade & Deployment Guide
 
-This document outlines the steps required to deploy the enhanced backup architecture to your production NUC server. These enhancements include robust concurrency locking (`flock`), increased local retention (14 snapshots), cloud storage pruning (90-day retention), Garmin token backups, and Healthchecks.io dead-man alerting.
+This document outlines the steps required to deploy the enhanced backup architecture to your production NUC server. These enhancements include robust concurrency locking (`flock`), increased local retention (28 snapshots, seven days of 6-hourly dumps), cloud storage pruning (90-day retention), Garmin token backups, and Healthchecks.io dead-man alerting.
 
 ---
 
@@ -26,7 +26,7 @@ We are using a "dead man's switch" approach to alerting. Instead of the script t
 
 1. Go to [Healthchecks.io](https://healthchecks.io/) and sign up or log in (it is completely free for this usage).
 2. Create a new "Check" and name it something like **Sleep Tracker DB Backup**.
-3. Set the schedule to **Every 12 hours** (matching your DB backup cron schedule). You can set a grace period of 1 hour.
+3. Set the schedule to **Every 6 hours** (matching your DB backup cron schedule). Set a grace period of **2 hours** (cron uses local time, so on the autumn clock change two runs are 7 real hours apart).
 4. Copy the unique **Ping URL** provided for that check.
 5. Open your `.env` file on the NUC:
    ```bash
@@ -45,7 +45,7 @@ We are using a "dead man's switch" approach to alerting. Instead of the script t
 
 ## 3. Update the Cron Job Configuration
 
-The default local retention has been increased from 4 snapshots to 14 (giving you 7 full days of local history). To apply this new setting to your active cron jobs, run the setup script:
+The default local retention is 28 snapshots (7 full days of local history at one dump every 6 hours; it was 4, then 14 at one dump every 12 hours). To apply this new setting to your active cron jobs, run the setup script:
 
 ```bash
 cd /srv/sleepwell
@@ -56,7 +56,7 @@ You can verify the cron job was updated correctly by running:
 ```bash
 crontab -l
 ```
-You should see `MAX_BACKUPS=14` in the `db_backup_rotation.sh` line.
+You should see `0 */6 * * * MAX_BACKUPS=28` in the `run_db_backup_rotation.sh` line.
 
 ---
 
@@ -70,7 +70,7 @@ cd /srv/sleepwell
 ```
 
 **What this script does:**
-1. Checks the latest `.dump` exists, is not empty and is recent (under `DRILL_MAX_AGE_HOURS`, default 14 hours; this goes down to 8 once the dump runs every 6 hours).
+1. Checks the latest `.dump` exists, is not empty and is recent (under `DRILL_MAX_AGE_HOURS`, default 8 hours, because dumps run every 6 hours).
 2. Silently spins up a temporary PostgreSQL Docker container, using the same major version as the live database (`PG_IMAGE` overrides this; it falls back to `postgres:15`).
 3. Restores the dump into the temporary container. Any `pg_restore` error fails the drill.
 4. Checks that the restored database has the same number of tables as the dump lists, and that moods and activities are not empty.

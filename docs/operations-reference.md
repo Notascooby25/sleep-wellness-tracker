@@ -111,7 +111,7 @@ Three tiers, each verified.
 
 | Data | Path | Retention | Cron |
 |---|---|---|---|
-| DB dumps + manifests | `/srv/shared/backups/*.dump`, `*.sql.gz`, `manifest_*.sha256` | 4 snapshots | every 12 h |
+| DB dumps + manifests | `/srv/shared/backups/*.dump`, `*.sql.gz` (once a day), `manifest_*.sha256` | 28 snapshots (7 days) | every 6 h at :00 |
 | Mood image archives | `/srv/shared/backups/mood-images/mood_images_*.tar.gz` + `.sha256` | 14 archives | every 6 h at :15 |
 | Mood image verify | writes to `/srv/shared/backups/mood_images_hook.log` | — | hourly at :45 |
 
@@ -123,6 +123,14 @@ Install/refresh crons:
 ./scripts/setup_offsite_backup_cron.sh
 crontab -l
 ```
+
+**Before a release that changes database models or startup migrations**, take a dump first on the server, then merge:
+
+```bash
+cd /srv/sleepwell && ./scripts/db_backup.sh
+```
+
+Watchtower redeploys within minutes of a merge and there is no automatic dump before that (the backend image has no `pg_dump`), so without this step the newest dump can be up to 6 hours old when a bad schema change lands.
 
 ### Tier 2 — DS223 mirror
 

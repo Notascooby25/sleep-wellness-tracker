@@ -126,7 +126,7 @@ The script exits non-zero and lists the failed targets if anything goes wrong. E
 
 | Producer | Pattern | Limit |
 |---|---|---|
-| Sleepwell DB dump | `sleepdb_*.dump` | 26h |
+| Sleepwell DB dump | `sleepdb_*.dump` | 4h (dumps run every 6h at :00 and this job at :35, so a healthy dump is under 1h old and one missed run shows as about 6.6h) |
 | Mood image archive | `mood-images/mood_images_*.tar.gz` | 13h |
 | Expense tracker archive | `expense_tracker_data_*.tar.gz` | 26h |
 | Host config snapshot | `host-config/host_config_*.tar.gz` | 26h |
@@ -137,7 +137,7 @@ Settings live in `~/.config/google-sync.env` on the NUC (`chmod 600`, not in git
 
 ```bash
 GOOGLE_HEALTHCHECK_URL=https://hc-ping.com/<uuid>
-# optional, hours (0 disables that one check): FRESH_DB_HOURS=26 FRESH_MOOD_HOURS=13 FRESH_EXPENSE_HOURS=26 FRESH_HOSTCONFIG_HOURS=26
+# optional, hours (0 disables that one check): FRESH_DB_HOURS=4 FRESH_MOOD_HOURS=13 FRESH_EXPENSE_HOURS=26 FRESH_HOSTCONFIG_HOURS=26
 ```
 
 A healthy run logs four `OK: newest ... is Nh old` lines. The old `--rmdirs` prune (which logged "directory not empty" on every run) is replaced by `rclone delete --min-age 90d` followed by `rclone rmdirs --leave-root`.

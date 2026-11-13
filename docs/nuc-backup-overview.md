@@ -43,7 +43,7 @@ Cron runs as the NUC user in local time (Europe/London). Scripts log timestamps 
 | | sleepwell | audio-scrobbler | expense tracker |
 |---|---|---|---|
 | Data | Postgres (bind mount `/srv/shared/postgres-data`), mood images, Garmin tokens | Postgres in a **Docker named volume** (`postgres_data`, not under `/srv`) | everything in `data/` (`expense_database.csv`, `settings.json`, `saved_filters.json` and the joint-account `expense_database_joint.csv` / `settings_joint.json`), plus `.streamlit/secrets.toml` |
-| Local backup | cron `run_db_backup_rotation.sh` at 00:00 and 12:00: `sleepdb_<UTC>.dump` + `.sql.gz` + sha256 manifest in `/srv/shared/backups`. Mood-image `.tar.gz` archives every 6h (`:15`, keeps 14) with an hourly integrity check. | systemd **user** timer every 6h: `scrobbler-<UTC>.dump` in `/srv/audio-scrobbler-app/backups`, restore-verified, heartbeat ping + Prometheus metrics. Local retention `BACKUP_RETENTION_DAYS` (default 3). | cron daily at 03:00: `data_backup.sh /srv/shared/backups 14` archives the **whole `data/` folder** (joint files included, `secrets.toml` deliberately not) into `expense_tracker_data_<ts>.tar.gz` + `.sha256` in `/srv/shared/backups`, self-verified before it is promoted, keeps 14. Installed by the expense repo's `scripts/setup_backup_cron.sh`. |
+| Local backup | cron `run_db_backup_rotation.sh` every 6 hours at :00 (keeps 28 snapshots): `sleepdb_<UTC>.dump` every run, a `.sql.gz` copy at most once a day, + sha256 manifest in `/srv/shared/backups`. Mood-image `.tar.gz` archives every 6h (`:15`, keeps 14) with an hourly integrity check. | systemd **user** timer every 6h: `scrobbler-<UTC>.dump` in `/srv/audio-scrobbler-app/backups`, restore-verified, heartbeat ping + Prometheus metrics. Local retention `BACKUP_RETENTION_DAYS` (default 3). | cron daily at 03:00: `data_backup.sh /srv/shared/backups 14` archives the **whole `data/` folder** (joint files included, `secrets.toml` deliberately not) into `expense_tracker_data_<ts>.tar.gz` + `.sha256` in `/srv/shared/backups`, self-verified before it is promoted, keeps 14. Installed by the expense repo's `scripts/setup_backup_cron.sh`. |
 | Google Drive | `sync_backups_to_google.sh` copies `/srv/shared/backups` to `gdrive-crypt:backups/sleep-wellness` (90-day prune), then **asserts freshness** and pings a healthchecks.io check (see [section 9](#9-monitoring-what-tells-you-when-something-stops)); mood archives also to `gdrive-crypt:mood-images/sleep-wellness` | its own script to `gdrive-crypt:AudioScrobblerBackups/` (`GDRIVE_RETENTION_DAYS=30`) | rides along inside sleepwell's copy of `/srv/shared/backups` |
 | Restore doc | [backup-runbook.md](backup-runbook.md) | `docs/DISASTER_RECOVERY.md` in its repo | tarball, or the mirrored `data/` folder on the NAS |
 
@@ -115,6 +115,18 @@ An audit of the live NUC, NAS and Drive found these gaps; all are now addressed 
 - **Host configuration was in no backup.** New `scripts/backup_host_config.sh` writes a daily snapshot (crontab, systemd user timers and unit files, Tailscale Funnel status, `docker ps`, rclone remote *names*, redacted `nas-sync.env`, git HEAD and local diffs of each `/srv` checkout) to `/srv/shared/backups/host-config/`, from where the NAS mirror and Google copy carry it off the host. It never captures `rclone.conf`, SSH keys or docker credentials.
 - **Cron installer.** `setup_offsite_backup_cron.sh` installs the host-config job (`10 4 * * *`) and no longer aborts when the crontab contains only its own jobs.
 
+### Follow-up 2026-11-13: six-hourly database backups
+
+The owner accepts losing at most 6 hours of recent data, so the **sleepwell DB dump moved from every 12 hours to every 6 hours** (`0 */6 * * *`, keeps 28 snapshots = 7 days). Details:
+
+- The custom-format `.dump` is written every run. The gzipped plain-SQL `.sql.gz` (for reading by eye) is written at most once per 20 hours (`PLAIN_SQL=daily`), so storage grows by about 10 MB a day, not 35.
+- The Google freshness limit for the DB dump is now 4 hours (`FRESH_DB_HOURS`): the check runs at :35, after the :00 dump, so a healthy dump is under 1 hour old and one missed run is about 6.6 hours old. The restore drill's age limit is 8 hours.
+- The sleepwell healthchecks.io check period should be 6 hours with a 2 hour grace (a dashboard setting).
+- `run_db_backup_rotation.sh` now defaults to keeping 28 snapshots when run by hand without `MAX_BACKUPS`.
+- **Rollout order matters:** take a dump with the current scripts first, then pull and run `scripts/setup_db_backup_cron.sh` straight afterwards, so the 4-hour freshness limit never runs against the old 12-hourly cron. Check afterwards that exactly one rotation line exists (`crontab -l | grep -c run_db_backup_rotation.sh` prints 1). The full steps and the rollback are in `docs/superpowers/plans/2026-11-13-six-hourly-db-backups.md`.
+- Set the healthchecks.io grace to 2 hours, not 1: cron uses local time, and on the autumn clock change the gap between two runs is 7 real hours.
+- Not done (decided separately): an automatic dump before each deploy (the backend image has no `pg_dump`, so it would need the image changed; until then run `scripts/db_backup.sh` by hand before a schema-changing release, see `operations-reference.md`), and tiered retention on Google Drive and the NAS (at six-hourly the growth is small; revisit once real usage is measured).
+
 ## 5. Rules for other app workspaces
 
 1. **Don't point your backups at another app's directory.** Keep your artifacts inside your own `/srv/<app>` folder (scrobbler: `/srv/audio-scrobbler-app/backups`). The mirror carries them to the NAS under your own folder, correctly filed. Writing into `/srv/shared/backups` files them under sleepwell's Google path and its append-only NAS tree. (Expense tracker already writes its tarballs there; that works and is covered by sleepwell's Google copy.)
@@ -162,7 +174,7 @@ cd /srv/audio-scrobbler-app && scripts/restore_drill.sh nas      # also: local, 
 cd /srv/sleepwell && ./scripts/test_restore_dump.sh              # sleepwell DB, throwaway container
 ```
 
-The sleepwell drill fails on any restore error, a table-count mismatch against the dump, empty key tables, a dump older than 14 hours, or restored row counts below 90% of live. Details and overrides are in [backup-deployment-steps.md](backup-deployment-steps.md#4-run-a-disaster-recovery-drill-optional-but-recommended).
+The sleepwell drill fails on any restore error, a table-count mismatch against the dump, empty key tables, a dump older than 8 hours, or restored row counts below 90% of live. Details and overrides are in [backup-deployment-steps.md](backup-deployment-steps.md#4-run-a-disaster-recovery-drill-optional-but-recommended).
 
 ## 8. Deployment note
 
@@ -174,7 +186,7 @@ Open follow-ups for this setup are kept in the owner's private notes, not in thi
 
 | Job | Signal | Configured in |
 |---|---|---|
-| Sleepwell DB dump | healthchecks.io ping after each successful run (12h, 1h grace) | `HEALTHCHECK_URL` in `/srv/sleepwell/.env` |
+| Sleepwell DB dump | healthchecks.io ping after each successful run (6h, 1h grace; was 12h before the six-hourly change, see the 2026-11-13 follow-up) | `HEALTHCHECK_URL` in `/srv/sleepwell/.env` |
 | Scrobbler dump + restore-verify | heartbeat ping + Prometheus/Alertmanager (verify and offsite stale >12h) | `HEARTBEAT_URL` in `audio-scrobbler-backup.env`; scrobbler repo |
 | **NAS mirror** (all apps) | healthchecks.io ping on success, `/fail` on error (6h, 1h grace) | `NAS_HEALTHCHECK_URL` in `~/.config/nas-sync.env` |
 | **Google copy + producer freshness** (sleepwell DB, mood images, expense, host config) | healthchecks.io ping only if the upload succeeded **and** every producer is current (6h, 1h grace) | `GOOGLE_HEALTHCHECK_URL` in `~/.config/google-sync.env` (`chmod 600`) |
@@ -184,7 +196,7 @@ Open follow-ups for this setup are kept in the owner's private notes, not in thi
 ```bash
 GOOGLE_HEALTHCHECK_URL=https://hc-ping.com/<uuid>
 # optional overrides (hours; 0 switches that check off):
-# FRESH_DB_HOURS=26  FRESH_MOOD_HOURS=13  FRESH_EXPENSE_HOURS=26  FRESH_HOSTCONFIG_HOURS=26
+# FRESH_DB_HOURS=4  FRESH_MOOD_HOURS=13  FRESH_EXPENSE_HOURS=26  FRESH_HOSTCONFIG_HOURS=26
 ```
 
 Precedence is caller environment (an inline `VAR=` in the cron line) > that file > the defaults. Deploy order matters when rolling this out: switch the expense backup to daily and install the host-config job **before** the new Google script runs, otherwise its freshness check reports those two as missing/stale.

@@ -273,9 +273,9 @@ docker exec -i sleep_db psql -U sleepuser sleepdb < backup_YYYYMMDD_HHMMSS.sql
 
 The database schema is managed with **Alembic** migrations (located in `db/`).
 
-### Automated Backups (Every 12 Hours, Keep Latest 4)
+### Automated Backups (Every 6 Hours, Keep Latest 28)
 
-Use the included scripts to run a backup every 12 hours and keep only the latest 4 backup snapshots.
+Use the included scripts to run a backup every 6 hours and keep the latest 28 backup snapshots (seven days).
 
 ```bash
 # Install/update cron entry for the current user
@@ -288,7 +288,7 @@ crontab -l | grep run_db_backup_rotation.sh
 What gets installed:
 
 ```cron
-0 */12 * * * MAX_BACKUPS=4 BACKUP_DIR=/srv/shared/backups /home/andyl/sleep-wellness-tracker/scripts/run_db_backup_rotation.sh >> /srv/shared/backups/db_backup_cron.log 2>&1
+0 */6 * * * MAX_BACKUPS=28 BACKUP_DIR=/srv/shared/backups /srv/sleepwell/scripts/run_db_backup_rotation.sh >> /srv/shared/backups/db_backup_cron.log 2>&1
 ```
 
 Manual run (same logic as cron):
@@ -298,8 +298,9 @@ Manual run (same logic as cron):
 ```
 
 Retention behavior:
-- A snapshot is all files that share one timestamp stem (for example `.dump` + `.sql.gz`).
-- Cleanup keeps the newest 4 snapshots and removes older ones.
+- A snapshot is all files that share one timestamp stem (a `.dump`, and sometimes a `.sql.gz`).
+- Every run writes the custom-format `.dump` (the real backup). The gzipped plain-SQL `.sql.gz`, which is only for reading by eye, is written at most once per 20 hours (`PLAIN_SQL=daily`; set `always` or `never` to change that).
+- Cleanup keeps the newest 28 snapshots and removes older ones. A run that fails to make a dump never prunes anything.
 
 ### Mood Image Backups (Recommended)
 
