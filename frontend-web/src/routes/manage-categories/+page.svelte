@@ -10,6 +10,7 @@
   let newSupportsPosition = false;
   let newPositionLabel = '';
   let status = '';
+  let busy = false; // true while a save/delete is running, so buttons can't be pressed twice
 
   const load = async () => {
     try {
@@ -24,6 +25,8 @@
 
   const add = async () => {
     if (!name.trim()) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await postJson('/categories/', {
@@ -37,10 +40,14 @@
       await load();
     } catch (error) {
       status = `Add failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const save = async (cat: Category) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/categories/${cat.id}`, {
@@ -52,22 +59,30 @@
       await load();
     } catch (error) {
       status = `Save failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const remove = async (id: number) => {
     if (!confirm('Delete this category?')) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await deleteJson(`/categories/${id}`);
       await load();
     } catch (error) {
       status = `Delete failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const addPositionOption = async () => {
     if (!newPositionLabel.trim()) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await postJson('/categories/position-options/', { label: newPositionLabel.trim() });
@@ -75,27 +90,37 @@
       await load();
     } catch (error) {
       status = `Add position failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const savePositionOption = async (option: PositionOption) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/categories/position-options/${option.id}`, { label: option.label });
       await load();
     } catch (error) {
       status = `Save position failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const removePositionOption = async (id: number) => {
     if (!confirm('Delete this position option?')) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await deleteJson(`/categories/position-options/${id}`);
       await load();
     } catch (error) {
       status = `Delete position failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
@@ -119,7 +144,7 @@
       <input type="checkbox" bind:checked={newSupportsPosition} />
       <span>Supports position</span>
     </label>
-    <button type="button" on:click={add}>Add</button>
+    <button type="button" disabled={busy} on:click={add}>Add</button>
     <button type="button" on:click={load}>Refresh</button>
   </div>
   {#if status}<p role="status">{status}</p>{/if}
@@ -174,6 +199,6 @@
   {/each}
   <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
     <input placeholder="New position label" bind:value={newPositionLabel} />
-    <button type="button" on:click={addPositionOption}>Add</button>
+    <button type="button" disabled={busy} on:click={addPositionOption}>Add</button>
   </div>
 </section>

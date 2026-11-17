@@ -7,6 +7,7 @@
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let status = '';
+  let busy = false; // true while a save/delete is running, so buttons can't be pressed twice
   let newName = '';
   let newCategoryId = '';
   let newSupportsPosition = false;
@@ -31,6 +32,8 @@
 
   const add = async () => {
     if (!newName.trim()) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await postJson('/activities/', {
@@ -43,10 +46,14 @@
       await load();
     } catch (error) {
       status = `Add failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const save = async (activity: Activity) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       const normalizedCategoryId =
@@ -62,37 +69,51 @@
       await load();
     } catch (error) {
       status = `Save failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const remove = async (id: number) => {
     if (!confirm('Delete this activity?')) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await deleteJson(`/activities/${id}`);
       await load();
     } catch (error) {
       status = `Delete failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const archive = async (id: number) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/activities/${id}/archive`, {}); // Provide second argument
       await load();
     } catch (error) {
       status = `Archive failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const unarchive = async (id: number) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/activities/${id}/unarchive`, {}); // Provide second argument
       await load();
     } catch (error) {
       status = `Unarchive failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
@@ -139,7 +160,7 @@
       <span>Supports position</span>
     </label>
     <div style="display:flex; align-items:end;">
-      <button type="button" on:click={add}>Add</button>
+      <button type="button" disabled={busy} on:click={add}>Add</button>
     </div>
   </div>
   {#if status}<p role="status">{status}</p>{/if}
