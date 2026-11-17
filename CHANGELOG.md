@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.6 (2026-11-17)
+
+**Test release for the "new version available" bar.** No visible changes. This release only exists to check that the bar appears for someone who still has 4.21.5 open.
+
 ## 4.21.5 (2026-11-17)
 
 **"New version available" bar.** When a new version of the app has been released, a bar now appears under the menu saying so, with an "Update now" button. Tapping it refreshes the app and loads the new version. It checks every 5 minutes and whenever you switch back to the app, and it never reloads on its own, so anything you're typing is never lost.
