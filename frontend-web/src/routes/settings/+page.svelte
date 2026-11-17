@@ -149,7 +149,7 @@
     <div class="reminder-row">
       <button on:click={enableThisDevice} disabled={subscribeBusy}>{subscribeBusy ? 'Enabling…' : 'Enable notifications on this device'}</button>
     </div>
-    <div style="margin: 0.6rem 0 0.6rem 0; font-size: 0.84rem; color: #163c61; background: #eef5fc; border-radius: 8px; padding: 0.5rem 0.6rem;">
+    <div style="margin: 0.6rem 0 0.6rem 0; font-size: 0.84rem; color: var(--color-primary-content); background: var(--color-surface-subtle); border-radius: 8px; padding: 0.5rem 0.6rem;">
       <strong>Android users:</strong> If you use Brave, you must disable Brave Shields for this site. Also, ensure your browser's Battery Optimization is set to "Unrestricted" in Android settings.
     </div>
     {#if notifPermission === 'denied'}
@@ -190,7 +190,7 @@
     <input type="text" bind:value={newMessage} placeholder="Custom message (optional)" style="flex:1;min-width:160px;" />
     <button on:click={addReminder} disabled={busyReminders}>Add reminder</button>
   </div>
-  <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: #f0f7f3; border: 1px solid #cce8d8; border-radius: 8px; padding: 0.6rem 0.8rem;">
+  <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: #f0f7f3; border: 1px solid var(--color-success-bg); border-radius: 8px; padding: 0.6rem 0.8rem;">
     <span style="font-size: 0.84rem; color: #1f5e3d;">
       💡 <strong>Positive Habit Preset:</strong> Remind yourself at 21:30 to celebrate good health and log a green score.
     </span>
@@ -247,16 +247,16 @@
   .chk input { width: auto; }
   .notif-warn { margin: 0.6rem 0 0; font-size: 0.84rem; color: var(--color-error); background: var(--color-error-bg); border-radius: 8px; padding: 0.3rem 0.6rem; }
   .device-list { list-style: none; margin: 0.4rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-  .device-list li { display: flex; align-items: center; gap: 0.6rem; border: 1px solid #d7e6f7; border-radius: 8px; background: #f8fbff; padding: 0.4rem 0.6rem; font-size: 0.86rem; }
+  .device-list li { display: flex; align-items: center; gap: 0.6rem; border: 1px solid var(--color-primary); border-radius: 8px; background: var(--color-bg-start); padding: 0.4rem 0.6rem; font-size: 0.86rem; }
   .device-list li span { flex: 1; }
-  .reminder-time { font-weight: 700; color: #163c61; flex: 0 0 auto !important; }
-  .reminder-msg { color: #486888; }
+  .reminder-time { font-weight: 700; color: var(--color-primary-content); flex: 0 0 auto !important; }
+  .reminder-msg { color: var(--color-neutral-text-muted); }
 
   .settings-link {
     display: block;
-    border: 1px solid #cfe0f3;
+    border: 1px solid var(--color-input-border);
     border-radius: 12px;
-    background: #f5faff;
+    background: var(--color-bg-start);
     padding: 0.9rem;
     transition: border-color 120ms ease, transform 120ms ease;
   }
@@ -268,12 +268,12 @@
 
   .settings-link h3 {
     margin: 0 0 0.35rem;
-    color: #163c61;
+    color: var(--color-primary-content);
   }
 
   .settings-link p {
     margin: 0;
-    color: #486888;
+    color: var(--color-neutral-text-muted);
     font-size: 0.92rem;
   }
 </style>

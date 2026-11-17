@@ -997,7 +997,7 @@
     font-weight: 700;
     font-size: 0.92rem;
     padding: 0.6rem;
-    border: 1px solid #cfe0f3;
+    border: 1px solid var(--color-input-border);
   }
   .sleep-debt-badge.debt { color: var(--color-error); background: var(--color-error-bg); border-color: #fecdca; }
   .sleep-debt-badge.surplus { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
@@ -1005,7 +1005,7 @@
   /* 12-week heatmap */
   .heatmap-wrap { display: flex; gap: 5px; align-items: flex-start; overflow-x: auto; padding-bottom: 2px; }
   .heatmap-days { display: grid; grid-template-rows: repeat(7, 24px); gap: 3px; }
-  .heatmap-days span { font-size: 0.65rem; color: #8091a7; line-height: 24px; width: 10px; text-align: right; }
+  .heatmap-days span { font-size: 0.65rem; color: var(--color-neutral-text-faint); line-height: 24px; width: 10px; text-align: right; }
   .heatmap-grid { display: grid; grid-template-rows: repeat(7, 24px); grid-auto-flow: column; gap: 3px; }
   .heatmap-cell { width: 24px; height: 24px; border-radius: 2px; background: var(--color-primary); cursor: default; transition: opacity 0.1s; }
   .heatmap-cell:hover { opacity: 0.75; }

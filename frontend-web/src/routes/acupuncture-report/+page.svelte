@@ -563,7 +563,7 @@
   .status-msg {
     margin: 0.7rem 0 0;
     font-size: 0.9rem;
-    background: #fce8e8;
+    background: var(--color-error-bg);
     color: #8a1c1c;
     border-radius: 10px;
     padding: 0.4rem 0.65rem;
@@ -577,7 +577,7 @@
     padding: 0;
   }
   .impact-row {
-    border-top: 1px solid #e5edf8;
+    border-top: 1px solid var(--color-surface-muted);
     padding: 0.7rem 0;
   }
   .impact-row:first-child {
@@ -657,8 +657,8 @@
     height: 32px;
     padding: 0;
     border-radius: 10px;
-    background: #edf4fd;
-    border: 1px solid #cadcef;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-input-border);
     color: var(--color-link);
     fill: var(--color-link);
     transition: background-color 160ms ease-out;
@@ -676,9 +676,9 @@
   .role-menu {
     margin-top: 0.6rem;
     padding: 0.6rem;
-    border: 1px solid #cadcef;
+    border: 1px solid var(--color-input-border);
     border-radius: 12px;
-    background: #f6faff;
+    background: var(--color-bg-start);
     display: grid;
     gap: 0.3rem;
   }
@@ -699,8 +699,8 @@
     transition: background-color 160ms ease-out;
   }
   .role-choice:hover:not(:disabled) {
-    background: #e6f0fb;
-    border-color: #cadcef;
+    background: var(--color-surface-muted);
+    border-color: var(--color-input-border);
   }
   .role-choice:disabled {
     opacity: 0.5;
@@ -718,7 +718,7 @@
     margin-top: 0.2rem;
     padding: 0.35rem 0.7rem;
     border-radius: 10px;
-    border: 1px solid #cadcef;
+    border: 1px solid var(--color-input-border);
     background: var(--color-neutral-bg);
     color: var(--color-link);
     font-size: 0.84rem;
@@ -730,7 +730,7 @@
     justify-content: space-between;
     gap: 0.2rem 0.75rem;
     padding: 0.4rem 0;
-    border-top: 1px solid #edf2f9;
+    border-top: 1px solid var(--color-surface-subtle);
     font-size: 0.9rem;
   }
   .early-list li:first-child {
@@ -756,8 +756,8 @@
     align-items: center;
     gap: 0.3rem;
     border-radius: 999px;
-    border: 1px solid #c3d8f1;
-    background: #ecf5ff;
+    border: 1px solid var(--color-input-border);
+    background: var(--color-surface-subtle);
     padding: 0.25rem 0.65rem;
     font-size: 0.82rem;
     color: var(--color-primary-content);

@@ -366,33 +366,33 @@
 
 <style>
   .table-wrap { overflow-x: auto; margin-top: 0.5rem; }
-  .table th, .table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid #e8f0f9; font-size: 0.86rem; }
+  .table th, .table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--color-surface-muted); font-size: 0.86rem; }
   .table th { font-size: 0.75rem; color: var(--color-neutral-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .edit-row { background: #f0f7ff; }
+  .edit-row { background: var(--color-surface-subtle); }
   .edit-acts { min-width: 260px; }
   .edit-acts-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; max-height: 130px; overflow: auto; margin-top: 0.35rem; }
   .edit-position-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.2rem 0 0.35rem 0.4rem; }
-  .position-chip { border: 1px solid #b9cce0; background: var(--color-neutral-bg); color: #315678; border-radius: 999px; padding: 0.18rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
-  .position-chip-selected { background: #315678; color: var(--color-neutral-bg); border-color: #315678; }
-  .act-chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
-  .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: var(--color-neutral-bg); }
-  .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: var(--color-link); margin: 0.1rem 0.15rem 0.1rem 0; }
+  .position-chip { border: 1px solid #b9cce0; background: var(--color-neutral-bg); color: var(--color-slate-text); border-radius: 999px; padding: 0.18rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
+  .position-chip-selected { background: var(--color-slate-text); color: var(--color-neutral-bg); border-color: var(--color-slate-text); }
+  .act-chip { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); color: var(--color-primary-content); border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
+  .act-chip-selected { background: var(--color-accent); border-color: var(--color-accent-border); color: var(--color-neutral-bg); }
+  .act-badge { display: inline-block; background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: var(--color-link); margin: 0.1rem 0.15rem 0.1rem 0; }
   .entry-photo-list { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-  .entry-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid #ccddf4; display: block; }
+  .entry-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid var(--color-input-border); display: block; }
   .btn-sm { padding: 0.3rem 0.55rem; font-size: 0.8rem; margin-right: 0.2rem; }
-  .btn-primary { background: #3c79c5; color: var(--color-neutral-bg); border-color: #3168ad; }
-  .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+  .btn-primary { background: var(--color-accent); color: var(--color-neutral-bg); border-color: var(--color-accent-border); }
+  .btn-danger { background: var(--color-error-bg); color: #dc2626; border-color: #fca5a5; }
   .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
   .filter-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.75rem; }
-  .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid #ccddf4; border-radius: 6px; background: #f5f9ff; color: #1f4066; }
-  .filter-input:focus { outline: none; border-color: #3c79c5; background: var(--color-neutral-bg); }
-  .clear-btn { background: #ecf2fb; border-color: #ccddf4; color: var(--color-neutral-text-muted); }
+  .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid var(--color-input-border); border-radius: 6px; background: var(--color-surface-subtle); color: var(--color-primary-content); }
+  .filter-input:focus { outline: none; border-color: var(--color-accent); background: var(--color-neutral-bg); }
+  .clear-btn { background: var(--color-surface-subtle); border-color: var(--color-input-border); color: var(--color-neutral-text-muted); }
   @media (max-width: 760px) {
     .table-wrap { overflow-x: visible; }
     .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
     .table thead { display: none; }
     .table tr {
-      border: 1px solid #dbe8f8;
+      border: 1px solid var(--color-primary);
       border-radius: 10px;
       margin-bottom: 0.65rem;
       padding: 0.4rem 0.55rem;

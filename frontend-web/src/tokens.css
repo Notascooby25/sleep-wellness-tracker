@@ -12,6 +12,14 @@
   --color-worse: #b23b3b;
   --color-confidence: #5b8fd0;
   --color-confidence-off: #e3ebf6;
+  --color-surface-subtle: #f2f6fc;
+  --color-surface-muted: #e3ebf6;
+  --color-input-border: #ccddf4;
+  --color-accent: #3c79c5;
+  --color-accent-border: #3168ad;
+  --color-primary-border-soft: #a9c9ea;
+  --color-neutral-text-faint: #8091a7;
+  --color-slate-text: #315678;
   --color-link: #1e4b76;
   --color-neutral-text-subtle: #999999;
   --color-error: #b42318;

@@ -101,7 +101,7 @@
     z-index: 2;
     backdrop-filter: blur(8px);
     background: rgba(246, 250, 255, 0.9);
-    border-bottom: 1px solid #d7e4f4;
+    border-bottom: 1px solid var(--color-neutral-border);
   }
 
   .topbar-inner {
@@ -124,27 +124,27 @@
   }
 
   nav a {
-    border: 1px solid #cadcef;
+    border: 1px solid var(--color-input-border);
     border-radius: 999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.82rem;
     color: var(--color-link);
-    background: #edf4fd;
+    background: var(--color-surface-subtle);
   }
 
   nav a.active {
-    background: #d4e9ff;
-    border-color: #a9c9ea;
+    background: var(--color-primary);
+    border-color: var(--color-primary-border-soft);
     font-weight: 700;
   }
 
   .logout-link {
-    border: 1px solid #cadcef;
+    border: 1px solid var(--color-input-border);
     border-radius: 999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.82rem;
     color: var(--color-link);
-    background: #edf4fd;
+    background: var(--color-surface-subtle);
     cursor: pointer;
   }
 

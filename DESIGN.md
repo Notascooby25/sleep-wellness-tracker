@@ -11,6 +11,14 @@ colors:
   neutral-border: "#d9e2ef"
   background-gradient-start: "#f9fbff"
   background-gradient-end: "#f2f6fc"
+  surface-subtle: "#f2f6fc"
+  surface-muted: "#e3ebf6"
+  input-border: "#ccddf4"
+  accent: "#3c79c5"
+  accent-border: "#3168ad"
+  primary-border-soft: "#a9c9ea"
+  neutral-text-faint: "#8091a7"
+  slate-text: "#315678"
   link: "#1e4b76"
   neutral-text-subtle: "#999999"
   error: "#b42318"
@@ -83,7 +91,12 @@ The palette feels like a crisp morning sky fading into a calm evening.
 - **Error** (#b42318) on **Error Wash** (#fee4e2): Problems and the offline banner.
 - **Success Text** (#22543d) on **Success Wash** (#d4edda): Confirmations.
 
-All colours live in `frontend-web/src/tokens.css`; styles use `var(--color-…)` and not raw hex values. Some older pages still hold close shades of blue as raw values, which are being folded into the tokens.
+All colours live in `frontend-web/src/tokens.css`; styles use `var(--color-…)` and not raw hex values. Shades of blue that were within a barely visible distance (CIE76 ΔE ≤ 4) of a token were folded into it. The pages still hold some one-off colours as raw hex values (status greens, ambers and reds for the mood scale, warnings and charts); those are deliberate data and status colours, not part of the blue palette.
+
+- **Surface Subtle** (#f2f6fc) and **Surface Muted** (#e3ebf6): quiet backgrounds for hovered rows, panels and table stripes.
+- **Input Border** (#ccddf4): borders on inputs and small controls.
+- **Accent** (#3c79c5) and **Accent Border** (#3168ad): selected states and strong controls.
+- **Primary Border Soft** (#a9c9ea), **Faint Slate** (#8091a7), **Slate Text** (#315678): supporting borders and text.
 
 ### Named Rules
 **The Low-Contrast Calm Rule.** Never use pure black (`#000000`) or pure white (`#ffffff`) for page backgrounds. Rely on the soft `#f9fbff` to `#f2f6fc` gradient to maintain the sanctuary feel.

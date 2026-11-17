@@ -339,10 +339,10 @@
   .sync-meta {
     font-size: 0.82rem;
     color: var(--color-neutral-text-muted, var(--color-neutral-text-muted));
-    background: #edf4fc;
+    background: var(--color-surface-subtle);
     padding: 0.2rem 0.55rem;
     border-radius: 6px;
-    border: 1px solid #d2e3f5;
+    border: 1px solid var(--color-input-border);
   }
   .btn-refresh {
     display: inline-flex;
@@ -359,7 +359,7 @@
     transition: background 0.15s ease, border-color 0.15s ease;
   }
   .btn-refresh:hover:not(:disabled) {
-    background: #f4f8fd;
+    background: var(--color-surface-subtle);
     border-color: #bcd3eb;
   }
   .refresh-icon.spin {
@@ -442,13 +442,13 @@
     color: var(--color-neutral-text, var(--color-neutral-text));
   }
   .checkin-recorded-badge {
-    background: #edf4fc;
+    background: var(--color-surface-subtle);
     color: var(--color-link);
     font-size: 0.82rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
     border-radius: 6px;
-    border: 1px solid #d2e3f5;
+    border: 1px solid var(--color-input-border);
   }
   .checkin-sub {
     margin: 0.35rem 0 0.85rem 0;
@@ -487,9 +487,9 @@
     border-color: #84cba4;
   }
   .btn-quick-log.score-2 {
-    background: #f5faf8;
+    background: var(--color-bg-start);
     border: 1.5px solid #bce1d1;
-    color: #1d573f;
+    color: var(--color-success-text);
   }
   .btn-quick-log.score-2:hover:not(:disabled) {
     background: #e8f5ef;
@@ -539,8 +539,8 @@
   }
 
   .advice-card {
-    background: #f7fafd;
-    border: 1px solid #dce7f4;
+    background: var(--color-bg-start);
+    border: 1px solid var(--color-neutral-border);
     border-radius: 12px;
     padding: 1rem 1.1rem;
     margin-bottom: 1rem;
@@ -579,8 +579,8 @@
     margin-right: 0.25rem;
   }
   .snap-pill {
-    background: #eef4fb;
-    border: 1px solid #ccddf4;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-input-border);
     border-radius: 999px;
     padding: 0.25rem 0.65rem;
     font-size: 0.82rem;
@@ -589,8 +589,8 @@
   }
 
   .empty-snap {
-    background: #f8fafd;
-    border: 1px dashed #d5e2f1;
+    background: var(--color-bg-start);
+    border: 1px dashed var(--color-neutral-border);
     border-radius: 12px;
     padding: 0.9rem 1rem;
     margin-bottom: 1rem;
@@ -602,7 +602,7 @@
   /* Skeleton Loading Styles */
   .skeleton-card {
     background: var(--color-neutral-bg);
-    border: 1px solid #e5edf7;
+    border: 1px solid var(--color-surface-muted);
     border-radius: 12px;
     padding: 1.5rem 1rem;
     margin-bottom: 1rem;
@@ -617,13 +617,13 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     background: var(--color-neutral-bg);
-    border: 1px solid #e5edf7;
+    border: 1px solid var(--color-surface-muted);
     border-radius: 12px;
     padding: 0.85rem 1rem;
     margin-bottom: 1rem;
   }
   .skeleton-shimmer {
-    background: linear-gradient(90deg, #f0f4fa 25%, #e6edf6 50%, #f0f4fa 75%);
+    background: linear-gradient(90deg, var(--color-surface-subtle) 25%, var(--color-surface-muted) 50%, var(--color-surface-subtle) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: 6px;
@@ -641,7 +641,7 @@
 
   /* Error Recovery Card */
   .error-card {
-    background: #fdfaf7;
+    background: var(--color-bg-start);
     border: 1px solid #eedfd4;
     border-radius: 12px;
     padding: 1.25rem;
@@ -702,7 +702,7 @@
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   .btn-cta:hover {
-    background: #cde4fa;
+    background: var(--color-input-border);
     border-color: #8bb4e1;
   }
   .btn-cta:focus-visible {
