@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, putJson } from '$lib/api';
   import type { Activity, MoodEntry, PositionOption } from '$lib/types';
@@ -23,6 +24,7 @@
   let editImageUrls: string[] = [];
   let editActivityFilter = '';
   let editBusy = false;
+  let deleteBusy = false;
 
   // Filter state
   let filterActivity = '';
@@ -73,7 +75,7 @@
       positionOptions = options;
       hasMore = firstPage.length === PAGE_SIZE;
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     } finally {
       loading = false;
     }
@@ -88,19 +90,23 @@
       entries = [...entries, ...next];
       hasMore = next.length === PAGE_SIZE;
     } catch (error) {
-      status = `Load more failed: ${error}`;
+      status = `Load more failed: ${describeError(error)}`;
     } finally {
       loadingMore = false;
     }
   };
 
   const remove = async (id: number) => {
+    if (deleteBusy) return;
     if (!confirm(`Delete entry #${id}?`)) return;
+    deleteBusy = true;
     try {
       await deleteJson(`/mood/${id}`);
       await load();
     } catch (error) {
-      status = `Delete failed: ${error}`;
+      status = `Delete failed: ${describeError(error)}`;
+    } finally {
+      deleteBusy = false;
     }
   };
 
@@ -185,7 +191,7 @@
       cancelEdit();
       await load();
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
     } finally {
       editBusy = false;
     }
@@ -208,7 +214,7 @@
     <h3 style="margin:0;">Entries ({filterActivity.trim() ? `${filteredEntries.length} of ${entries.length}` : entries.length})</h3>
     <button type="button" on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
   </div>
-  {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status">{status}</p>{/if}
 
   {#if entries.length === 0}
     <p>No entries found.</p>
@@ -344,7 +350,7 @@
                 <td data-label="Actions" style="white-space:nowrap;">
                   {#if entry.id !== undefined}
                     <button type="button" class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
-                    <button type="button" class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
+                    <button type="button" class="btn-sm btn-danger" disabled={deleteBusy} on:click={() => remove(entry.id!)}>Delete</button>
                   {/if}
                 </td>
               </tr>

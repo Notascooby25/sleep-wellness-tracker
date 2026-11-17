@@ -1,3 +1,18 @@
+import { goto } from '$app/navigation';
+import { ApiError, isSignedOutRedirect } from './errors.js';
+
+// If the session has ended, send the person to the login page and bring them back afterwards.
+// Several requests can fail together, so only the first one redirects.
+let signedOutHandled = false;
+function handleSignedOut() {
+  if (typeof window === 'undefined' || signedOutHandled) return;
+  if (window.location.pathname.startsWith('/login')) return;
+  signedOutHandled = true;
+  const here = window.location.pathname + window.location.search;
+  void goto(`/login?redirect=${encodeURIComponent(here)}`);
+  setTimeout(() => (signedOutHandled = false), 3000);
+}
+
 const GET_CACHE_TTL_MS = 15000;
 const TIMEOUT_MS = 12000;
 
@@ -56,9 +71,25 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
         }
       });
 
+      // Session ended: the server redirected this API call to the login page.
+      if (isSignedOutRedirect(response)) {
+        if (!path.startsWith('/auth/')) handleSignedOut();
+        throw new ApiError(401, 'Signed out', 'redirected to login');
+      }
+
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`${response.status} ${text || response.statusText}`);
+        let detail: unknown = text || response.statusText;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === 'object' && 'detail' in parsed) detail = parsed.detail;
+        } catch {
+          // not JSON: keep the text
+        }
+        // Raw details stay in the browser console for debugging; people see describeError() text.
+        console.warn(`API ${method} ${path} failed with ${response.status}:`, text.slice(0, 300));
+        if (response.status === 401 && !path.startsWith('/auth/')) handleSignedOut();
+        throw new ApiError(response.status, detail, text || response.statusText);
       }
 
       if (response.status === 204) {

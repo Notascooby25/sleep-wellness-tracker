@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { getJson, putJson } from '$lib/api';
 
@@ -111,7 +112,7 @@
     try {
       data = await getJson<ImpactResponse>(`/lifestyle-impact?metric=${selectedMetric}&days=${selectedDays}`);
     } catch (error) {
-      status = `Couldn’t load the results: ${error}`;
+      status = `Couldn’t load the results: ${describeError(error)}`;
       data = null;
     } finally {
       busy = false;
@@ -125,7 +126,7 @@
       await putJson(`/activities/${activityId}/report-settings`, body);
       await load();
     } catch (error) {
-      status = `Couldn’t save that change: ${error}`;
+      status = `Couldn’t save that change: ${describeError(error)}`;
     } finally {
       savingId = null;
     }
@@ -145,7 +146,7 @@
       const pages = await hiddenPagesFor(activityId);
       await saveSettings(activityId, { hidden_pages: [...new Set([...pages, PAGE_KEY])] });
     } catch (error) {
-      status = `Couldn’t save that change: ${error}`;
+      status = `Couldn’t save that change: ${describeError(error)}`;
     }
   };
 
@@ -158,7 +159,7 @@
       const pages = await hiddenPagesFor(item.activity_id);
       await saveSettings(item.activity_id, { hidden_pages: pages.filter((page) => page !== PAGE_KEY) });
     } catch (error) {
-      status = `Couldn’t save that change: ${error}`;
+      status = `Couldn’t save that change: ${describeError(error)}`;
     }
   };
 

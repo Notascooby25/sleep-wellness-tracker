@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { describeError, safeRedirectPath } from '$lib/errors.js';
 
   let password = '';
   let status = '';
@@ -25,10 +26,10 @@
         status = 'Incorrect password.';
         return;
       }
-      const redirectTo = $page.url.searchParams.get('redirect') || '/mood-entry';
+      const redirectTo = safeRedirectPath($page.url.searchParams.get('redirect'));
       await goto(redirectTo, { invalidateAll: true });
     } catch (error) {
-      status = `Login failed: ${error}`;
+      status = `Login failed: ${describeError(error)}`;
     } finally {
       busy = false;
     }
@@ -54,5 +55,5 @@
       {busy ? 'Checking...' : 'Log in'}
     </button>
   </form>
-  {#if status}<p>{status}</p>{/if}
+  {#if status}<p role="alert">{status}</p>{/if}
 </section>

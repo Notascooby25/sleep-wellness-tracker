@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { getJson, postJson } from '$lib/api';
   import type { GarminLatestWrap, MoodEntry } from '$lib/types';
@@ -84,7 +85,7 @@
         ? 'Recorded! Today logged as Great (Score 1) ✨'
         : 'Recorded! Today logged as Good (Score 2) 🌿';
     } catch (error) {
-      quickLogFeedback = `Could not save check-in: ${error}`;
+      quickLogFeedback = `Could not save check-in: ${describeError(error)}`;
     } finally {
       quickLogBusy = false;
     }

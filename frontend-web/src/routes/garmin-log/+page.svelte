@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { getJson, postJson } from '$lib/api';
 
@@ -158,7 +159,7 @@
         activitiesByDate[key].sort((a, b) => String(b.start_time || '').localeCompare(String(a.start_time || '')));
       }
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     }
   };
 
@@ -176,7 +177,7 @@
       await load();
       status = 'Synced successfully.';
     } catch (error) {
-      status = `Sync failed: ${error}`;
+      status = `Sync failed: ${describeError(error)}`;
     } finally {
       busy = false;
     }
@@ -288,7 +289,7 @@
     </div>
   </details>
 
-  {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status">{status}</p>{/if}
 </section>
 
 <section class="summary-grid quick-grid">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, postJson, putJson } from '$lib/api';
   import type { Activity, Category } from '$lib/types';
@@ -6,6 +7,7 @@
   let categories: Category[] = [];
   let activities: Activity[] = [];
   let status = '';
+  let busy = false; // true while a save/delete is running, so buttons can't be pressed twice
   let newName = '';
   let newCategoryId = '';
   let newSupportsPosition = false;
@@ -18,7 +20,7 @@
         getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true')
       ]);
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     }
   };
 
@@ -30,6 +32,8 @@
 
   const add = async () => {
     if (!newName.trim()) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await postJson('/activities/', {
@@ -41,11 +45,15 @@
       newSupportsPosition = false;
       await load();
     } catch (error) {
-      status = `Add failed: ${error}`;
+      status = `Add failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const save = async (activity: Activity) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       const normalizedCategoryId =
@@ -60,38 +68,52 @@
       });
       await load();
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const remove = async (id: number) => {
     if (!confirm('Delete this activity?')) return;
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await deleteJson(`/activities/${id}`);
       await load();
     } catch (error) {
-      status = `Delete failed: ${error}`;
+      status = `Delete failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const archive = async (id: number) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/activities/${id}/archive`, {}); // Provide second argument
       await load();
     } catch (error) {
-      status = `Archive failed: ${error}`;
+      status = `Archive failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
   const unarchive = async (id: number) => {
+    if (busy) return;
+    busy = true;
     status = '';
     try {
       await putJson(`/activities/${id}/unarchive`, {}); // Provide second argument
       await load();
     } catch (error) {
-      status = `Unarchive failed: ${error}`;
+      status = `Unarchive failed: ${describeError(error)}`;
+    } finally {
+      busy = false;
     }
   };
 
@@ -138,10 +160,10 @@
       <span>Supports position</span>
     </label>
     <div style="display:flex; align-items:end;">
-      <button type="button" on:click={add}>Add</button>
+      <button type="button" disabled={busy} on:click={add}>Add</button>
     </div>
   </div>
-  {#if status}<p>{status}</p>{/if}
+  {#if status}<p role="status">{status}</p>{/if}
 </section>
 
 <section class="card">
@@ -185,8 +207,8 @@
           </div>
         </div>
         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-          <button type="button" on:click={() => save(activity)}>Save</button>
-          <button type="button" on:click={() => remove(activity.id)}>Delete</button>
+          <button type="button" disabled={busy} on:click={() => save(activity)}>Save</button>
+          <button type="button" disabled={busy} on:click={() => remove(activity.id)}>Delete</button>
         </div>
       </div>
     {/each}
@@ -199,7 +221,7 @@
     {#each activeActivities as activity}
       <li>
         {activity.name} ({categoryName(activity.category_id)})
-        <button type="button" on:click={() => archive(activity.id)}>Archive</button>
+        <button type="button" disabled={busy} on:click={() => archive(activity.id)}>Archive</button>
       </li>
     {/each}
   </ul>
@@ -211,7 +233,7 @@
     {#each archivedActivities as activity}
       <li>
         {activity.name} ({categoryName(activity.category_id)})
-        <button type="button" on:click={() => unarchive(activity.id)}>Unarchive</button>
+        <button type="button" disabled={busy} on:click={() => unarchive(activity.id)}>Unarchive</button>
       </li>
     {/each}
   </ul>
