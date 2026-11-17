@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.7 (2026-11-17)
+
+**Repository tidy-up.** Removed 18 leftover one-off files from the top of the project (old `patch_*` scripts, scratch test scripts, an empty-data backup stub and a spare import script). Nothing in the app, its build, its tests or its deployment used them, and they remain in the project's history if ever needed. No change to how the app behaves.
+
 ## 4.21.6 (2026-11-17)
 
 **Test release for the "new version available" bar.** No visible changes. This release only exists to check that the bar appears for someone who still has 4.21.5 open.
