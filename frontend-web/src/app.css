@@ -12,8 +12,8 @@
 :root {
   font-family: 'DM Sans', 'Segoe UI', Tahoma, sans-serif;
   color: var(--color-neutral-text);
-  background: radial-gradient(900px 260px at 8% -12%, #dbeafe 0%, transparent 45%),
-    radial-gradient(900px 280px at 92% -18%, #e5f4ff 0%, transparent 42%),
+  background: radial-gradient(900px 260px at 8% -12%, var(--color-primary) 0%, transparent 45%),
+    radial-gradient(900px 280px at 92% -18%, var(--color-surface-muted) 0%, transparent 42%),
     linear-gradient(180deg, var(--color-bg-start) 0%, var(--color-bg-end) 100%);
 }
 
@@ -92,7 +92,7 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid #c7d9ef;
+  border: 1px solid var(--color-input-border);
   border-radius: 10px;
   padding: 0.45rem 0.55rem;
   background: var(--color-neutral-bg);
@@ -120,9 +120,9 @@ textarea {
 .badge {
   display: inline-block;
   border-radius: 999px;
-  border: 1px solid #c3d8f1;
-  background: #ecf5ff;
-  color: #1d4b76;
+  border: 1px solid var(--color-input-border);
+  background: var(--color-surface-subtle);
+  color: var(--color-link);
   padding: 0.12rem 0.58rem;
   font-size: 0.78rem;
 }

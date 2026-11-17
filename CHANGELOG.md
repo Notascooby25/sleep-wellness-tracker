@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.9 (2026-11-17)
+
+**Consistent shades of blue.** About 50 slightly different shades of blue and grey that were typed out separately across the pages are now taken from the shared colour list. Each one moved to its nearest named colour, by a difference too small to notice at a glance (the largest is about the gap between two neighbouring paint swatches). Status and chart colours (greens, ambers, reds) were left as they were. Nothing else changes.
+
 ## 4.21.8 (2026-11-17)
 
 **Behind-the-scenes colour tidy-up (no visible change).** The app's colours are now read from one shared list (`tokens.css`) in 125 places instead of being typed out again each time, and six new named colours were added for links, errors and confirmations. Every colour keeps exactly the same value, so the app should look identical. This prepares for making similar shades consistent in a later release.

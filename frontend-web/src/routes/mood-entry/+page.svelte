@@ -477,7 +477,7 @@
   </div>
 
   <div style="margin-top:0.8rem;">
-    <div class="label">Overall Mood <small style="color:#8091a7;">(1 = great, 5 = struggling)</small></div>
+    <div class="label">Overall Mood <small style="color:var(--color-neutral-text-faint);">(1 = great, 5 = struggling)</small></div>
     {#if ratingRequired()}
       <div class="mood-pills">
         {#each [1,2,3,4,5] as score}
@@ -499,7 +499,7 @@
   <div style="margin-top:0.8rem;" id="sleep-rating-section">
     <div class="label">
       Last Night's Sleep
-      <small style="color: {sleepRatingMissing ? 'var(--color-worse, var(--color-worse))' : '#8091a7'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
+      <small style="color: {sleepRatingMissing ? 'var(--color-worse, var(--color-worse))' : 'var(--color-neutral-text-faint)'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
         ({sleepRatingMissing ? 'required' : 'optional'}; 1 = great, 5 = poor)
       </small>
     </div>
@@ -525,7 +525,7 @@
   </label>
 
   <div class="image-upload-wrap">
-    <div class="label">Photos <small style="color:#8091a7;">(optional)</small></div>
+    <div class="label">Photos <small style="color:var(--color-neutral-text-faint);">(optional)</small></div>
     <div class="image-upload-actions">
       <button on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
       <button on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
@@ -678,7 +678,7 @@
 <style>
   .garmin-snap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .snap-label { font-size: 0.78rem; font-weight: 700; color: var(--color-neutral-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .snap-pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: var(--color-link); }
+  .snap-pill { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: var(--color-link); }
   .streak-pill { background: #fff3c4; border-color: #f4d47a; color: #6b4c03; font-weight: 700; }
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
@@ -694,23 +694,23 @@
     color: var(--color-neutral-bg) !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
   }
   .mood-pill-active small { opacity: 1; }
-  .badge-info { font-size: 0.84rem; color: var(--color-neutral-text-muted); background: #eef4fb; border: 1px solid #ccddf4; border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
+  .badge-info { font-size: 0.84rem; color: var(--color-neutral-text-muted); background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
   .image-upload-wrap { margin-top: 0.9rem; }
   .image-upload-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
   .hidden-file-input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
   .image-preview-wrap { margin-top: 0.55rem; display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
   .image-preview-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
-  .image-uploaded-at { font-size: 0.76rem; color: #8091a7; }
+  .image-uploaded-at { font-size: 0.76rem; color: var(--color-neutral-text-faint); }
   .image-preview {
     width: min(260px, 100%);
     max-height: 260px;
     object-fit: cover;
     border-radius: 10px;
-    border: 1px solid #ccddf4;
+    border: 1px solid var(--color-input-border);
     box-shadow: 0 4px 14px rgba(12, 33, 62, 0.08);
   }
-  .btn-primary { background: #3c79c5; color: var(--color-neutral-bg); border-color: #3168ad; }
-  .btn-clear { background: transparent; border-color: #c7d9ef; color: var(--color-neutral-text-muted); font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
+  .btn-primary { background: var(--color-accent); color: var(--color-neutral-bg); border-color: var(--color-accent-border); }
+  .btn-clear { background: transparent; border-color: var(--color-input-border); color: var(--color-neutral-text-muted); font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
   .sleep-required-notice {
     font-size: 0.86rem;
     color: #7a4f01;
@@ -725,20 +725,20 @@
   .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
   .status-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
   .acts-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
-  .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8f0f9; }
-  .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid #e2eaf4; margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
-  .cat-tab { position: relative; background: transparent; border: 1px solid #d7e6f7; border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: var(--color-link); cursor: pointer; }
-  .cat-tab-active { background: #d4e9ff; border-color: #a9c9ea; font-weight: 700; }
-  .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3c79c5; margin-left: 4px; vertical-align: middle; }
+  .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-surface-muted); }
+  .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid var(--color-surface-muted); margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
+  .cat-tab { position: relative; background: transparent; border: 1px solid var(--color-primary); border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: var(--color-link); cursor: pointer; }
+  .cat-tab-active { background: var(--color-primary); border-color: var(--color-primary-border-soft); font-weight: 700; }
+  .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); margin-left: 4px; vertical-align: middle; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
-  .chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
-  .chip-selected { background: #3c79c5; border-color: #3168ad; color: var(--color-neutral-bg); }
-  .activity-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; background: #f7fafd; border: 1px solid #dce7f4; border-radius: 10px; }
+  .chip { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); color: var(--color-primary-content); border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
+  .chip-selected { background: var(--color-accent); border-color: var(--color-accent-border); color: var(--color-neutral-bg); }
+  .activity-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; background: var(--color-bg-start); border: 1px solid var(--color-neutral-border); border-radius: 10px; }
   .detail-row { display: flex; flex-direction: column; gap: 0.35rem; }
-  .detail-name { font-weight: 700; color: #1f4066; font-size: 0.9rem; }
+  .detail-name { font-weight: 700; color: var(--color-primary-content); font-size: 0.9rem; }
   .detail-options { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
   .detail-label { font-size: 0.8rem; color: var(--color-neutral-text-muted); margin-right: 0.25rem; }
   .detail-chip { font-size: 0.78rem; padding: 0.22rem 0.6rem; }
   .detail-quantity { display: inline-flex; align-items: center; gap: 0.5rem; }
-  .detail-quantity input { width: 6rem; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid #c7d9ef; font-size: 0.9rem; }
+  .detail-quantity input { width: 6rem; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid var(--color-input-border); font-size: 0.9rem; }
 </style>
