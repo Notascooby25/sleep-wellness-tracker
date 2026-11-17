@@ -149,6 +149,10 @@
     };
 </script>
 
+<svelte:head>
+  <title>Dashboard · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <div class="hero-content">
     <div>
@@ -702,7 +706,7 @@
     border-color: #8bb4e1;
   }
   .btn-cta:focus-visible {
-    outline: 2px solid #5b9bd5;
+    outline: 2px solid #173a5c;
     outline-offset: 2px;
   }
 </style>

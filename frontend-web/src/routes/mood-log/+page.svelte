@@ -194,6 +194,10 @@
   onMount(load);
 </script>
 
+<svelte:head>
+  <title>Mood Log · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Mood Log</h2>
   <p>Review, edit, and remove mood entries.</p>

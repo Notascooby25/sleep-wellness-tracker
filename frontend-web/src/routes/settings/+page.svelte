@@ -129,6 +129,10 @@
   };
 </script>
 
+<svelte:head>
+  <title>Settings · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Settings</h2>
   <p>Configure advanced pages and management tools from one place.</p>

@@ -69,14 +69,14 @@
   </main>
 {:else}
   {#if !isOnline}
-    <div class="offline-banner">Offline — can't reach the server. Some actions may not work until reconnected.</div>
+    <div class="offline-banner" role="status">Offline — can't reach the server. Some actions may not work until reconnected.</div>
   {/if}
   <header class="topbar">
     <div class="topbar-inner">
       <h1>Sleep Wellness Tracker</h1>
-      <nav>
+      <nav aria-label="Main">
         {#each links as link}
-          <a href={link.href} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
+          <a href={link.href} aria-current={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/') ? 'page' : undefined} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
         {/each}
         {#if showInstallButton}
           <button on:click={installApp} class="install-link">Install app</button>
@@ -154,6 +154,17 @@
     background: #0d6efd;
     cursor: pointer;
     font-weight: 600;
+  }
+
+  /* Touch screens: nav controls meet the 44px minimum target size. */
+  @media (pointer: coarse) {
+    nav a,
+    .logout-link,
+    .install-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
   }
 
   .offline-banner {

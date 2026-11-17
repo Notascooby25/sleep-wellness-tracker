@@ -448,6 +448,10 @@
 
 </script>
 
+<svelte:head>
+  <title>Mood Entry · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Mood Entry</h2>
   <p>Log your mood and activity context.</p>

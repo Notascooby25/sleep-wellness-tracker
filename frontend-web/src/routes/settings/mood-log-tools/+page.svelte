@@ -598,6 +598,10 @@
   onMount(load);
 </script>
 
+<svelte:head>
+  <title>Mood Log Tools · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Mood Log Tools</h2>
   <p>Export, backup, restore, and run bulk maintenance tools for your mood log.</p>

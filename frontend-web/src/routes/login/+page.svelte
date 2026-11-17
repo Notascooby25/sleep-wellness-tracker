@@ -30,6 +30,10 @@
   };
 </script>
 
+<svelte:head>
+  <title>Log in · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Sleep Wellness Tracker</h2>
   <p>Enter the password to continue.</p>

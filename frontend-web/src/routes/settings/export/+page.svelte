@@ -225,6 +225,10 @@
   onMount(loadCatalog);
 </script>
 
+<svelte:head>
+  <title>Export Data · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Export Data to CSV</h2>
   <p>Select a date range and one or more data sources to download a readable CSV export. Activity names, types, and notes are included using plain language column headers. Note: attached images cannot be embedded in a CSV file — they remain viewable in the app.</p>

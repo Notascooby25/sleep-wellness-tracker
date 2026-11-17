@@ -190,6 +190,10 @@
   onMount(loadInitial);
 </script>
 
+<svelte:head>
+  <title>Acupuncture &amp; Symptom Report · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Acupuncture & Symptom Report</h2>
   <p>Track headache patterns, frequency, and potential triggers over time.</p>
