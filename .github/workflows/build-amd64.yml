@@ -90,6 +90,10 @@ jobs:
         working-directory: frontend-web
         run: npm run check
 
+      - name: Test frontend helpers (node --test)
+        working-directory: frontend-web
+        run: node --test src/lib/*.test.js
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
