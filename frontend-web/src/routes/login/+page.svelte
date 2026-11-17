@@ -55,5 +55,5 @@
       {busy ? 'Checking...' : 'Log in'}
     </button>
   </form>
-  {#if status}<p>{status}</p>{/if}
+  {#if status}<p role="alert">{status}</p>{/if}
 </section>

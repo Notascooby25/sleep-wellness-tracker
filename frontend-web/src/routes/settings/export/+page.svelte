@@ -355,7 +355,7 @@
   {#if previewLoading}
     <p class="preview-msg">Checking what's included…</p>
   {:else if previewError}
-    <p class="preview-msg preview-warn">{previewError}</p>
+    <p class="preview-msg preview-warn" role="alert">{previewError}</p>
   {:else if preview}
     <div class="preview-msg">
       <span>This export includes </span>
@@ -385,7 +385,7 @@
   {/if}
 
   {#if status}
-    <p class="status-msg">{status}</p>
+    <p class="status-msg" role="status">{status}</p>
   {/if}
 </section>
 

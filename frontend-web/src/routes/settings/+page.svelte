@@ -157,7 +157,7 @@
       <p class="notif-warn">Notifications are blocked — allow them in your browser's site settings.</p>
     {/if}
   {/if}
-  {#if subscriptionError}<p class="notif-warn">{subscriptionError}</p>{/if}
+  {#if subscriptionError}<p class="notif-warn" role="alert">{subscriptionError}</p>{/if}
   {#if subscriptions.length > 0}
     <ul class="device-list">
       {#each subscriptions as sub}
@@ -171,7 +171,7 @@
   {/if}
 
   <h4 style="margin:1rem 0 0.4rem;font-size:0.92rem;">Reminder times</h4>
-  {#if reminderError}<p class="notif-warn">{reminderError}</p>{/if}
+  {#if reminderError}<p class="notif-warn" role="alert">{reminderError}</p>{/if}
   {#if reminders.length > 0}
     <ul class="device-list">
       {#each reminders as reminder}

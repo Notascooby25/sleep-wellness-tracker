@@ -209,7 +209,7 @@
     <h3 style="margin:0;">Entries ({filterActivity.trim() ? `${filteredEntries.length} of ${entries.length}` : entries.length})</h3>
     <button type="button" on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
   </div>
-  {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status">{status}</p>{/if}
 
   {#if entries.length === 0}
     <p>No entries found.</p>

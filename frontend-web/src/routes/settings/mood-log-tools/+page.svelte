@@ -615,7 +615,7 @@
   </div>
   <p class="label" style="margin-top:0.45rem;">Loaded {entries.length} entries</p>
   {#if status}
-    <p>{status}</p>
+    <p role="status">{status}</p>
   {/if}
 </section>
 

@@ -78,7 +78,10 @@
     toDate = today;
   };
 
+  let isLoading = false;
+
   const load = async () => {
+    isLoading = true;
     status = '';
     try {
       const [moodData, sleepWrap, bodyWrap, hrvWrap, rhrWrap, stressWrap, stepsWrap, acts, cats] = await Promise.all([
@@ -107,6 +110,8 @@
       }
     } catch (error) {
       status = `Load failed: ${describeError(error)}`;
+    } finally {
+      isLoading = false;
     }
   };
 
@@ -707,7 +712,11 @@
       <input type="number" min="300" max="720" step="15" bind:value={sleepGoalMinutes} />
     </label>
   </div>
-  {#if status}<p class="status">{status}</p>{/if}
+  {#if isLoading}<p class="status" role="status">Loading your analytics…</p>{/if}
+  {#if status}
+    <p class="status" role="alert">{status}</p>
+    <button type="button" on:click={load} disabled={isLoading}>Try again</button>
+  {/if}
 
   <div class="legend-box">
     <div class="legend-title">How to read this</div>

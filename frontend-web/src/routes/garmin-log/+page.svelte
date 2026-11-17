@@ -289,7 +289,7 @@
     </div>
   </details>
 
-  {#if status}<p class="status-msg">{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status">{status}</p>{/if}
 </section>
 
 <section class="summary-grid quick-grid">

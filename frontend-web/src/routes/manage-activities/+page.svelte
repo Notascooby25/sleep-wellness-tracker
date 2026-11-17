@@ -142,7 +142,7 @@
       <button type="button" on:click={add}>Add</button>
     </div>
   </div>
-  {#if status}<p>{status}</p>{/if}
+  {#if status}<p role="status">{status}</p>{/if}
 </section>
 
 <section class="card">

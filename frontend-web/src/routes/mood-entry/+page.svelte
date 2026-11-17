@@ -578,7 +578,7 @@
     <button type="button" class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
     <button type="button" disabled={busy} on:click={load}>Refresh</button>
   </div>
-  {#if status}<p class="status-msg" class:status-error={status.includes('failed') || status.includes('Please choose')}>{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status" class:status-error={status.includes('failed') || status.includes('Please choose')}>{status}</p>{/if}
   {#if loadError}<button type="button" class="btn-clear" on:click={load}>Retry loading</button>{/if}
 </section>
 
