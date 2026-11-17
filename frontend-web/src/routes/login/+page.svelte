@@ -41,7 +41,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Sleep Wellness Tracker</h2>
+  <h1>Sleep Wellness Tracker</h1>
   <p>Enter the password to continue.</p>
 </section>
 

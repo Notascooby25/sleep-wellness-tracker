@@ -132,7 +132,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Manage Categories</h2>
+  <h1>Manage Categories</h1>
   <p>Create, edit, and remove categories while preserving existing API behavior.</p>
 </section>
 

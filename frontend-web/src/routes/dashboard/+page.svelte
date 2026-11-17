@@ -157,7 +157,7 @@
 <section class="hero">
   <div class="hero-content">
     <div>
-      <h2>Daily Dashboard</h2>
+      <h1>Daily Dashboard</h1>
       <p class="hero-sub">Your morning readiness and personalized advice.</p>
     </div>
     <div class="sync-actions">

@@ -604,7 +604,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Mood Log Tools</h2>
+  <h1>Mood Log Tools</h1>
   <p>Export, backup, restore, and run bulk maintenance tools for your mood log.</p>
 </section>
 

@@ -135,7 +135,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Manage Activities</h2>
+  <h1>Manage Activities</h1>
   <p>Manage activity labels and category mapping for mood entry and analytics pages.</p>
 </section>
 

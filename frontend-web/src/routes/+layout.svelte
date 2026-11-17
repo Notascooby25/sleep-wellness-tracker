@@ -74,7 +74,7 @@
   {/if}
   <header class="topbar">
     <div class="topbar-inner">
-      <h1>Sleep Wellness Tracker</h1>
+      <p class="brand">Sleep Wellness Tracker</p>
       <nav aria-label="Main">
         {#each links as link}
           <a href={link.href} aria-current={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/') ? 'page' : undefined} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
@@ -110,9 +110,10 @@
     padding: 0.8rem 1rem;
   }
 
-  h1 {
+  .brand {
     margin: 0;
     font-size: 1.1rem;
+    font-weight: 700;
     color: #11314f;
   }
 

@@ -678,7 +678,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Analytics</h2>
+  <h1>Analytics</h1>
   <p>Trends and insights across mood, sleep, and Garmin wellness data.</p>
 </section>
 

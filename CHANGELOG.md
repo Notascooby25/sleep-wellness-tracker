@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.14 (2026-11-17)
+
+**Proper page headings for screen readers.** Each page's title is now its main heading (the site name in the header used to be the main heading on every page, so screen reader users never heard what page they were on). The pages look exactly the same as before.
+
 ## 4.21.13 (2026-11-17)
 
 **Tidier error replies.** When the app's server can't reach its database service, it used to send the browser a technical error string that could include an internal address. It now sends a plain fixed message and keeps the technical detail in its own log. No visible change.

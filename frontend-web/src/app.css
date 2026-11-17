@@ -38,6 +38,12 @@ main {
   padding: 1rem;
 }
 
+/* Each page's title is its <h1>. These are the sizes the title had when it was an <h2>, so nothing moves. */
+main h1 {
+  font-size: 1.5em;
+  margin: 0.83em 0;
+}
+
 .hero {
   background: var(--color-neutral-bg);
   border: 1px solid var(--color-neutral-border);

@@ -135,7 +135,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Settings</h2>
+  <h1>Settings</h1>
   <p>Configure advanced pages and management tools from one place.</p>
 </section>
 
