@@ -147,7 +147,7 @@
     <p class="notif-warn">Your browser does not support push notifications. Note: Android requires accessing the app via HTTPS (or localhost) for push to work.</p>
   {:else}
     <div class="reminder-row">
-      <button on:click={enableThisDevice} disabled={subscribeBusy}>{subscribeBusy ? 'Enabling…' : 'Enable notifications on this device'}</button>
+      <button type="button" on:click={enableThisDevice} disabled={subscribeBusy}>{subscribeBusy ? 'Enabling…' : 'Enable notifications on this device'}</button>
     </div>
     <div style="margin: 0.6rem 0 0.6rem 0; font-size: 0.84rem; color: var(--color-primary-content); background: var(--color-surface-subtle); border-radius: 8px; padding: 0.5rem 0.6rem;">
       <strong>Android users:</strong> If you use Brave, you must disable Brave Shields for this site. Also, ensure your browser's Battery Optimization is set to "Unrestricted" in Android settings.
@@ -162,8 +162,8 @@
       {#each subscriptions as sub}
         <li>
           <span>{sub.device_label || 'Unnamed device'}</span>
-          <button class="btn-clear" on:click={() => testDevice(sub.id)}>Test</button>
-          <button class="btn-clear" on:click={() => removeDevice(sub.id)}>Remove</button>
+          <button type="button" class="btn-clear" on:click={() => testDevice(sub.id)}>Test</button>
+          <button type="button" class="btn-clear" on:click={() => removeDevice(sub.id)}>Remove</button>
         </li>
       {/each}
     </ul>
@@ -180,7 +180,7 @@
           </label>
           <span class="reminder-time">{reminder.time_of_day}</span>
           <span class="reminder-msg">{reminder.message || 'Update your tracker'}</span>
-          <button class="btn-clear" on:click={() => removeReminder(reminder.id)}>Remove</button>
+          <button type="button" class="btn-clear" on:click={() => removeReminder(reminder.id)}>Remove</button>
         </li>
       {/each}
     </ul>
@@ -188,7 +188,7 @@
   <div class="reminder-row">
     <input type="time" bind:value={newTime} style="width:auto;" />
     <input type="text" bind:value={newMessage} placeholder="Custom message (optional)" style="flex:1;min-width:160px;" />
-    <button on:click={addReminder} disabled={busyReminders}>Add reminder</button>
+    <button type="button" on:click={addReminder} disabled={busyReminders}>Add reminder</button>
   </div>
   <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: #f0f7f3; border: 1px solid var(--color-success-bg); border-radius: 8px; padding: 0.6rem 0.8rem;">
     <span style="font-size: 0.84rem; color: #1f5e3d;">

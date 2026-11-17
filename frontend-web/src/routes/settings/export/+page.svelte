@@ -303,7 +303,7 @@
         {#each Array.from(selectedActivityIds) as id}
           {@const act = activities.find(a => a.id === id)}
           {#if act}
-            <button class="chip chip-selected" on:click={() => toggleActivity(id)}>{act.name} ×</button>
+            <button type="button" class="chip chip-selected" on:click={() => toggleActivity(id)}>{act.name} ×</button>
           {/if}
         {/each}
       </div>
@@ -373,7 +373,7 @@
   {/if}
 
   <div class="actions">
-    <button class="btn-primary" disabled={busy} on:click={exportCsv}>
+    <button type="button" class="btn-primary" disabled={busy} on:click={exportCsv}>
       {busy ? 'Exporting...' : 'Export CSV'}
     </button>
   </div>

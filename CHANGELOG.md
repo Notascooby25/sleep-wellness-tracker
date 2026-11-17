@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.11 (2026-11-17)
+
+**Accessibility tidy-up.** If your phone or computer is set to "reduce motion", the app no longer spins, slides or shimmers (colour changes and loading text still work). The Mood Log filter box now shows the same clear dark outline as everything else when you click into it. Buttons are marked as plain buttons so they can never submit a form by accident, the Mood Log table now has proper column labels for screen readers, and the login page puts the cursor in the password box in a cleaner way. Nothing else changes in how the app looks.
+
 ## 4.21.10 (2026-11-17)
 
 **Security housekeeping for the website's building blocks.** The saved list of exact software versions the web app is built from (the "lock file") was out of date, so GitHub's scanner reported 28 vulnerability alerts against versions the app isn't actually built with. The lock file is refreshed to the current safe versions, and the app's build now follows it exactly, so what GitHub scans is what runs. No change to how the app looks or behaves.

@@ -1,10 +1,15 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
   let password = '';
   let status = '';
   let busy = false;
+  let passwordInput: HTMLInputElement;
+
+  // Put the cursor in the password box on arrival (done here, not with the autofocus attribute).
+  onMount(() => passwordInput?.focus());
 
   const login = async () => {
     if (!password) return;
@@ -43,7 +48,7 @@
   <form on:submit|preventDefault={login}>
     <label>
       <div class="label">Password</div>
-      <input type="password" bind:value={password} autofocus />
+      <input type="password" bind:value={password} bind:this={passwordInput} />
     </label>
     <button type="submit" disabled={busy} style="margin-top:0.75rem;">
       {busy ? 'Checking...' : 'Log in'}

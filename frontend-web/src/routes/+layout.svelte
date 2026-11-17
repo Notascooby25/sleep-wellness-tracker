@@ -80,9 +80,9 @@
           <a href={link.href} aria-current={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/') ? 'page' : undefined} class:active={$page.url.pathname === link.href || $page.url.pathname.startsWith(link.href + '/')}>{link.label}</a>
         {/each}
         {#if showInstallButton}
-          <button on:click={installApp} class="install-link">Install app</button>
+          <button type="button" on:click={installApp} class="install-link">Install app</button>
         {/if}
-        <button on:click={logout} class="logout-link">Log out</button>
+        <button type="button" on:click={logout} class="logout-link">Log out</button>
       </nav>
     </div>
   </header>

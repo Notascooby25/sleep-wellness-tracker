@@ -696,7 +696,7 @@
       </select>
     </label>
     <div class="btn-row">
-      <button on:click={load}>Refresh</button>
+      <button type="button" on:click={load}>Refresh</button>
     </div>
   </div>
 
@@ -756,8 +756,8 @@
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
     <h3 style="margin:0;">12-Week Heatmap</h3>
     <div class="heatmap-toggle">
-      <button class:active={heatmapType === 'mood'} on:click={() => (heatmapType = 'mood')}>Mood</button>
-      <button class:active={heatmapType === 'sleep'} on:click={() => (heatmapType = 'sleep')}>Sleep score</button>
+      <button type="button" class:active={heatmapType === 'mood'} on:click={() => (heatmapType = 'mood')}>Mood</button>
+      <button type="button" class:active={heatmapType === 'sleep'} on:click={() => (heatmapType = 'sleep')}>Sleep score</button>
     </div>
   </div>
   <div class="heatmap-wrap">
@@ -921,7 +921,7 @@
           <div class="label">Select mood</div>
           <div class="mood-buttons">
             {#each [1,2,3,4,5] as mood}
-              <button 
+              <button type="button" 
                 class={`mood-btn ${selectedMood === mood ? 'active' : ''}`}
                 style={`--mood-color: ${moodColors[mood]}`}
                 on:click={() => selectedMood = mood as 1|2|3|4|5}
@@ -1051,8 +1051,8 @@
 
   /* Mood Buttons */
   .mood-buttons { display: flex; gap: 0.5rem; }
-  .mood-btn { padding: 0.5rem 0.75rem; border: 2px solid var(--color-neutral-border); border-radius: 8px; background: var(--color-neutral-bg); color: var(--color-neutral-text); font-weight: 600; cursor: pointer; transition: all 0.2s ease;
-  @media (prefers-reduced-motion: reduce) { transition: none; } font-size: 0.9rem; }
+  .mood-btn { padding: 0.5rem 0.75rem; border: 2px solid var(--color-neutral-border); border-radius: 8px; background: var(--color-neutral-bg); color: var(--color-neutral-text); font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 0.9rem; }
+  @media (prefers-reduced-motion: reduce) { .mood-btn { transition: none; } }
   .mood-btn:hover { border-color: var(--mood-color); }
   .mood-btn.active { border-color: var(--mood-color); background: var(--mood-color); color: var(--color-neutral-bg); }
 

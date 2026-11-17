@@ -118,8 +118,8 @@
       <input type="checkbox" bind:checked={newSupportsPosition} />
       <span>Supports position</span>
     </label>
-    <button on:click={add}>Add</button>
-    <button on:click={load}>Refresh</button>
+    <button type="button" on:click={add}>Add</button>
+    <button type="button" on:click={load}>Refresh</button>
   </div>
   {#if status}<p>{status}</p>{/if}
 </section>
@@ -153,8 +153,8 @@
           </label>
         </div>
         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-          <button on:click={() => save(category)}>Save</button>
-          <button on:click={() => remove(category.id)}>Delete</button>
+          <button type="button" on:click={() => save(category)}>Save</button>
+          <button type="button" on:click={() => remove(category.id)}>Delete</button>
         </div>
       </div>
     {/each}
@@ -167,12 +167,12 @@
   {#each positionOptions as option (option.id)}
     <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem;">
       <input bind:value={option.label} />
-      <button on:click={() => savePositionOption(option)}>Save</button>
-      <button on:click={() => removePositionOption(option.id)}>Delete</button>
+      <button type="button" on:click={() => savePositionOption(option)}>Save</button>
+      <button type="button" on:click={() => removePositionOption(option.id)}>Delete</button>
     </div>
   {/each}
   <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
     <input placeholder="New position label" bind:value={newPositionLabel} />
-    <button on:click={addPositionOption}>Add</button>
+    <button type="button" on:click={addPositionOption}>Add</button>
   </div>
 </section>
