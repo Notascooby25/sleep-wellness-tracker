@@ -101,6 +101,10 @@
   onMount(load);
 </script>
 
+<svelte:head>
+  <title>Manage Categories · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Manage Categories</h2>
   <p>Create, edit, and remove categories while preserving existing API behavior.</p>

@@ -667,6 +667,10 @@
   })();
 </script>
 
+<svelte:head>
+  <title>Analytics · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Analytics</h2>
   <p>Trends and insights across mood, sleep, and Garmin wellness data.</p>

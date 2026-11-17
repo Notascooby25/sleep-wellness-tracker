@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.3 (2026-11-17)
+
+**Accessibility basics.** Keyboard focus outlines are now dark blue, so you can see where you are (they were too pale to see clearly). Every page now has its own browser tab title, such as "Mood Log · Sleep Wellness Tracker". The menu is labelled as the main navigation and marks the current page for screen readers, the offline banner is announced, and on touch screens the menu buttons are taller (44px) and easier to tap. No data or layout changes on desktop.
+
 ## 4.21.2 (2026-11-07)
 
 **Require Last Night's Sleep rating on Morning Feedback.** When selecting activities under the "Morning / Waking Feedback" category, the sleep rating is now required before saving. An inline reminder appears above the Save Entry button if a rating is still missing, and attempting to save without a rating shows a clear guidance message and automatically scrolls smoothly up to the rating pills.

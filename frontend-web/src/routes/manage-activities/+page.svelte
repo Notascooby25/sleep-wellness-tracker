@@ -108,6 +108,10 @@
   onMount(load);
 </script>
 
+<svelte:head>
+  <title>Manage Activities · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Manage Activities</h2>
   <p>Manage activity labels and category mapping for mood entry and analytics pages.</p>

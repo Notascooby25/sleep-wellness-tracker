@@ -169,6 +169,10 @@
   onMount(load);
 </script>
 
+<svelte:head>
+  <title>Lifestyle Impact · Sleep Wellness Tracker</title>
+</svelte:head>
+
 <section class="hero">
   <h2>Lifestyle Impact</h2>
   <p>What seems to change your sleep and recovery, worked out from your own nights.</p>
