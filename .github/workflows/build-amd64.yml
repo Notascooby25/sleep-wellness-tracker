@@ -80,7 +80,7 @@ jobs:
 
       - name: Install frontend deps
         working-directory: frontend-web
-        run: npm install
+        run: npm ci
 
       - name: Generate SvelteKit types
         working-directory: frontend-web
