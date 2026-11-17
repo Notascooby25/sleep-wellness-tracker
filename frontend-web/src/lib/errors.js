@@ -5,9 +5,11 @@ export class ApiError extends Error {
   /**
    * @param {number} status HTTP status code
    * @param {unknown} detail parsed `detail` from the server response, or its text
+   * @param {string} [raw] the full response text. Kept in `message` for code that matches on it
+   *   (never shown to people; use describeError for that).
    */
-  constructor(status, detail) {
-    super(`Request failed (${status})`);
+  constructor(status, detail, raw = '') {
+    super(`${status} ${raw}`.trim());
     this.name = 'ApiError';
     this.status = status;
     this.detail = detail;

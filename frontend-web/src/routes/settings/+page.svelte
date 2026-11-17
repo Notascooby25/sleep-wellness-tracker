@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import {
     pushSupported,
@@ -33,12 +34,12 @@
     try {
       reminders = await listReminders();
     } catch (error) {
-      reminderError = `Could not load reminders: ${error}`;
+      reminderError = `Could not load reminders: ${describeError(error)}`;
     }
     try {
       subscriptions = await listSubscriptions();
     } catch (error) {
-      subscriptionError = `Could not load devices: ${error}`;
+      subscriptionError = `Could not load devices: ${describeError(error)}`;
     }
   };
 
@@ -58,7 +59,7 @@
       });
       await load();
     } catch (error) {
-      reminderError = `Could not add preset reminder: ${error}`;
+      reminderError = `Could not add preset reminder: ${describeError(error)}`;
     } finally {
       busyReminders = false;
     }
@@ -72,7 +73,7 @@
       newMessage = '';
       await load();
     } catch (error) {
-      reminderError = `Could not add reminder: ${error}`;
+      reminderError = `Could not add reminder: ${describeError(error)}`;
     } finally {
       busyReminders = false;
     }
@@ -83,7 +84,7 @@
       await updateReminder(reminder.id, { enabled: !reminder.enabled });
       await load();
     } catch (error) {
-      reminderError = `Could not update reminder: ${error}`;
+      reminderError = `Could not update reminder: ${describeError(error)}`;
     }
   };
 
@@ -92,7 +93,7 @@
       await deleteReminder(id);
       await load();
     } catch (error) {
-      reminderError = `Could not delete reminder: ${error}`;
+      reminderError = `Could not delete reminder: ${describeError(error)}`;
     }
   };
 
@@ -104,7 +105,7 @@
       notifPermission = Notification.permission;
       await load();
     } catch (error) {
-      subscriptionError = `Could not enable notifications: ${error}`;
+      subscriptionError = `Could not enable notifications: ${describeError(error)}`;
     } finally {
       subscribeBusy = false;
     }
@@ -115,7 +116,7 @@
       await removeSubscription(id);
       await load();
     } catch (error) {
-      subscriptionError = `Could not remove device: ${error}`;
+      subscriptionError = `Could not remove device: ${describeError(error)}`;
     }
   };
 
@@ -124,7 +125,7 @@
     try {
       await testSubscription(id);
     } catch (error) {
-      subscriptionError = `Could not send test push: ${error}`;
+      subscriptionError = `Could not send test push: ${describeError(error)}`;
     }
   };
 </script>

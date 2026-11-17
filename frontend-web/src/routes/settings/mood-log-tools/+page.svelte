@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, postJson, putJson } from '$lib/api';
   import type { Activity, Category, MoodEntry } from '$lib/types';
@@ -241,7 +242,7 @@
           .map((c) => c.id);
       }
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     } finally {
       busy = false;
     }
@@ -474,7 +475,7 @@
         ? 'Dry run finished. Disable dry run and import again to apply changes.'
         : `Import complete: ${imported} imported, ${skipped} duplicates skipped, ${failed} failed.`;
     } catch (error) {
-      status = `Import failed: ${error}`;
+      status = `Import failed: ${describeError(error)}`;
       importSummary = '';
     } finally {
       busy = false;

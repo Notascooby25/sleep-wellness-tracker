@@ -83,7 +83,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
         // Raw details stay in the browser console for debugging; people see describeError() text.
         console.warn(`API ${method} ${path} failed with ${response.status}:`, text.slice(0, 300));
         if (response.status === 401 && !path.startsWith('/auth/')) handleSignedOut();
-        throw new ApiError(response.status, detail);
+        throw new ApiError(response.status, detail, text || response.statusText);
       }
 
       if (response.status === 204) {

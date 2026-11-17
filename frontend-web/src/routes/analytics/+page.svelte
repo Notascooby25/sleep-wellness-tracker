@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { getJson } from '$lib/api';
   import type { Activity, Category, MoodEntry } from '$lib/types';
@@ -105,7 +106,7 @@
         selectedActivity = names[0] || '';
       }
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     }
   };
 

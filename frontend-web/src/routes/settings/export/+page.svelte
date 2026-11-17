@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
 
   import { getJson } from '$lib/api';
@@ -71,7 +72,7 @@
       }
       preview = (await response.json()) as PreviewResponse;
     } catch (error) {
-      previewError = `Could not load export preview: ${error}`;
+      previewError = `Could not load export preview: ${describeError(error)}`;
       preview = null;
     } finally {
       previewLoading = false;
@@ -94,7 +95,7 @@
       categories = (categoryRows || []).slice().sort((a, b) => a.name.localeCompare(b.name));
       activities = (activityRows || []).slice().sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-      status = `Could not load activity catalog: ${error}`;
+      status = `Could not load activity catalog: ${describeError(error)}`;
     }
   };
 
@@ -215,7 +216,7 @@
 
       status = 'Export downloaded successfully.';
     } catch (error) {
-      status = `Export failed: ${error}`;
+      status = `Export failed: ${describeError(error)}`;
     } finally {
       busy = false;
       downloadProgressPct = null;

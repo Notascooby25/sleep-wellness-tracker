@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount, onDestroy } from 'svelte';
   import { beforeNavigate } from '$app/navigation';
   import { getJson, postJson } from '$lib/api';
@@ -282,7 +283,7 @@
       } else if (message.includes('Failed to fetch')) {
         status = `Image upload failed: Network error while uploading. Please check your connection and retry.${partialUploadSuffix}`;
       } else {
-        status = `Image upload failed: ${error}.${partialUploadSuffix}`;
+        status = `Image upload failed: ${describeError(error)}${partialUploadSuffix}`;
       }
     } finally {
       imageUploadBusy = false;
@@ -386,7 +387,7 @@
         activeCategoryId = categories[0]?.id ?? null;
       }
     } catch (error) {
-      status = `Load error: ${error}`;
+      status = `Load error: ${describeError(error)}`;
       loadError = true;
     }
   };
@@ -425,7 +426,7 @@
       activityDetails = new Map();
       subjectiveSleepRating = null;
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
     } finally {
       busy = false;
     }

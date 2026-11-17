@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { getJson, putJson } from '$lib/api';
 
@@ -146,7 +147,7 @@
       await putJson(`/activities/${activityId}/report-settings`, body);
       await loadSummary();
     } catch (err) {
-      status = `Couldn’t save that change: ${err}`;
+      status = `Couldn’t save that change: ${describeError(err)}`;
     } finally {
       savingId = null;
     }
@@ -166,7 +167,7 @@
       const pages = await hiddenPagesFor(activityId);
       await saveSettings(activityId, { hidden_pages: [...new Set([...pages, PAGE_KEY])] });
     } catch (err) {
-      status = `Couldn’t save that change: ${err}`;
+      status = `Couldn’t save that change: ${describeError(err)}`;
     }
   };
 
@@ -179,7 +180,7 @@
       const pages = await hiddenPagesFor(item.activity_id);
       await saveSettings(item.activity_id, { hidden_pages: pages.filter((page) => page !== PAGE_KEY) });
     } catch (err) {
-      status = `Couldn’t save that change: ${err}`;
+      status = `Couldn’t save that change: ${describeError(err)}`;
     }
   };
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, postJson, putJson } from '$lib/api';
   import type { Activity, Category } from '$lib/types';
@@ -18,7 +19,7 @@
         getJson<Activity[]>('/activities/?include_archived=true&include_deprecated=true')
       ]);
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     }
   };
 
@@ -41,7 +42,7 @@
       newSupportsPosition = false;
       await load();
     } catch (error) {
-      status = `Add failed: ${error}`;
+      status = `Add failed: ${describeError(error)}`;
     }
   };
 
@@ -60,7 +61,7 @@
       });
       await load();
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
     }
   };
 
@@ -71,7 +72,7 @@
       await deleteJson(`/activities/${id}`);
       await load();
     } catch (error) {
-      status = `Delete failed: ${error}`;
+      status = `Delete failed: ${describeError(error)}`;
     }
   };
 
@@ -81,7 +82,7 @@
       await putJson(`/activities/${id}/archive`, {}); // Provide second argument
       await load();
     } catch (error) {
-      status = `Archive failed: ${error}`;
+      status = `Archive failed: ${describeError(error)}`;
     }
   };
 
@@ -91,7 +92,7 @@
       await putJson(`/activities/${id}/unarchive`, {}); // Provide second argument
       await load();
     } catch (error) {
-      status = `Unarchive failed: ${error}`;
+      status = `Unarchive failed: ${describeError(error)}`;
     }
   };
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, postJson, putJson } from '$lib/api';
   import type { Category, PositionOption } from '$lib/types';
@@ -17,7 +18,7 @@
         getJson<PositionOption[]>('/categories/position-options/')
       ]);
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     }
   };
 
@@ -35,7 +36,7 @@
       newSupportsPosition = false;
       await load();
     } catch (error) {
-      status = `Add failed: ${error}`;
+      status = `Add failed: ${describeError(error)}`;
     }
   };
 
@@ -50,7 +51,7 @@
       });
       await load();
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
     }
   };
 
@@ -61,7 +62,7 @@
       await deleteJson(`/categories/${id}`);
       await load();
     } catch (error) {
-      status = `Delete failed: ${error}`;
+      status = `Delete failed: ${describeError(error)}`;
     }
   };
 
@@ -73,7 +74,7 @@
       newPositionLabel = '';
       await load();
     } catch (error) {
-      status = `Add position failed: ${error}`;
+      status = `Add position failed: ${describeError(error)}`;
     }
   };
 
@@ -83,7 +84,7 @@
       await putJson(`/categories/position-options/${option.id}`, { label: option.label });
       await load();
     } catch (error) {
-      status = `Save position failed: ${error}`;
+      status = `Save position failed: ${describeError(error)}`;
     }
   };
 
@@ -94,7 +95,7 @@
       await deleteJson(`/categories/position-options/${id}`);
       await load();
     } catch (error) {
-      status = `Delete position failed: ${error}`;
+      status = `Delete position failed: ${describeError(error)}`;
     }
   };
 

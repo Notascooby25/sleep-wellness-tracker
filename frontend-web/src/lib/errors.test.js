@@ -60,6 +60,12 @@ test('unknown things get a generic line and never leak raw text', () => {
   assert.equal(describeError(undefined), 'Something went wrong. Please try again.');
 });
 
+test('ApiError keeps the old "status body" message for code that matches on it, but people never see it', () => {
+  const e = new ApiError(502, 'x', '{"message":"Upstream backend unavailable"}');
+  assert.ok(e.message.startsWith('502 ') && e.message.includes('Upstream backend unavailable'));
+  assert.equal(describeError(e), 'Something went wrong on the server. Please try again in a moment.');
+});
+
 test('safeRedirectPath only allows the app\'s own paths', () => {
   assert.equal(safeRedirectPath('/mood-log?x=1'), '/mood-log?x=1');
   assert.equal(safeRedirectPath('//evil.example'), '/mood-entry');

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeError } from '$lib/errors.js';
   import { onMount } from 'svelte';
   import { deleteJson, getJson, putJson } from '$lib/api';
   import type { Activity, MoodEntry, PositionOption } from '$lib/types';
@@ -73,7 +74,7 @@
       positionOptions = options;
       hasMore = firstPage.length === PAGE_SIZE;
     } catch (error) {
-      status = `Load failed: ${error}`;
+      status = `Load failed: ${describeError(error)}`;
     } finally {
       loading = false;
     }
@@ -88,7 +89,7 @@
       entries = [...entries, ...next];
       hasMore = next.length === PAGE_SIZE;
     } catch (error) {
-      status = `Load more failed: ${error}`;
+      status = `Load more failed: ${describeError(error)}`;
     } finally {
       loadingMore = false;
     }
@@ -100,7 +101,7 @@
       await deleteJson(`/mood/${id}`);
       await load();
     } catch (error) {
-      status = `Delete failed: ${error}`;
+      status = `Delete failed: ${describeError(error)}`;
     }
   };
 
@@ -185,7 +186,7 @@
       cancelEdit();
       await load();
     } catch (error) {
-      status = `Save failed: ${error}`;
+      status = `Save failed: ${describeError(error)}`;
     } finally {
       editBusy = false;
     }
