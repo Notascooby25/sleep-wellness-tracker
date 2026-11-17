@@ -18,6 +18,10 @@ const config = {
     csrf: {
       trustedOrigins,
     },
+    // Check for a newly deployed build every 5 minutes; the UpdateBanner shows when one is found.
+    version: {
+      pollInterval: 300000
+    },
     alias: {
       $lib: 'src/lib'
     }

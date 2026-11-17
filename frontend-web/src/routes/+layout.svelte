@@ -4,6 +4,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { registerServiceWorker } from '$lib/push';
+  import UpdateBanner from '$lib/UpdateBanner.svelte';
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
@@ -85,6 +86,8 @@
       </nav>
     </div>
   </header>
+
+  <UpdateBanner />
 
   <main>
     <slot />

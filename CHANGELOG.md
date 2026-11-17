@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.5 (2026-11-17)
+
+**"New version available" bar.** When a new version of the app has been released, a bar now appears under the menu saying so, with an "Update now" button. Tapping it refreshes the app and loads the new version. It checks every 5 minutes and whenever you switch back to the app, and it never reloads on its own, so anything you're typing is never lost.
+
 ## 4.21.4 (2026-11-17)
 
 **DM Sans font now actually loads.** The app was designed around the DM Sans font but never loaded it, so every device showed its own fallback font. The font is now stored inside the app itself (no request to Google or any outside site) and used everywhere, so text looks the same on every device. Text may be very slightly wider than before, and nothing else changes.
