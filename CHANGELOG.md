@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.12 (2026-11-17)
+
+**Clearer messages when something goes wrong.** Instead of technical text like `TypeError: Failed to fetch` or `422 {"detail":…}`, every page now says what happened and what to do, for example "You appear to be offline or the server can't be reached. Check your connection and try again." or "That took too long. Please try again." If your session has ended, the app now takes you to the sign-in page and brings you back to where you were. Error and status messages are also read out by screen readers. Analytics shows "Loading your analytics…" with a "Try again" button if it fails, and Manage Activities, Manage Categories and the Mood Log delete button can no longer be pressed twice while they're working. The login page's redirect only ever goes to a page inside the app.
+
 ## 4.21.11 (2026-11-17)
 
 **Accessibility tidy-up.** If your phone or computer is set to "reduce motion", the app no longer spins, slides or shimmers (colour changes and loading text still work). The Mood Log filter box now shows the same clear dark outline as everything else when you click into it. Buttons are marked as plain buttons so they can never submit a form by accident, the Mood Log table now has proper column labels for screen readers, and the login page puts the cursor in the password box in a cleaner way. Nothing else changes in how the app looks.

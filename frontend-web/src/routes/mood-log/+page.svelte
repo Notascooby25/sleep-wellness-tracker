@@ -24,6 +24,7 @@
   let editImageUrls: string[] = [];
   let editActivityFilter = '';
   let editBusy = false;
+  let deleteBusy = false;
 
   // Filter state
   let filterActivity = '';
@@ -96,12 +97,16 @@
   };
 
   const remove = async (id: number) => {
+    if (deleteBusy) return;
     if (!confirm(`Delete entry #${id}?`)) return;
+    deleteBusy = true;
     try {
       await deleteJson(`/mood/${id}`);
       await load();
     } catch (error) {
       status = `Delete failed: ${describeError(error)}`;
+    } finally {
+      deleteBusy = false;
     }
   };
 
@@ -345,7 +350,7 @@
                 <td data-label="Actions" style="white-space:nowrap;">
                   {#if entry.id !== undefined}
                     <button type="button" class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
-                    <button type="button" class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
+                    <button type="button" class="btn-sm btn-danger" disabled={deleteBusy} on:click={() => remove(entry.id!)}>Delete</button>
                   {/if}
                 </td>
               </tr>

@@ -179,8 +179,8 @@
           </label>
         </div>
         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-          <button type="button" on:click={() => save(category)}>Save</button>
-          <button type="button" on:click={() => remove(category.id)}>Delete</button>
+          <button type="button" disabled={busy} on:click={() => save(category)}>Save</button>
+          <button type="button" disabled={busy} on:click={() => remove(category.id)}>Delete</button>
         </div>
       </div>
     {/each}
@@ -193,8 +193,8 @@
   {#each positionOptions as option (option.id)}
     <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem;">
       <input bind:value={option.label} />
-      <button type="button" on:click={() => savePositionOption(option)}>Save</button>
-      <button type="button" on:click={() => removePositionOption(option.id)}>Delete</button>
+      <button type="button" disabled={busy} on:click={() => savePositionOption(option)}>Save</button>
+      <button type="button" disabled={busy} on:click={() => removePositionOption(option.id)}>Delete</button>
     </div>
   {/each}
   <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
