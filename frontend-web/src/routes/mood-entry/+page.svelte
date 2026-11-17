@@ -499,7 +499,7 @@
   <div style="margin-top:0.8rem;" id="sleep-rating-section">
     <div class="label">
       Last Night's Sleep
-      <small style="color: {sleepRatingMissing ? 'var(--color-worse, #b23b3b)' : '#8091a7'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
+      <small style="color: {sleepRatingMissing ? 'var(--color-worse, var(--color-worse))' : '#8091a7'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
         ({sleepRatingMissing ? 'required' : 'optional'}; 1 = great, 5 = poor)
       </small>
     </div>
@@ -677,24 +677,24 @@
 
 <style>
   .garmin-snap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-  .snap-label { font-size: 0.78rem; font-weight: 700; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; }
-  .snap-pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: #1e4b76; }
+  .snap-label { font-size: 0.78rem; font-weight: 700; color: var(--color-neutral-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .snap-pill { background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: var(--color-link); }
   .streak-pill { background: #fff3c4; border-color: #f4d47a; color: #6b4c03; font-weight: 700; }
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
     flex: 1 1 0; min-width: 52px; max-width: 100px;
     padding: 0.55rem 0.15rem; border-radius: 14px; border: 2px solid transparent;
-    background: var(--pill-bg); color: #132238;
+    background: var(--pill-bg); color: var(--color-neutral-text);
     font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.12s;
     display: flex; flex-direction: column; align-items: center; line-height: 1.05;
   }
   .mood-pill small { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; }
   .mood-pill-active {
     background: var(--pill-active) !important; border-color: var(--pill-active) !important;
-    color: #fff !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
+    color: var(--color-neutral-bg) !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
   }
   .mood-pill-active small { opacity: 1; }
-  .badge-info { font-size: 0.84rem; color: #496685; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
+  .badge-info { font-size: 0.84rem; color: var(--color-neutral-text-muted); background: #eef4fb; border: 1px solid #ccddf4; border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
   .image-upload-wrap { margin-top: 0.9rem; }
   .image-upload-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
   .hidden-file-input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
@@ -709,8 +709,8 @@
     border: 1px solid #ccddf4;
     box-shadow: 0 4px 14px rgba(12, 33, 62, 0.08);
   }
-  .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
-  .btn-clear { background: transparent; border-color: #c7d9ef; color: #496685; font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
+  .btn-primary { background: #3c79c5; color: var(--color-neutral-bg); border-color: #3168ad; }
+  .btn-clear { background: transparent; border-color: #c7d9ef; color: var(--color-neutral-text-muted); font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
   .sleep-required-notice {
     font-size: 0.86rem;
     color: #7a4f01;
@@ -722,22 +722,22 @@
     margin-bottom: 0;
     line-height: 1.35;
   }
-  .status-msg { font-size: 0.88rem; color: #22543d; background: #d4edda; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
+  .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
   .status-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
   .acts-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
   .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8f0f9; }
   .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid #e2eaf4; margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
-  .cat-tab { position: relative; background: transparent; border: 1px solid #d7e6f7; border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: #1e4b76; cursor: pointer; }
+  .cat-tab { position: relative; background: transparent; border: 1px solid #d7e6f7; border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: var(--color-link); cursor: pointer; }
   .cat-tab-active { background: #d4e9ff; border-color: #a9c9ea; font-weight: 700; }
   .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3c79c5; margin-left: 4px; vertical-align: middle; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
   .chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
-  .chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
+  .chip-selected { background: #3c79c5; border-color: #3168ad; color: var(--color-neutral-bg); }
   .activity-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; background: #f7fafd; border: 1px solid #dce7f4; border-radius: 10px; }
   .detail-row { display: flex; flex-direction: column; gap: 0.35rem; }
   .detail-name { font-weight: 700; color: #1f4066; font-size: 0.9rem; }
   .detail-options { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
-  .detail-label { font-size: 0.8rem; color: #496685; margin-right: 0.25rem; }
+  .detail-label { font-size: 0.8rem; color: var(--color-neutral-text-muted); margin-right: 0.25rem; }
   .detail-chip { font-size: 0.78rem; padding: 0.22rem 0.6rem; }
   .detail-quantity { display: inline-flex; align-items: center; gap: 0.5rem; }
   .detail-quantity input { width: 6rem; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid #c7d9ef; font-size: 0.9rem; }

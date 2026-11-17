@@ -128,7 +128,7 @@
     border-radius: 999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.82rem;
-    color: #1e4b76;
+    color: var(--color-link);
     background: #edf4fd;
   }
 
@@ -143,17 +143,17 @@
     border-radius: 999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.82rem;
-    color: #1e4b76;
+    color: var(--color-link);
     background: #edf4fd;
     cursor: pointer;
   }
 
   .install-link {
-    border: 1px solid #9ec0e7;
+    border: 1px solid var(--color-primary-border);
     border-radius: 999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.82rem;
-    color: #fff;
+    color: var(--color-neutral-bg);
     background: #0d6efd;
     cursor: pointer;
     font-weight: 600;
@@ -171,8 +171,8 @@
   }
 
   .offline-banner {
-    background: #fee4e2;
-    color: #b42318;
+    background: var(--color-error-bg);
+    color: var(--color-error);
     text-align: center;
     font-size: 0.85rem;
     padding: 0.4rem 0.8rem;

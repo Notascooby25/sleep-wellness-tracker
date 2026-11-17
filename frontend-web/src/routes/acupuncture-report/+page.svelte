@@ -519,7 +519,7 @@
   .stat-box {
     flex: 1;
     min-width: 100px;
-    background: #fff;
+    background: var(--color-neutral-bg);
     border: 1px solid var(--color-neutral-border);
     padding: 1rem;
     border-radius: 12px;
@@ -659,8 +659,8 @@
     border-radius: 10px;
     background: #edf4fd;
     border: 1px solid #cadcef;
-    color: #1e4b76;
-    fill: #1e4b76;
+    color: var(--color-link);
+    fill: var(--color-link);
     transition: background-color 160ms ease-out;
   }
   .menu-button:hover:not(:disabled),
@@ -719,8 +719,8 @@
     padding: 0.35rem 0.7rem;
     border-radius: 10px;
     border: 1px solid #cadcef;
-    background: #fff;
-    color: #1e4b76;
+    background: var(--color-neutral-bg);
+    color: var(--color-link);
     font-size: 0.84rem;
   }
 

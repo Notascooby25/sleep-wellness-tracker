@@ -814,9 +814,9 @@
                 </div>
               {/each}
             </div>
-            <p style="font-size: 0.7rem; color: #999; margin-top: 4px; text-align: center;">Last {Math.min(20, sleepGapList.length)} logged days (Green=Subjective, Blue=Garmin)</p>
+            <p style="font-size: 0.7rem; color: var(--color-neutral-text-subtle); margin-top: 4px; text-align: center;">Last {Math.min(20, sleepGapList.length)} logged days (Green=Subjective, Blue=Garmin)</p>
           {:else}
-            <p style="color: #999;">Not enough subjective sleep ratings to compare.</p>
+            <p style="color: var(--color-neutral-text-subtle);">Not enough subjective sleep ratings to compare.</p>
           {/if}
         </div>
       </article>
@@ -834,7 +834,7 @@
             <strong>Days &lt;25 Stress:</strong> 
             <span>{daysWithLowStressMood ? daysWithLowStressMood.toFixed(2) : 'N/A'} avg mood</span>
           </div>
-          <div style="font-size: 0.8rem; color: #999; margin-top: 0.5rem;">
+          <div style="font-size: 0.8rem; color: var(--color-neutral-text-subtle); margin-top: 0.5rem;">
             Baseline avg mood: {avgMood ? avgMood.toFixed(2) : 'N/A'}
           </div>
         </div>
@@ -970,7 +970,7 @@
 <style>
   .controls { display: grid; gap: 0.7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .btn-row { display:flex; align-items:end; }
-  .status { margin-top: 0.5rem; color: #22543d; }
+  .status { margin-top: 0.5rem; color: var(--color-success-text); }
   .summary-grid { display:grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.7rem; }
   .stat-card { background: var(--color-neutral-bg); border: 1px solid var(--color-neutral-border); border-radius: 12px; padding: 0.75rem; }
   .sl { color:var(--color-neutral-text-muted); font-size:0.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
@@ -999,7 +999,7 @@
     padding: 0.6rem;
     border: 1px solid #cfe0f3;
   }
-  .sleep-debt-badge.debt { color: #b42318; background: #fee4e2; border-color: #fecdca; }
+  .sleep-debt-badge.debt { color: var(--color-error); background: var(--color-error-bg); border-color: #fecdca; }
   .sleep-debt-badge.surplus { color: #086c3a; background: #dcfae6; border-color: #b7e6c9; }
   .week-summary { margin: 0.75rem 0 0; color: var(--color-neutral-text); font-size: 0.9rem; }
   /* 12-week heatmap */
@@ -1030,8 +1030,8 @@
   .influence-label { font-size: 0.82rem; color: var(--color-neutral-text-muted); flex: 0 0 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .influence-bar { flex: 1; height: 24px; background: var(--color-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center;  }
   .influence-val { font-size: 0.75rem; font-weight: 600; color: var(--color-neutral-text); }
-  .influence-na { padding: 0 0.5rem; font-size: 0.75rem; color: #999; }
-  .influence-count { font-size: 0.82rem; color: #999; flex: 0 0 40px; text-align: right; }
+  .influence-na { padding: 0 0.5rem; font-size: 0.75rem; color: var(--color-neutral-text-subtle); }
+  .influence-count { font-size: 0.82rem; color: var(--color-neutral-text-subtle); flex: 0 0 40px; text-align: right; }
 
   /* Frequency Comparison */
   .frequency-list { display: flex; flex-direction: column; gap: 0.5rem; }

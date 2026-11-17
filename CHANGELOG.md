@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.8 (2026-11-17)
+
+**Behind-the-scenes colour tidy-up (no visible change).** The app's colours are now read from one shared list (`tokens.css`) in 125 places instead of being typed out again each time, and six new named colours were added for links, errors and confirmations. Every colour keeps exactly the same value, so the app should look identical. This prepares for making similar shades consistent in a later release.
+
 ## 4.21.7 (2026-11-17)
 
 **Repository tidy-up.** Removed 18 leftover one-off files from the top of the project (old `patch_*` scripts, scratch test scripts, an empty-data backup stub and a spare import script). Nothing in the app, its build, its tests or its deployment used them, and they remain in the project's history if ever needed. No change to how the app behaves.

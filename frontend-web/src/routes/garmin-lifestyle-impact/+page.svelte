@@ -353,7 +353,7 @@
     border-radius: 999px;
     background: #edf4fd;
     border: 1px solid #cadcef;
-    color: #1e4b76;
+    color: var(--color-link);
     font-size: 0.84rem;
     padding: 0.3rem 0.75rem;
     transition: background-color 160ms ease-out, border-color 160ms ease-out;
@@ -500,7 +500,7 @@
     border-radius: 10px;
     background: #edf4fd;
     border: 1px solid #cadcef;
-    fill: #1e4b76;
+    fill: var(--color-link);
     transition: background-color 160ms ease-out;
   }
   .menu-button:hover:not(:disabled),
@@ -563,8 +563,8 @@
     padding: 0.35rem 0.7rem;
     border-radius: 10px;
     border: 1px solid #cadcef;
-    background: #fff;
-    color: #1e4b76;
+    background: var(--color-neutral-bg);
+    color: var(--color-link);
     font-size: 0.84rem;
   }
 
