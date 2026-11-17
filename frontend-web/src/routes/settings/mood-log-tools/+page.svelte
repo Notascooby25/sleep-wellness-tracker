@@ -610,7 +610,7 @@
 <section class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem;">
     <h3 style="margin:0;">Settings</h3>
-    <button on:click={load} disabled={busy}>{busy ? 'Working...' : 'Refresh'}</button>
+    <button type="button" on:click={load} disabled={busy}>{busy ? 'Working...' : 'Refresh'}</button>
   </div>
   <p class="label" style="margin-top:0.45rem;">Loaded {entries.length} entries</p>
   {#if status}
@@ -621,9 +621,9 @@
 <section class="card">
   <h3>Export and Backup</h3>
   <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.6rem;">
-    <button on:click={exportJsonFile} disabled={busy || entries.length === 0}>Export JSON</button>
-    <button on:click={exportCsvFile} disabled={busy || entries.length === 0}>Export CSV</button>
-    <button on:click={exportBackupFile} disabled={busy || entries.length === 0}>Export Full Backup</button>
+    <button type="button" on:click={exportJsonFile} disabled={busy || entries.length === 0}>Export JSON</button>
+    <button type="button" on:click={exportCsvFile} disabled={busy || entries.length === 0}>Export CSV</button>
+    <button type="button" on:click={exportBackupFile} disabled={busy || entries.length === 0}>Export Full Backup</button>
   </div>
   <p class="label" style="margin-top:0;">
     Full backup includes entries, activities, categories, and metadata. Use this for migration/reinstall recovery.
@@ -647,7 +647,7 @@
     <span>Dry run first (validate and count only, no writes)</span>
   </label>
   <div style="margin-top:0.5rem;">
-    <button on:click={importEntries} disabled={!selectedFile || busy}>
+    <button type="button" on:click={importEntries} disabled={!selectedFile || busy}>
       {dryRun ? 'Validate Import' : 'Run Import'}
     </button>
   </div>
@@ -664,14 +664,14 @@
   </label>
 
   <div style="display:flex; gap:0.5rem; margin-top:0.6rem; flex-wrap:wrap;">
-    <button on:click={() => (confirmDeleteDay = true)} disabled={busy}>Delete Selected Day</button>
-    <button on:click={() => (confirmDeleteAll = true)} disabled={busy}>Delete All Entries</button>
+    <button type="button" on:click={() => (confirmDeleteDay = true)} disabled={busy}>Delete Selected Day</button>
+    <button type="button" on:click={() => (confirmDeleteAll = true)} disabled={busy}>Delete All Entries</button>
   </div>
 
   {#if confirmDeleteDay}
     <p>Delete all entries on {deleteDate}? This cannot be undone.</p>
     <div style="display:flex; gap:0.5rem;">
-      <button
+      <button type="button"
         on:click={async () => {
           confirmDeleteDay = false;
           await deleteRows(entriesOnDate(deleteDate));
@@ -679,14 +679,14 @@
       >
         Confirm Bulk Delete
       </button>
-      <button on:click={() => (confirmDeleteDay = false)}>Cancel Bulk Delete</button>
+      <button type="button" on:click={() => (confirmDeleteDay = false)}>Cancel Bulk Delete</button>
     </div>
   {/if}
 
   {#if confirmDeleteAll}
     <p>Delete all mood log entries? This cannot be undone.</p>
     <div style="display:flex; gap:0.5rem;">
-      <button
+      <button type="button"
         on:click={async () => {
           confirmDeleteAll = false;
           await deleteRows(entries);
@@ -694,7 +694,7 @@
       >
         Confirm Bulk Delete
       </button>
-      <button on:click={() => (confirmDeleteAll = false)}>Cancel Bulk Delete</button>
+      <button type="button" on:click={() => (confirmDeleteAll = false)}>Cancel Bulk Delete</button>
     </div>
   {/if}
 </section>
@@ -721,7 +721,7 @@
 
   <p class="label" style="margin-top:0.55rem;">Matches with rating to clear: {matches.length}</p>
 
-  <button on:click={() => (previewOpen = !previewOpen)} style="margin-bottom:0.5rem;">
+  <button type="button" on:click={() => (previewOpen = !previewOpen)} style="margin-bottom:0.5rem;">
     {previewOpen ? 'Hide matching entries' : 'Preview matching entries'}
   </button>
 
@@ -744,6 +744,6 @@
   {/if}
 
   <div style="margin-top:0.6rem;">
-    <button on:click={clearRatings} disabled={matches.length === 0 || busy}>Clear Ratings for Matches</button>
+    <button type="button" on:click={clearRatings} disabled={matches.length === 0 || busy}>Clear Ratings for Matches</button>
   </div>
 </section>

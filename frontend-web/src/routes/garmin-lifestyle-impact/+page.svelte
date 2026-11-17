@@ -181,7 +181,7 @@
 <section class="card controls">
   <div class="tab-row" role="group" aria-label="Period">
     {#each periodOptions as option}
-      <button
+      <button type="button"
         class="tab"
         class:active={selectedDays === option.days}
         aria-pressed={selectedDays === option.days}
@@ -195,7 +195,7 @@
 
   <div class="tab-row" role="group" aria-label="Measure">
     {#each metricOptions as option}
-      <button
+      <button type="button"
         class="tab"
         class:active={selectedMetric === option.value}
         aria-pressed={selectedMetric === option.value}
@@ -263,7 +263,7 @@
                 </span>
                 {#if item.activity_id !== null}
                   {@const id = item.activity_id}
-                  <button
+                  <button type="button"
                     class="menu-button"
                     aria-label={`Change how ${item.activity} is used`}
                     aria-expanded={openMenuId === id}
@@ -285,12 +285,12 @@
               <div class="role-menu">
                 <p class="role-question">What is “{item.activity}” for you?</p>
                 {#each roleChoices as choice}
-                  <button class="role-choice" disabled={savingId !== null} on:click={() => chooseRole(id, choice.role)}>
+                  <button type="button" class="role-choice" disabled={savingId !== null} on:click={() => chooseRole(id, choice.role)}>
                     <span class="choice-label">{choice.label}</span>
                     <span class="choice-hint">{choice.hint}</span>
                   </button>
                 {/each}
-                <button class="role-cancel" on:click={() => (openMenuId = null)}>Cancel</button>
+                <button type="button" class="role-cancel" on:click={() => (openMenuId = null)}>Cancel</button>
               </div>
             {/if}
           </li>
@@ -316,7 +316,7 @@
         {#each data.left_out as item (item.activity_id)}
           <li class="chip">
             <span>{item.activity} · {reasonWords[item.reason] ?? item.reason}</span>
-            <button
+            <button type="button"
               class="chip-remove"
               aria-label={`Bring ${item.activity} back`}
               disabled={savingId !== null}

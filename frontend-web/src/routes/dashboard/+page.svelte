@@ -163,7 +163,7 @@
       {#if lastSyncDate}
         <span class="sync-meta">Garmin: {lastSyncDate}</span>
       {/if}
-      <button class="btn-refresh" on:click={load} disabled={isLoading} aria-label="Refresh latest metrics" title="Refresh metrics">
+      <button type="button" class="btn-refresh" on:click={load} disabled={isLoading} aria-label="Refresh latest metrics" title="Refresh metrics">
         <svg class="refresh-icon {isLoading ? 'spin' : ''}" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
@@ -201,7 +201,7 @@
     </div>
     <p>{adviceMessage}</p>
     <div class="error-actions">
-      <button class="btn-retry" on:click={load}>Try Again</button>
+      <button type="button" class="btn-retry" on:click={load}>Try Again</button>
     </div>
   </section>
 {:else}

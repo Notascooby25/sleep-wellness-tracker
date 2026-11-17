@@ -206,7 +206,7 @@
 <section class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
     <h3 style="margin:0;">Entries ({filterActivity.trim() ? `${filteredEntries.length} of ${entries.length}` : entries.length})</h3>
-    <button on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
+    <button type="button" on:click={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</button>
   </div>
   {#if status}<p class="status-msg">{status}</p>{/if}
 
@@ -221,7 +221,7 @@
         class="filter-input"
       />
       {#if filterActivity}
-        <button class="btn-sm clear-btn" on:click={() => (filterActivity = '')}>✕</button>
+        <button type="button" class="btn-sm clear-btn" on:click={() => (filterActivity = '')}>✕</button>
       {/if}
     </div>
 
@@ -232,14 +232,15 @@
     {:else}
     <div class="table-wrap">
       <table class="table">
+        <caption class="sr-only">Mood log entries</caption>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Scores</th>
-            <th>Photos</th>
-            <th>Notes</th>
-            <th>Activities</th>
-            <th></th>
+            <th scope="col">Date</th>
+            <th scope="col">Scores</th>
+            <th scope="col">Photos</th>
+            <th scope="col">Notes</th>
+            <th scope="col">Activities</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -295,8 +296,8 @@
                   </div>
                 </td>
                 <td data-label="Actions" style="white-space:nowrap;">
-                  <button class="btn-primary btn-sm" disabled={editBusy} on:click={saveEdit}>Save</button>
-                  <button class="btn-sm" on:click={cancelEdit}>Cancel</button>
+                  <button type="button" class="btn-primary btn-sm" disabled={editBusy} on:click={saveEdit}>Save</button>
+                  <button type="button" class="btn-sm" on:click={cancelEdit}>Cancel</button>
                 </td>
               </tr>
             {:else}
@@ -342,8 +343,8 @@
                 </td>
                 <td data-label="Actions" style="white-space:nowrap;">
                   {#if entry.id !== undefined}
-                    <button class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
-                    <button class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
+                    <button type="button" class="btn-sm" on:click={() => startEdit(entry)}>Edit</button>
+                    <button type="button" class="btn-sm btn-danger" on:click={() => remove(entry.id!)}>Delete</button>
                   {/if}
                 </td>
               </tr>
@@ -355,7 +356,7 @@
 
     {#if hasMore}
       <div style="margin-top:0.6rem;">
-        <button on:click={loadMore} disabled={loadingMore}>
+        <button type="button" on:click={loadMore} disabled={loadingMore}>
           {loadingMore ? 'Loading...' : 'Load 100 More'}
         </button>
       </div>
@@ -385,7 +386,7 @@
   .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
   .filter-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.75rem; }
   .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid var(--color-input-border); border-radius: 6px; background: var(--color-surface-subtle); color: var(--color-primary-content); }
-  .filter-input:focus { outline: none; border-color: var(--color-accent); background: var(--color-neutral-bg); }
+  .filter-input:focus { border-color: var(--color-accent); background: var(--color-neutral-bg); }
   .clear-btn { background: var(--color-surface-subtle); border-color: var(--color-input-border); color: var(--color-neutral-text-muted); }
   @media (max-width: 760px) {
     .table-wrap { overflow-x: visible; }

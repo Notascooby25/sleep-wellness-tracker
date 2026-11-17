@@ -481,7 +481,7 @@
     {#if ratingRequired()}
       <div class="mood-pills">
         {#each [1,2,3,4,5] as score}
-          <button
+          <button type="button"
             class="mood-pill"
             class:mood-pill-active={moodScore === score}
             style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
@@ -505,7 +505,7 @@
     </div>
     <div class="mood-pills">
       {#each [1,2,3,4,5] as score}
-        <button
+        <button type="button"
           class="mood-pill"
           class:mood-pill-active={subjectiveSleepRating === score}
           style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
@@ -527,8 +527,8 @@
   <div class="image-upload-wrap">
     <div class="label">Photos <small style="color:var(--color-neutral-text-faint);">(optional)</small></div>
     <div class="image-upload-actions">
-      <button on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
-      <button on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
+      <button type="button" on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
+      <button type="button" on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
       {#if imageUploadBusy}
         <span class="label" style="margin:0;">Uploading...</span>
       {/if}
@@ -560,7 +560,7 @@
             {#if formatUploadedAt(imageUploadedAt.get(imageUrl))}
               <span class="image-uploaded-at">Uploaded {formatUploadedAt(imageUploadedAt.get(imageUrl))}</span>
             {/if}
-            <button class="btn-clear" on:click={() => removeImage(index)} disabled={busy || imageUploadBusy}>Remove</button>
+            <button type="button" class="btn-clear" on:click={() => removeImage(index)} disabled={busy || imageUploadBusy}>Remove</button>
           </div>
         {/each}
       </div>
@@ -574,18 +574,18 @@
   {/if}
 
   <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-    <button class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
-    <button disabled={busy} on:click={load}>Refresh</button>
+    <button type="button" class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
+    <button type="button" disabled={busy} on:click={load}>Refresh</button>
   </div>
   {#if status}<p class="status-msg" class:status-error={status.includes('failed') || status.includes('Please choose')}>{status}</p>{/if}
-  {#if loadError}<button class="btn-clear" on:click={load}>Retry loading</button>{/if}
+  {#if loadError}<button type="button" class="btn-clear" on:click={load}>Retry loading</button>{/if}
 </section>
 
 <section class="card">
   <div class="acts-header">
     <h3 style="margin:0;">Activities</h3>
     <span class="label" style="flex:1;margin:0;">Tap chips to toggle, then switch categories using tabs.</span>
-    <button class="btn-clear" on:click={clearSelected}>Clear</button>
+    <button type="button" class="btn-clear" on:click={clearSelected}>Clear</button>
   </div>
 
   {#if selected.size > 0}
@@ -593,7 +593,7 @@
       {#each Array.from(selected) as id}
         {@const act = activities.find(a => a.id === id)}
         {#if act}
-          <button class="chip chip-selected" on:click={() => toggle(id)}>{act.name} ×</button>
+          <button type="button" class="chip chip-selected" on:click={() => toggle(id)}>{act.name} ×</button>
         {/if}
       {/each}
     </div>
@@ -610,7 +610,7 @@
             <div class="detail-options">
               <span class="detail-label">Position:</span>
               {#each POSITION_OPTIONS as position}
-                <button
+                <button type="button"
                   class="chip detail-chip"
                   class:chip-selected={row.detail.positions.includes(position)}
                   on:click={() => togglePosition(row.id, position)}
@@ -645,7 +645,7 @@
   {:else}
     <div class="cat-tabs">
       {#each categories as cat}
-        <button
+        <button type="button"
           class="cat-tab"
           class:cat-tab-active={activeCategoryId === cat.id}
           on:click={() => (activeCategoryId = cat.id)}
@@ -662,7 +662,7 @@
       {@const catActivities = byCategory(activeCategoryId as number)}
       <div class="chips">
         {#each catActivities as activity}
-          <button
+          <button type="button"
             class="chip"
             class:chip-selected={selected.has(activity.id)}
             on:click={() => toggle(activity.id)}

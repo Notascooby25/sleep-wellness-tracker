@@ -138,7 +138,7 @@
       <span>Supports position</span>
     </label>
     <div style="display:flex; align-items:end;">
-      <button on:click={add}>Add</button>
+      <button type="button" on:click={add}>Add</button>
     </div>
   </div>
   {#if status}<p>{status}</p>{/if}
@@ -185,8 +185,8 @@
           </div>
         </div>
         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-          <button on:click={() => save(activity)}>Save</button>
-          <button on:click={() => remove(activity.id)}>Delete</button>
+          <button type="button" on:click={() => save(activity)}>Save</button>
+          <button type="button" on:click={() => remove(activity.id)}>Delete</button>
         </div>
       </div>
     {/each}
@@ -199,7 +199,7 @@
     {#each activeActivities as activity}
       <li>
         {activity.name} ({categoryName(activity.category_id)})
-        <button on:click={() => archive(activity.id)}>Archive</button>
+        <button type="button" on:click={() => archive(activity.id)}>Archive</button>
       </li>
     {/each}
   </ul>
@@ -211,7 +211,7 @@
     {#each archivedActivities as activity}
       <li>
         {activity.name} ({categoryName(activity.category_id)})
-        <button on:click={() => unarchive(activity.id)}>Unarchive</button>
+        <button type="button" on:click={() => unarchive(activity.id)}>Unarchive</button>
       </li>
     {/each}
   </ul>

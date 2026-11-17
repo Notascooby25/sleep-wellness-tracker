@@ -249,8 +249,8 @@
       <input type="number" min="300" max="720" step="15" bind:value={sleepGoalMinutes} />
     </label>
     <div style="display:flex;align-items:flex-end;gap:0.4rem;flex-shrink:0;">
-      <button on:click={load}>Refresh</button>
-      <button class="btn-sync" disabled={busy} on:click={syncNow}>
+      <button type="button" on:click={load}>Refresh</button>
+      <button type="button" class="btn-sync" disabled={busy} on:click={syncNow}>
         {busy ? 'Syncing…' : 'Sync Garmin'}
       </button>
     </div>
@@ -276,9 +276,9 @@
           <span class="help-icon" title="Overrides env backfill days for this sync request only.">?</span>
         </div>
         <div class="num-wrap">
-          <button class="num-btn" on:click={() => (backfillDays = Math.max(1, backfillDays - 1))}>−</button>
+          <button type="button" class="num-btn" on:click={() => (backfillDays = Math.max(1, backfillDays - 1))}>−</button>
           <input class="num-input" type="number" min="1" max="730" bind:value={backfillDays} />
-          <button class="num-btn" on:click={() => (backfillDays = Math.min(730, backfillDays + 1))}>+</button>
+          <button type="button" class="num-btn" on:click={() => (backfillDays = Math.min(730, backfillDays + 1))}>+</button>
         </div>
       </label>
     </div>
