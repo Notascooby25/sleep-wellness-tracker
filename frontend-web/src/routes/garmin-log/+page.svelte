@@ -231,7 +231,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Garmin Log</h2>
+  <h1>Garmin Log</h1>
   <p>Daily Garmin recovery and wellness summaries. Sleep and body battery stay visible on the mood pages; this page is for the wider Garmin view.</p>
 </section>
 

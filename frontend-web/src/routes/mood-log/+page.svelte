@@ -205,7 +205,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Mood Log</h2>
+  <h1>Mood Log</h1>
   <p>Review, edit, and remove mood entries.</p>
 </section>
 

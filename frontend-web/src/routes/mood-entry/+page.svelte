@@ -454,7 +454,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Mood Entry</h2>
+  <h1>Mood Entry</h1>
   <p>Log your mood and activity context.</p>
 </section>
 

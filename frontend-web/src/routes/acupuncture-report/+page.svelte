@@ -196,7 +196,7 @@
 </svelte:head>
 
 <section class="hero">
-  <h2>Acupuncture & Symptom Report</h2>
+  <h1>Acupuncture & Symptom Report</h1>
   <p>Track headache patterns, frequency, and potential triggers over time.</p>
 </section>
 
