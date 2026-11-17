@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.13 (2026-11-17)
+
+**Tidier error replies.** When the app's server can't reach its database service, it used to send the browser a technical error string that could include an internal address. It now sends a plain fixed message and keeps the technical detail in its own log. No visible change.
+
 ## 4.21.12 (2026-11-17)
 
 **Clearer messages when something goes wrong.** Instead of technical text like `TypeError: Failed to fetch` or `422 {"detail":…}`, every page now says what happened and what to do, for example "You appear to be offline or the server can't be reached. Check your connection and try again." or "That took too long. Please try again." If your session has ended, the app now takes you to the sign-in page and brings you back to where you were. Error and status messages are also read out by screen readers. Analytics shows "Loading your analytics…" with a "Try again" button if it fails, and Manage Activities, Manage Categories and the Mood Log delete button can no longer be pressed twice while they're working. The login page's redirect only ever goes to a page inside the app.

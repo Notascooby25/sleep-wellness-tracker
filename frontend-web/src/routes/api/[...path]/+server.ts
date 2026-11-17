@@ -153,8 +153,10 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
       headers: responseHeaders
     });
   } catch (error) {
+    // The real cause (which can name internal addresses) stays in the server log, not the response.
+    console.error('API proxy could not reach the backend:', error);
     return new Response(
-      JSON.stringify({ message: 'Upstream backend unavailable', detail: String(error) }),
+      JSON.stringify({ message: 'Upstream backend unavailable', detail: 'The server could not be reached.' }),
       {
         status: 502,
         headers: { 'content-type': 'application/json' }
