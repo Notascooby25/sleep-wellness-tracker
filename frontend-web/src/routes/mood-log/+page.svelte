@@ -228,7 +228,7 @@
     <p class="label" style="margin-top:0.45rem;">Loaded {entries.length} entries</p>
 
     {#if filteredEntries.length === 0}
-      <p style="margin-top:0.5rem; color:#496685;">No entries match the activity filter.</p>
+      <p style="margin-top:0.5rem; color:var(--color-neutral-text-muted);">No entries match the activity filter.</p>
     {:else}
     <div class="table-wrap">
       <table class="table">
@@ -251,10 +251,10 @@
                 </td>
                 <td data-label="Scores">
                   <div style="display:flex; flex-direction:column; gap:0.25rem;">
-                    <label style="font-size:0.75rem; color:#496685; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                    <label style="font-size:0.75rem; color:var(--color-neutral-text-muted); display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
                       Mood: <input type="number" min="1" max="5" bind:value={editScore} style="width:4rem;" />
                     </label>
-                    <label style="font-size:0.75rem; color:#496685; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                    <label style="font-size:0.75rem; color:var(--color-neutral-text-muted); display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
                       Sleep: <input type="number" min="1" max="5" bind:value={editSleepRating} style="width:4rem;" />
                     </label>
                   </div>
@@ -304,7 +304,7 @@
                 <td data-label="Date" style="white-space:nowrap;">
                   {fmtDate(entry.timestamp)}
                   {#if entry.weather_temperature_c !== null && entry.weather_temperature_c !== undefined}
-                    <div style="font-size: 0.75rem; color: #496685; margin-top: 0.2rem; display: flex; align-items: center; gap: 0.2rem;">
+                    <div style="font-size: 0.75rem; color: var(--color-neutral-text-muted); margin-top: 0.2rem; display: flex; align-items: center; gap: 0.2rem;">
                       <span>{(entry.weather_cloud_cover ?? 0) > 60 ? '☁️' : (entry.weather_condition?.toLowerCase().includes('rain') ? '🌧️' : '☀️')}</span>
                       <span>{Math.round(entry.weather_temperature_c)}°C</span>
                       {#if entry.weather_condition}
@@ -316,7 +316,7 @@
                 <td data-label="Scores">
                   <div>Mood: {entry.mood_score ?? '-'}</div>
                   {#if entry.subjective_sleep_rating != null}
-                    <div style="font-size:0.8rem; color:#496685; margin-top:0.2rem;">Sleep: {entry.subjective_sleep_rating}</div>
+                    <div style="font-size:0.8rem; color:var(--color-neutral-text-muted); margin-top:0.2rem;">Sleep: {entry.subjective_sleep_rating}</div>
                   {/if}
                 </td>
                 <td data-label="Photos">
@@ -367,26 +367,26 @@
 <style>
   .table-wrap { overflow-x: auto; margin-top: 0.5rem; }
   .table th, .table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid #e8f0f9; font-size: 0.86rem; }
-  .table th { font-size: 0.75rem; color: #496685; text-transform: uppercase; letter-spacing: 0.04em; }
+  .table th { font-size: 0.75rem; color: var(--color-neutral-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .edit-row { background: #f0f7ff; }
   .edit-acts { min-width: 260px; }
   .edit-acts-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; max-height: 130px; overflow: auto; margin-top: 0.35rem; }
   .edit-position-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.2rem 0 0.35rem 0.4rem; }
-  .position-chip { border: 1px solid #b9cce0; background: #fff; color: #315678; border-radius: 999px; padding: 0.18rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
-  .position-chip-selected { background: #315678; color: #fff; border-color: #315678; }
+  .position-chip { border: 1px solid #b9cce0; background: var(--color-neutral-bg); color: #315678; border-radius: 999px; padding: 0.18rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
+  .position-chip-selected { background: #315678; color: var(--color-neutral-bg); border-color: #315678; }
   .act-chip { background: #ecf2fb; border: 1px solid #ccddf4; color: #1f4066; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
-  .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: #fff; }
-  .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: #1e4b76; margin: 0.1rem 0.15rem 0.1rem 0; }
+  .act-chip-selected { background: #3c79c5; border-color: #3168ad; color: var(--color-neutral-bg); }
+  .act-badge { display: inline-block; background: #eef4fb; border: 1px solid #ccddf4; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.75rem; color: var(--color-link); margin: 0.1rem 0.15rem 0.1rem 0; }
   .entry-photo-list { display: flex; gap: 0.35rem; flex-wrap: wrap; }
   .entry-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid #ccddf4; display: block; }
   .btn-sm { padding: 0.3rem 0.55rem; font-size: 0.8rem; margin-right: 0.2rem; }
-  .btn-primary { background: #3c79c5; color: #fff; border-color: #3168ad; }
+  .btn-primary { background: #3c79c5; color: var(--color-neutral-bg); border-color: #3168ad; }
   .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
-  .status-msg { font-size: 0.88rem; color: #22543d; background: #d4edda; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
+  .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
   .filter-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.75rem; }
   .filter-input { flex: 1; max-width: 280px; padding: 0.3rem 0.55rem; font-size: 0.85rem; border: 1px solid #ccddf4; border-radius: 6px; background: #f5f9ff; color: #1f4066; }
-  .filter-input:focus { outline: none; border-color: #3c79c5; background: #fff; }
-  .clear-btn { background: #ecf2fb; border-color: #ccddf4; color: #496685; }
+  .filter-input:focus { outline: none; border-color: #3c79c5; background: var(--color-neutral-bg); }
+  .clear-btn { background: #ecf2fb; border-color: #ccddf4; color: var(--color-neutral-text-muted); }
   @media (max-width: 760px) {
     .table-wrap { overflow-x: visible; }
     .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
@@ -396,7 +396,7 @@
       border-radius: 10px;
       margin-bottom: 0.65rem;
       padding: 0.4rem 0.55rem;
-      background: #fff;
+      background: var(--color-neutral-bg);
     }
     .table td {
       display: flex;
@@ -412,7 +412,7 @@
     .table td::before {
       content: attr(data-label);
       flex: 0 0 5.2rem;
-      color: #496685;
+      color: var(--color-neutral-text-muted);
       font-size: 0.72rem;
       font-weight: 600;
       letter-spacing: 0.03em;

@@ -11,6 +11,12 @@ colors:
   neutral-border: "#d9e2ef"
   background-gradient-start: "#f9fbff"
   background-gradient-end: "#f2f6fc"
+  link: "#1e4b76"
+  neutral-text-subtle: "#999999"
+  error: "#b42318"
+  error-bg: "#fee4e2"
+  success-text: "#22543d"
+  success-bg: "#d4edda"
 typography:
   body:
     fontFamily: "'DM Sans', 'Segoe UI', Tahoma, sans-serif"
@@ -70,6 +76,14 @@ The palette feels like a crisp morning sky fading into a calm evening.
 - **Muted Slate** (#496685): Used for secondary text, labels, and timestamps.
 - **Card Background** (#ffffff): Pure white for data containers to lift them subtly off the background gradient.
 - **Soft Border** (#d9e2ef): Used to separate sections cleanly without visual noise.
+- **Link Blue** (#1e4b76): Menu links and other interactive text.
+- **Subtle Grey** (#999999): Hints and disabled-looking text only.
+
+### Status
+- **Error** (#b42318) on **Error Wash** (#fee4e2): Problems and the offline banner.
+- **Success Text** (#22543d) on **Success Wash** (#d4edda): Confirmations.
+
+All colours live in `frontend-web/src/tokens.css`; styles use `var(--color-…)` and not raw hex values. Some older pages still hold close shades of blue as raw values, which are being folded into the tokens.
 
 ### Named Rules
 **The Low-Contrast Calm Rule.** Never use pure black (`#000000`) or pure white (`#ffffff`) for page backgrounds. Rely on the soft `#f9fbff` to `#f2f6fc` gradient to maintain the sanctuary feel.

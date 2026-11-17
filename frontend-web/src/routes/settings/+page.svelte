@@ -245,7 +245,7 @@
   .reminder-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.4rem 0; }
   .chk { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
   .chk input { width: auto; }
-  .notif-warn { margin: 0.6rem 0 0; font-size: 0.84rem; color: #b42318; background: #fee4e2; border-radius: 8px; padding: 0.3rem 0.6rem; }
+  .notif-warn { margin: 0.6rem 0 0; font-size: 0.84rem; color: var(--color-error); background: var(--color-error-bg); border-radius: 8px; padding: 0.3rem 0.6rem; }
   .device-list { list-style: none; margin: 0.4rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
   .device-list li { display: flex; align-items: center; gap: 0.6rem; border: 1px solid #d7e6f7; border-radius: 8px; background: #f8fbff; padding: 0.4rem 0.6rem; font-size: 0.86rem; }
   .device-list li span { flex: 1; }
@@ -262,7 +262,7 @@
   }
 
   .settings-link:hover {
-    border-color: #9ec0e7;
+    border-color: var(--color-primary-border);
     transform: translateY(-1px);
   }
 

@@ -328,7 +328,7 @@
   }
   .hero-sub {
     margin: 0.25rem 0 0 0;
-    color: var(--color-neutral-text-muted, #496685);
+    color: var(--color-neutral-text-muted, var(--color-neutral-text-muted));
     font-size: 0.92rem;
   }
   .sync-actions {
@@ -338,7 +338,7 @@
   }
   .sync-meta {
     font-size: 0.82rem;
-    color: var(--color-neutral-text-muted, #496685);
+    color: var(--color-neutral-text-muted, var(--color-neutral-text-muted));
     background: #edf4fc;
     padding: 0.2rem 0.55rem;
     border-radius: 6px;
@@ -348,9 +348,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: #ffffff;
-    border: 1px solid var(--color-neutral-border, #d9e2ef);
-    color: var(--color-neutral-text, #132238);
+    background: var(--color-neutral-bg);
+    border: 1px solid var(--color-neutral-border, var(--color-neutral-border));
+    color: var(--color-neutral-text, var(--color-neutral-text));
     font-size: 0.84rem;
     font-weight: 500;
     padding: 0.28rem 0.65rem;
@@ -406,8 +406,8 @@
 
   /* Quick Check-In Card */
   .quick-checkin-card {
-    background: #ffffff;
-    border: 1px solid var(--color-neutral-border, #d9e2ef);
+    background: var(--color-neutral-bg);
+    border: 1px solid var(--color-neutral-border, var(--color-neutral-border));
     border-radius: 12px;
     padding: 1.15rem 1.25rem;
     margin-bottom: 1rem;
@@ -439,11 +439,11 @@
     margin: 0;
     font-size: 1.05rem;
     font-weight: 600;
-    color: var(--color-neutral-text, #132238);
+    color: var(--color-neutral-text, var(--color-neutral-text));
   }
   .checkin-recorded-badge {
     background: #edf4fc;
-    color: #1e4b76;
+    color: var(--color-link);
     font-size: 0.82rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
@@ -452,7 +452,7 @@
   }
   .checkin-sub {
     margin: 0.35rem 0 0.85rem 0;
-    color: var(--color-neutral-text-muted, #496685);
+    color: var(--color-neutral-text-muted, var(--color-neutral-text-muted));
     font-size: 0.88rem;
     line-height: 1.4;
   }
@@ -535,7 +535,7 @@
     text-underline-offset: 2px;
   }
   .checkin-link:hover {
-    color: #173a5c;
+    color: var(--color-primary-content);
   }
 
   .advice-card {
@@ -548,13 +548,13 @@
   .advice-card h3 {
     margin-top: 0;
     margin-bottom: 0.45rem;
-    color: #1e4b76;
+    color: var(--color-link);
     font-size: 1.05rem;
     font-weight: 600;
   }
   .advice-card p {
     margin: 0;
-    color: #496685;
+    color: var(--color-neutral-text-muted);
     line-height: 1.45;
     font-size: 0.95rem;
   }
@@ -564,8 +564,8 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    background: #ffffff;
-    border: 1px solid var(--color-neutral-border, #d9e2ef);
+    background: var(--color-neutral-bg);
+    border: 1px solid var(--color-neutral-border, var(--color-neutral-border));
     border-radius: 12px;
     padding: 0.85rem 1rem;
     margin-bottom: 1rem;
@@ -573,7 +573,7 @@
   .snap-label {
     font-size: 0.78rem;
     font-weight: 700;
-    color: #496685;
+    color: var(--color-neutral-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-right: 0.25rem;
@@ -584,7 +584,7 @@
     border-radius: 999px;
     padding: 0.25rem 0.65rem;
     font-size: 0.82rem;
-    color: #1e4b76;
+    color: var(--color-link);
     font-weight: 500;
   }
 
@@ -601,7 +601,7 @@
 
   /* Skeleton Loading Styles */
   .skeleton-card {
-    background: #ffffff;
+    background: var(--color-neutral-bg);
     border: 1px solid #e5edf7;
     border-radius: 12px;
     padding: 1.5rem 1rem;
@@ -616,7 +616,7 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    background: #ffffff;
+    background: var(--color-neutral-bg);
     border: 1px solid #e5edf7;
     border-radius: 12px;
     padding: 0.85rem 1rem;
@@ -664,7 +664,7 @@
     font-size: 0.9rem;
   }
   .btn-retry {
-    background: #ffffff;
+    background: var(--color-neutral-bg);
     border: 1px solid #c9b09d;
     color: #634731;
     font-size: 0.86rem;
@@ -685,9 +685,9 @@
     justify-content: center;
   }
   .btn-cta {
-    background: var(--color-primary, #dceeff);
-    color: var(--color-primary-content, #173a5c);
-    border: 1px solid var(--color-primary-border, #9ec0e7);
+    background: var(--color-primary, var(--color-primary));
+    color: var(--color-primary-content, var(--color-primary-content));
+    border: 1px solid var(--color-primary-border, var(--color-primary-border));
     border-radius: 10px;
     padding: 0.75rem 2rem;
     font-size: 1.05rem;
@@ -706,7 +706,7 @@
     border-color: #8bb4e1;
   }
   .btn-cta:focus-visible {
-    outline: 2px solid #173a5c;
+    outline: 2px solid var(--color-primary-content);
     outline-offset: 2px;
   }
 </style>
