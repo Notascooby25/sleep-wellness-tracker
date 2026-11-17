@@ -1,0 +1,9 @@
+DM Sans
+Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://openfontlicense.org
+
+The full license text is published at https://openfontlicense.org/open-font-license-official-text/
+(Redistribution of this font file with this notice is permitted under that license.)
