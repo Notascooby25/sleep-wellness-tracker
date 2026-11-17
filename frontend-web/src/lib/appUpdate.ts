@@ -1,4 +1,4 @@
-// Loads the newest version of the app: asks the service worker to update, clears old caches, reloads.
+// Loads the newest version of the app: asks the service worker to update, then reloads.
 // Only ever called from a click, so it never interrupts someone mid-entry.
 export async function refreshToLatest(): Promise<void> {
   // Offline / server restarting: do nothing, so the caches (including the offline page) stay intact.
@@ -18,14 +18,8 @@ export async function refreshToLatest(): Promise<void> {
     // A failed service worker update must not block the reload.
   }
 
-  try {
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((key) => caches.delete(key)));
-    }
-  } catch {
-    // Same: reload anyway.
-  }
-
+  // Deliberately NOT clearing CacheStorage: the service worker only keeps the offline page there and
+  // only re-fills it when sw.js itself changes, so wiping it would break the offline screen. The app's
+  // own files have build-stamped names, so a reload already fetches the new ones.
   location.reload();
 }

@@ -2,7 +2,7 @@
 
 ## 4.21.5 (2026-11-17)
 
-**"New version available" bar.** When a new version of the app has been released, a bar now appears under the menu saying so, with an "Update now" button. Tapping it clears the old saved files and loads the new version. It checks every 5 minutes and whenever you switch back to the app, and it never reloads on its own, so anything you're typing is never lost.
+**"New version available" bar.** When a new version of the app has been released, a bar now appears under the menu saying so, with an "Update now" button. Tapping it refreshes the app and loads the new version. It checks every 5 minutes and whenever you switch back to the app, and it never reloads on its own, so anything you're typing is never lost.
 
 ## 4.21.3 (2026-11-17)
 
