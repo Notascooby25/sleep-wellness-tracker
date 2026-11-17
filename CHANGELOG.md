@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.10 (2026-11-17)
+
+**Security housekeeping for the website's building blocks.** The saved list of exact software versions the web app is built from (the "lock file") was out of date, so GitHub's scanner reported 28 vulnerability alerts against versions the app isn't actually built with. The lock file is refreshed to the current safe versions, and the app's build now follows it exactly, so what GitHub scans is what runs. No change to how the app looks or behaves.
+
 ## 4.21.9 (2026-11-17)
 
 **Consistent shades of blue.** About 50 slightly different shades of blue and grey that were typed out separately across the pages are now taken from the shared colour list. Each one moved to its nearest named colour, by a difference too small to notice at a glance (the largest is about the gap between two neighbouring paint swatches). Status and chart colours (greens, ambers, reds) were left as they were. Nothing else changes.
