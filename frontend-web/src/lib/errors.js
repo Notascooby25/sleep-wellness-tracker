@@ -59,6 +59,21 @@ export function describeError(error) {
 }
 
 /**
+ * When the session has ended, the server answers API calls with a redirect to the login page, and the
+ * browser follows it and hands back the login page's HTML with a 200 status. That is "signed out".
+ * @param {{ redirected?: boolean, url?: string }} response
+ * @returns {boolean}
+ */
+export function isSignedOutRedirect(response) {
+  if (!response || !response.redirected || typeof response.url !== 'string') return false;
+  try {
+    return new URL(response.url, 'http://localhost').pathname.startsWith('/login');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Only ever lets a person be sent to a path inside this app.
  * @param {string | null | undefined} target
  * @returns {string}

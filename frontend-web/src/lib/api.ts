@@ -1,5 +1,5 @@
 import { goto } from '$app/navigation';
-import { ApiError } from './errors.js';
+import { ApiError, isSignedOutRedirect } from './errors.js';
 
 // If the session has ended, send the person to the login page and bring them back afterwards.
 // Several requests can fail together, so only the first one redirects.
@@ -70,6 +70,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
           ...(init?.headers || {})
         }
       });
+
+      // Session ended: the server redirected this API call to the login page.
+      if (isSignedOutRedirect(response)) {
+        if (!path.startsWith('/auth/')) handleSignedOut();
+        throw new ApiError(401, 'Signed out', 'redirected to login');
+      }
 
       if (!response.ok) {
         const text = await response.text();

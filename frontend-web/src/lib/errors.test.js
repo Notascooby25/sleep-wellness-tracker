@@ -1,7 +1,19 @@
 // Run with: node --test frontend-web/src/lib/errors.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, describeError, safeRedirectPath } from './errors.js';
+import { ApiError, describeError, safeRedirectPath, isSignedOutRedirect } from './errors.js';
+
+test('a redirect to the login page counts as signed out', () => {
+  assert.equal(isSignedOutRedirect({ redirected: true, url: 'http://localhost/login?redirect=%2Fmood-log' }), true);
+  assert.equal(isSignedOutRedirect({ redirected: true, url: '/login' }), true);
+});
+
+test('other responses are not treated as signed out', () => {
+  assert.equal(isSignedOutRedirect({ redirected: false, url: 'http://localhost/login' }), false);
+  assert.equal(isSignedOutRedirect({ redirected: true, url: 'http://localhost/api/other' }), false);
+  assert.equal(isSignedOutRedirect({}), false);
+  assert.equal(isSignedOutRedirect(undefined), false);
+});
 
 test('offline fetch failure says offline', () => {
   assert.equal(
