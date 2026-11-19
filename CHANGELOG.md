@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.21.15 (2026-11-19)
+
+**Acupuncture report redesigned as a quick "Clinic Brief", and the trigger-finding made more trustworthy.** The page now opens with headline numbers for the appointment period (headache days, migraine days and other headache-type items, each counted once per day) with a badge showing the change since last time, a clickable strip of days with acupuncture days marked, and bar charts for headache types and head positions. Things you didn't log in the period are hidden. A switch lets you look for triggers over this period, the last 90 days or all time, with a plain-English verdict on whether there's a real pattern or it looks like chance. The trigger logic was fixed: days you didn't log are no longer treated as "nothing happened", "Before Sleep" items only count as a possible cause for the next day, things you log because of a headache (like painkillers) are no longer treated as triggers, and results are corrected for chance findings, with tiny effects listed separately as "no clear link". The "since last appointment" quick-select and date pickers are kept, and the old report link still works. Date ranges over 2 years are now politely refused instead of slowing the page down.
+
 ## 4.21.14 (2026-11-17)
 
 **Proper page headings for screen readers.** Each page's title is now its main heading (the site name in the header used to be the main heading on every page, so screen reader users never heard what page they were on). The pages look exactly the same as before.

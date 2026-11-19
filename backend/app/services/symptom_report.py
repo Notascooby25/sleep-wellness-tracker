@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import math
 import statistics
 from collections import defaultdict
@@ -6,8 +7,8 @@ from collections import defaultdict
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
-from .comparison import CONFIDENCE_ORDER, MIN_NIGHTS, bh_adjust, compare, level_for
-from .insight_dates import UK_TZ, is_late_workout, night_for_entry
+from .comparison import CONFIDENCE_ORDER, MIN_NIGHTS, bh_adjust, compare, is_negligible, level_for
+from .insight_dates import UK_TZ, is_late_workout, night_for_entry, night_for_workout
 from .item_roles import (
     ACUPUNCTURE_PAGE,
     effective_role,
@@ -17,9 +18,24 @@ from .item_roles import (
     role_was_set_by_owner,
 )
 
+TRIGGER_WINDOWS = ("period", "90d", "all")
+MIN_BINARY_EFFECT_PCT = 5
 WORKOUT_LABEL = "Workout (day before)"
 LATE_WORKOUT_LABEL = "Late workout (after 6pm, day before)"
 LONG_WORKOUT_LABEL = "Long workout (> 45m, day before)"
+MAX_REPORT_RANGE_DAYS = 731
+EARLIEST_REPORT_DATE = dt.date(2000, 1, 1)
+LATEST_REPORT_DATE = dt.date(2100, 12, 31)
+
+
+def _check_report_range(start_date: dt.date, end_date: dt.date) -> None:
+    """Reject ranges the report can't sensibly show (also stops a huge day-by-day timeline)."""
+    if start_date > end_date:
+        raise ValueError("start_date must be on or before end_date")
+    if start_date < EARLIEST_REPORT_DATE or end_date > LATEST_REPORT_DATE:
+        raise ValueError("dates must be between 2000-01-01 and 2100-12-31")
+    if (end_date - start_date).days + 1 > MAX_REPORT_RANGE_DAYS:
+        raise ValueError(f"date range must be {MAX_REPORT_RANGE_DAYS} days or fewer")
 
 
 def _number(value) -> float | None:
@@ -41,9 +57,36 @@ def _dig(payload, *paths: tuple[str, ...]) -> float | None:
     return None
 
 
+def _normalize_positions(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        candidates = value
+    elif isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            parsed = [value]
+        candidates = parsed if isinstance(parsed, list) else [str(parsed)]
+    else:
+        candidates = [str(value)]
+    positions: list[str] = []
+    for candidate in candidates:
+        label = str(candidate).strip()
+        if label and label not in positions:
+            positions.append(label)
+    return positions
+
+
+def _is_migraine_name(name: str | None) -> bool:
+    return "migraine" in (name or "").strip().lower()
+
+
 def _group_old_and_current_copies(
     db: Session, logged: dict[int, models.Activity]
 ) -> list[tuple[models.Activity, list[models.Activity]]]:
+    if not logged:
+        return []
     names = {(a.name or "").strip().lower() for a in logged.values()}
     same_named: dict[str, list[models.Activity]] = defaultdict(list)
     for activity in db.query(models.Activity).options(selectinload(models.Activity.category)).all():
@@ -67,7 +110,70 @@ def _group_old_and_current_copies(
     return [(primaries[pid], copies) for pid, copies in members.items()]
 
 
-def compute_headache_summary(
+def get_acupuncture_session_dates(db: Session) -> list[dt.date]:
+    activities = db.query(models.Activity).filter(models.Activity.name.ilike("%acupuncture%")).all()
+    if not activities:
+        return []
+    activity_ids = [a.id for a in activities]
+    moods = (
+        db.query(models.Mood.timestamp)
+        .join(models.mood_activities)
+        .filter(models.mood_activities.c.activity_id.in_(activity_ids))
+        .all()
+    )
+    return sorted({ts.astimezone(UK_TZ).date() for (ts,) in moods}, reverse=True)
+
+
+def _resolve_prior_period(
+    db: Session,
+    start_date: dt.date,
+    end_date: dt.date,
+    session_dates: list[dt.date],
+) -> dict | None:
+    total_days = (end_date - start_date).days + 1
+    session_set = set(session_dates)
+    anchor = start_date - dt.timedelta(days=1)
+    has_newer_inside = any(start_date <= s < end_date for s in session_dates)
+    earlier_sessions = [s for s in session_dates if s < anchor]
+
+    if anchor in session_set and not has_newer_inside and earlier_sessions:
+        prev_start = earlier_sessions[0] + dt.timedelta(days=1)
+        prev_end = anchor
+        comparison_type = "previous_session_gap"
+    else:
+        prev_end = start_date - dt.timedelta(days=1)
+        prev_start = prev_end - dt.timedelta(days=total_days - 1)
+        comparison_type = "equal_length_prior"
+
+    prior_from = dt.datetime.combine(prev_start, dt.time(), tzinfo=UK_TZ)
+    prior_to = dt.datetime.combine(prev_end + dt.timedelta(days=1), dt.time(), tzinfo=UK_TZ)
+    prior_moods = (
+        db.query(models.Mood)
+        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
+        .filter(models.Mood.timestamp >= prior_from, models.Mood.timestamp < prior_to)
+        .all()
+    )
+    if not prior_moods:
+        return None
+
+    prior_symptom_days: set[dt.date] = set()
+    for mood in prior_moods:
+        m_date = mood.timestamp.astimezone(UK_TZ).date()
+        if prev_start <= m_date <= prev_end and any(is_symptom(act) for act in mood.activities):
+            prior_symptom_days.add(m_date)
+
+    prior_total = max(1, (prev_end - prev_start).days + 1)
+    return {
+        "start_date": prev_start.isoformat(),
+        "end_date": prev_end.isoformat(),
+        "total_days": prior_total,
+        "symptom_days": len(prior_symptom_days),
+        "frequency": round((len(prior_symptom_days) / prior_total) * 100),
+        "comparison_type": comparison_type,
+    }
+
+
+def compute_appointment_summary(
     db: Session,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
@@ -75,15 +181,14 @@ def compute_headache_summary(
     today = dt.datetime.now(UK_TZ).date()
     end_date = end_date or today
     start_date = start_date or (end_date - dt.timedelta(days=29))
+    _check_report_range(start_date, end_date)
 
-    in_window = lambda d: start_date <= d <= end_date  # noqa: E731
-    total_days = max(1, (end_date - start_date).days + 1)
-    all_window_days = {start_date + dt.timedelta(days=i) for i in range(total_days)}
+    total_days = (end_date - start_date).days + 1
+    session_dates = get_acupuncture_session_dates(db)
+    session_set = set(session_dates)
 
-    # Fetch moods covering the window and the 2 days prior (for day-before activity lookups)
-    mood_from = dt.datetime.combine(start_date - dt.timedelta(days=2), dt.time(), tzinfo=UK_TZ)
+    mood_from = dt.datetime.combine(start_date, dt.time(), tzinfo=UK_TZ)
     mood_to = dt.datetime.combine(end_date + dt.timedelta(days=1), dt.time(), tzinfo=UK_TZ)
-
     moods = (
         db.query(models.Mood)
         .options(
@@ -94,59 +199,136 @@ def compute_headache_summary(
         .all()
     )
 
-    symptom_days = set()
+    symptom_days: set[dt.date] = set()
     symptom_severities: list[float] = []
-
-    day_before_item_days: dict[int, set[dt.date]] = defaultdict(set)
-    same_day_item_days: dict[int, set[dt.date]] = defaultdict(set)
-    all_activities: dict[int, models.Activity] = {}
+    symptom_activities_by_id: dict[int, models.Activity] = {}
+    symptom_activity_days: dict[int, set[dt.date]] = defaultdict(set)
+    position_days: dict[str, set[dt.date]] = defaultdict(set)
+    day_raw_activities: dict[dt.date, set[int]] = defaultdict(set)
+    day_positions: dict[dt.date, set[str]] = defaultdict(set)
 
     for mood in moods:
         mood_date = mood.timestamp.astimezone(UK_TZ).date()
-        has_symptom_on_mood = False
+        if not (start_date <= mood_date <= end_date):
+            continue
+
+        details_by_activity: dict[int, list[models.MoodActivityDetail]] = defaultdict(list)
+        for det in mood.activity_details:
+            details_by_activity[det.activity_id].append(det)
 
         for activity in mood.activities:
-            all_activities[activity.id] = activity
-            if is_symptom(activity):
-                has_symptom_on_mood = True
-                for det in mood.activity_details:
-                    if det.activity_id == activity.id and det.severity is not None:
-                        symptom_severities.append(float(det.severity))
-            else:
-                category_name = activity.category.name if activity.category else None
-                # Day & night before matching:
-                # Before sleep items belong to wake morning (day affected).
-                # Daytime items logged on d-1 affect d.
-                if is_before_sleep(category_name):
-                    day_affected = night_for_entry(mood.timestamp, True)
-                else:
-                    day_affected = mood_date + dt.timedelta(days=1)
-
-                if in_window(day_affected):
-                    day_before_item_days[activity.id].add(day_affected)
-
-                if in_window(mood_date):
-                    same_day_item_days[activity.id].add(mood_date)
-
-        if has_symptom_on_mood and in_window(mood_date):
+            if not is_symptom(activity):
+                continue
             symptom_days.add(mood_date)
+            symptom_activities_by_id[activity.id] = activity
+            symptom_activity_days[activity.id].add(mood_date)
+            day_raw_activities[mood_date].add(activity.id)
+
+            for det in details_by_activity.get(activity.id, ()):
+                if det.severity is not None:
+                    symptom_severities.append(float(det.severity))
+                for pos in _normalize_positions(det.position):
+                    position_days[pos].add(mood_date)
+                    day_positions[mood_date].add(pos)
+
+    grouped_symptoms = _group_old_and_current_copies(db, symptom_activities_by_id)
+    primary_name_by_id: dict[int, str] = {}
+    symptom_breakdown: list[dict] = []
+    for primary, copies in grouped_symptoms:
+        name = (primary.name or "").strip()
+        days_union = set().union(*(symptom_activity_days[c.id] for c in copies))
+        for copy in copies:
+            primary_name_by_id[copy.id] = name
+        if days_union:
+            symptom_breakdown.append(
+                {
+                    "activity_id": primary.id,
+                    "activity": name,
+                    "days": len(days_union),
+                    "is_migraine": _is_migraine_name(name),
+                }
+            )
+    symptom_breakdown.sort(key=lambda item: (-item["days"], item["activity"].lower()))
+
+    position_breakdown = [
+        {"position": pos, "days": len(days)}
+        for pos, days in position_days.items()
+        if days
+    ]
+    position_breakdown.sort(key=lambda item: (-item["days"], item["position"].lower()))
+
+    daily_timeline: list[dict] = []
+    for offset in range(total_days):
+        day = start_date + dt.timedelta(days=offset)
+        names = sorted({primary_name_by_id[aid] for aid in day_raw_activities.get(day, ()) if aid in primary_name_by_id})
+        if any(_is_migraine_name(n) for n in names):
+            status = "migraine"
+        elif names:
+            status = "headache"
+        else:
+            status = "clear"
+        daily_timeline.append(
+            {
+                "date": day.isoformat(),
+                "status": status,
+                "symptoms": names,
+                "positions": sorted(day_positions.get(day, ())),
+                "has_acupuncture": day in session_set,
+            }
+        )
 
     num_symptom_days = len(symptom_days)
-    clean_days = all_window_days - symptom_days
-    num_clean_days = len(clean_days)
     avg_severity = round(statistics.fmean(symptom_severities), 1) if symptom_severities else None
+    previous_period = _resolve_prior_period(db, start_date, end_date, session_dates)
 
-    # Candidate grouping
-    groups = _group_old_and_current_copies(db, all_activities)
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "total_days": total_days,
+        "symptom_days": num_symptom_days,
+        "clean_days": total_days - num_symptom_days,
+        "frequency": round((num_symptom_days / total_days) * 100) if total_days > 0 else 0,
+        "average_severity": avg_severity,
+        "previous_period": previous_period,
+        "symptom_breakdown": symptom_breakdown,
+        "position_breakdown": position_breakdown,
+        "daily_timeline": daily_timeline,
+    }
+
+
+def _resolve_trigger_window(
+    db: Session,
+    window: str,
+    start_date: dt.date | None,
+    end_date: dt.date | None,
+) -> tuple[dt.date | None, dt.date | None]:
+    if window not in TRIGGER_WINDOWS:
+        raise ValueError(f"window must be one of {TRIGGER_WINDOWS}")
+    today = dt.datetime.now(UK_TZ).date()
+    if window == "period":
+        resolved_end = end_date or today
+        resolved_start = start_date or (resolved_end - dt.timedelta(days=29))
+        _check_report_range(resolved_start, resolved_end)
+        return resolved_start, resolved_end
+    if window == "90d":
+        return today - dt.timedelta(days=89), today
+    # window == "all"
+    earliest = db.query(models.Mood.timestamp).order_by(models.Mood.timestamp.asc()).first()
+    if earliest is None:
+        return None, None
+    earliest_date = earliest[0].astimezone(UK_TZ).date()
+    resolved_end = max(today, earliest_date)
+    return earliest_date, resolved_end
+
+
+def _collect_explicit_left_out(db: Session) -> dict[int, dict]:
     left_out_dict: dict[int, dict] = {}
-    too_early: list[dict] = []
-
-    # Include any explicitly hidden or habit/describes_night activities across database so user can restore them
     explicit_left_out = (
         db.query(models.Activity)
         .filter(
             models.Activity.deprecated_at.is_(None),
-            (models.Activity.report_role.in_(["habit", "describes_night"])) | (models.Activity.hidden_pages.isnot(None)),
+            (models.Activity.report_role.in_(["habit", "describes_night", "reaction"]))
+            | (models.Activity.hidden_pages.isnot(None)),
         )
         .all()
     )
@@ -154,9 +336,99 @@ def compute_headache_summary(
         name = (act.name or "").strip()
         if is_hidden_on(act, ACUPUNCTURE_PAGE):
             left_out_dict[act.id] = {"activity_id": act.id, "activity": name, "reason": "hidden"}
-        elif act.report_role in ("habit", "describes_night"):
+        elif act.report_role in ("habit", "describes_night", "reaction"):
             left_out_dict[act.id] = {"activity_id": act.id, "activity": name, "reason": act.report_role}
+    return left_out_dict
 
+
+def compute_headache_triggers(
+    db: Session,
+    window: str = "90d",
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+) -> dict:
+    resolved_start, resolved_end = _resolve_trigger_window(db, window, start_date, end_date)
+    left_out_dict = _collect_explicit_left_out(db)
+
+    if resolved_start is None or resolved_end is None:
+        return {
+            "window": window,
+            "start_date": None,
+            "end_date": None,
+            "logged_days": 0,
+            "symptom_days": 0,
+            "clean_days": 0,
+            "tested_count": 0,
+            "clue_count": 0,
+            "verdict_kind": "insufficient_data",
+            "triggers_day_before": [],
+            "triggers_same_day": [],
+            "biometrics": [],
+            "no_clear_link": [],
+            "too_early": [],
+            "left_out": sorted(left_out_dict.values(), key=lambda x: x["activity"]),
+            "min_nights": MIN_NIGHTS,
+        }
+
+    in_window = lambda d: resolved_start <= d <= resolved_end  # noqa: E731
+
+    mood_from = dt.datetime.combine(resolved_start - dt.timedelta(days=2), dt.time(), tzinfo=UK_TZ)
+    mood_to = dt.datetime.combine(resolved_end + dt.timedelta(days=1), dt.time(), tzinfo=UK_TZ)
+    moods = (
+        db.query(models.Mood)
+        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
+        .filter(models.Mood.timestamp >= mood_from, models.Mood.timestamp < mood_to)
+        .all()
+    )
+
+    active_logged_days: set[dt.date] = set()
+    exposure_logged_days: set[dt.date] = set()
+    before_sleep_target_days: set[dt.date] = set()
+    symptom_days: set[dt.date] = set()
+
+    day_before_item_days: dict[int, set[dt.date]] = defaultdict(set)
+    same_day_item_days: dict[int, set[dt.date]] = defaultdict(set)
+    all_activities: dict[int, models.Activity] = {}
+
+    for mood in moods:
+        mood_date = mood.timestamp.astimezone(UK_TZ).date()
+        exposure_logged_days.add(mood_date)
+        if in_window(mood_date):
+            active_logged_days.add(mood_date)
+
+        has_symptom_on_mood = False
+        for activity in mood.activities:
+            all_activities[activity.id] = activity
+            if is_symptom(activity):
+                has_symptom_on_mood = True
+                continue
+
+            category_name = activity.category.name if activity.category else None
+            if is_before_sleep(category_name):
+                day_affected = night_for_entry(mood.timestamp, True)
+                if in_window(day_affected):
+                    day_before_item_days[activity.id].add(day_affected)
+                    before_sleep_target_days.add(day_affected)
+                # Before Sleep items never count as same-day triggers
+                continue
+
+            day_affected = mood_date + dt.timedelta(days=1)
+            if in_window(day_affected):
+                day_before_item_days[activity.id].add(day_affected)
+            if in_window(mood_date):
+                same_day_item_days[activity.id].add(mood_date)
+
+        if has_symptom_on_mood and in_window(mood_date):
+            symptom_days.add(mood_date)
+
+    clean_days = active_logged_days - symptom_days
+    day_before_eligible_days = {
+        d
+        for d in active_logged_days
+        if (d - dt.timedelta(days=1)) in exposure_logged_days or d in before_sleep_target_days
+    }
+
+    groups = _group_old_and_current_copies(db, all_activities)
     candidates_day_before: list[tuple[int | None, str, set[dt.date], set[dt.date], str]] = []
     candidates_same_day: list[tuple[int | None, str, set[dt.date], set[dt.date], str]] = []
 
@@ -166,44 +438,45 @@ def compute_headache_summary(
             left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "hidden"}
             continue
         role = effective_role(primary)
-        if role == "habit":
+        if role in ("habit", "describes_night", "reaction"):
             if role_was_set_by_owner(primary):
-                left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "habit"}
-            continue
-        if role == "describes_night":
-            if role_was_set_by_owner(primary):
-                left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": "describes_night"}
+                left_out_dict[primary.id] = {"activity_id": primary.id, "activity": name, "reason": role}
             continue
         if role == "symptom":
             continue
 
-        # Day before candidates (only possible_cause)
-        if role == "possible_cause":
-            with_set = set().union(*(day_before_item_days[a.id] for a in copies))
-            candidates_day_before.append((primary.id, name, with_set, all_window_days - with_set, "activity"))
+        # Only possible_cause reaches here
+        with_db = set().union(*(day_before_item_days[a.id] for a in copies)) & active_logged_days
+        if with_db:
+            without_db = day_before_eligible_days - with_db
+            candidates_day_before.append((primary.id, name, with_db, without_db, "activity"))
 
-        # Same day candidates (possible_cause or reaction)
-        if role in ("possible_cause", "reaction"):
-            with_set_same = set().union(*(same_day_item_days[a.id] for a in copies))
-            candidates_same_day.append((primary.id, name, with_set_same, all_window_days - with_set_same, "activity"))
+        with_sd = set().union(*(same_day_item_days[a.id] for a in copies)) & active_logged_days
+        if with_sd:
+            without_sd = active_logged_days - with_sd
+            candidates_same_day.append((primary.id, name, with_sd, without_sd, "activity"))
 
     # Garmin Workouts (day before)
     workout_rows = (
-        db.query(models.GarminActivity.start_time, models.GarminActivity.activity_date, models.GarminActivity.duration_seconds)
+        db.query(
+            models.GarminActivity.start_time,
+            models.GarminActivity.activity_date,
+            models.GarminActivity.duration_seconds,
+        )
         .filter(
-            models.GarminActivity.activity_date >= start_date - dt.timedelta(days=2),
-            models.GarminActivity.activity_date <= end_date,
+            models.GarminActivity.activity_date >= resolved_start - dt.timedelta(days=2),
+            models.GarminActivity.activity_date <= resolved_end,
         )
         .all()
     )
 
-    workout_days = set()
-    late_workout_days = set()
-    long_workout_days = set()
+    workout_days: set[dt.date] = set()
+    late_workout_days: set[dt.date] = set()
+    long_workout_days: set[dt.date] = set()
 
     for start_time, act_date, duration in workout_rows:
-        day_affected = act_date + dt.timedelta(days=1)
-        if in_window(day_affected):
+        day_affected = night_for_workout(start_time) if start_time is not None else act_date + dt.timedelta(days=1)
+        if in_window(day_affected) and day_affected in active_logged_days:
             workout_days.add(day_affected)
             if start_time and is_late_workout(start_time):
                 late_workout_days.add(day_affected)
@@ -211,12 +484,14 @@ def compute_headache_summary(
                 long_workout_days.add(day_affected)
 
     earliest_workout = (
-        db.query(models.GarminActivity.activity_date)
-        .order_by(models.GarminActivity.activity_date.asc())
+        db.query(models.GarminActivity.start_time, models.GarminActivity.activity_date)
+        .order_by(models.GarminActivity.activity_date.asc(), models.GarminActivity.start_time.asc())
         .first()
     )
     if earliest_workout is not None:
-        eligible_workout_days = {d for d in all_window_days if d >= earliest_workout[0] + dt.timedelta(days=1)}
+        ew_start, ew_date = earliest_workout
+        earliest_tracked = night_for_workout(ew_start) if ew_start is not None else ew_date + dt.timedelta(days=1)
+        eligible_workout_days = {d for d in active_logged_days if d >= earliest_tracked}
     else:
         eligible_workout_days = set()
 
@@ -228,169 +503,337 @@ def compute_headache_summary(
         if w_days:
             candidates_day_before.append((None, label, w_days, eligible_workout_days - w_days, "garmin"))
 
-    def evaluate_candidates(candidate_list):
+    raw_too_early: list[dict] = []
+    evaluated_activity_ids: set[int] = set()
+
+    def evaluate_candidates(candidate_list, timing: str) -> tuple[list[dict], list[dict]]:
         tested = []
         for activity_id, name, with_set, without_set, source in candidate_list:
-            with_days = sorted(d for d in with_set if d in all_window_days)
-            without_days = sorted(d for d in without_set if d in all_window_days)
-            if not with_days or not without_days:
+            with_days = sorted(d for d in with_set if d in active_logged_days)
+            without_days = sorted(d for d in without_set if d in active_logged_days)
+            if not with_days:
+                continue
+            if not without_days:
+                if len(with_days) < MIN_NIGHTS:
+                    raw_too_early.append(
+                        {"activity_id": activity_id, "activity": name, "with_nights": len(with_days), "source": source}
+                    )
                 continue
 
             with_vals = [1.0 if d in symptom_days else 0.0 for d in with_days]
             without_vals = [1.0 if d in symptom_days else 0.0 for d in without_days]
-
             result = compare(with_vals, without_vals)
             if result.confidence == "too_early":
-                too_early.append({"activity_id": activity_id, "activity": name, "with_nights": result.with_n})
+                raw_too_early.append(
+                    {"activity_id": activity_id, "activity": name, "with_nights": result.with_n, "source": source}
+                )
                 continue
-            tested.append((activity_id, name, with_days, without_days, result, source))
+            if activity_id is not None:
+                evaluated_activity_ids.add(activity_id)
+            tested.append((activity_id, name, with_days, with_vals + without_vals, result, source))
 
         if not tested:
-            return []
+            return [], []
 
         adjusted = bh_adjust([result.p_value for *_, result, _ in tested])
-        items = []
-        for (activity_id, name, with_days, without_days, result, source), q_value in zip(tested, adjusted):
-            result.confidence = level_for(q_value, result.with_n, result.without_n)
+        all_items: list[dict] = []
+        for (activity_id, name, with_days, pooled_vals, result, source), q_value in zip(tested, adjusted):
+            confidence = level_for(q_value, result.with_n, result.without_n)
             effect_pct = round(result.effect * 100)
-            items.append(
+            negligible = abs(effect_pct) < MIN_BINARY_EFFECT_PCT or is_negligible(result.effect, pooled_vals)
+            all_items.append(
                 {
                     "activity_id": activity_id,
                     "activity": name,
                     "effect": effect_pct,
                     "with_nights": result.with_n,
                     "without_nights": result.without_n,
-                    "confidence": result.confidence,
+                    "confidence": confidence,
                     "better": effect_pct < 0,
                     "source": source,
+                    "kind": "garmin_workout" if source == "garmin" else "activity",
+                    "timing": timing,
                     "logged_with": [],
                     "_days": frozenset(with_days),
+                    "_is_clue": confidence in ("strong", "some") and not negligible,
                 }
             )
 
-        # Twin detection
+        # Twin detection across all tested items in this bucket
         by_days: dict[frozenset, list[str]] = defaultdict(list)
-        for item in items:
+        for item in all_items:
             by_days[item["_days"]].append(item["activity"])
-        for item in items:
+        clues: list[dict] = []
+        weak_items: list[dict] = []
+        for item in all_items:
             twins = by_days[item.pop("_days")]
             item["logged_with"] = sorted(n for n in twins if n != item["activity"])
+            is_clue = item.pop("_is_clue")
+            if is_clue:
+                clues.append(item)
+            else:
+                weak_items.append(item)
 
-        items.sort(key=lambda x: (CONFIDENCE_ORDER[x["confidence"]], -abs(x["effect"])))
-        return items
+        clues.sort(key=lambda x: (CONFIDENCE_ORDER[x["confidence"]], -abs(x["effect"])))
+        weak_items.sort(key=lambda x: (CONFIDENCE_ORDER[x["confidence"]], -abs(x["effect"])))
+        return clues, weak_items
 
-    triggers_day_before = evaluate_candidates(candidates_day_before)
-    triggers_same_day = evaluate_candidates(candidates_same_day)
+    triggers_day_before, weak_day_before = evaluate_candidates(candidates_day_before, "day_before")
+    triggers_same_day, weak_same_day = evaluate_candidates(candidates_same_day, "same_day")
 
-    # Garmin Biometrics Analysis
-    biometrics = []
-
-    def evaluate_biometric(metric_map, label, higher_is_better, unit=""):
-        symp_vals = [metric_map[d] for d in symptom_days if d in metric_map]
-        clean_vals = [metric_map[d] for d in clean_days if d in metric_map]
-        if not symp_vals or not clean_vals:
-            return
-
-        res = compare(symp_vals, clean_vals)
-        if res.confidence == "too_early":
-            return
-
-        symp_avg = round(res.with_mean, 1)
-        clean_avg = round(res.without_mean, 1)
-        diff = round(symp_avg - clean_avg, 1)
-
-        biometrics.append(
-            {
-                "metric": label,
-                "symptom_avg": symp_avg,
-                "clean_avg": clean_avg,
-                "effect": diff,
-                "unit": unit,
-                "confidence": res.confidence,
-                "better": (diff > 0) == higher_is_better,
-            }
-        )
+    # Garmin Biometrics Analysis (BH-adjusted + negligible filtered)
+    bio_inputs: list[tuple[dict[dt.date, float], str, bool, str]] = []
 
     # 1. Sleep score (night leading into d)
-    sleep_rows = db.query(models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.sleep_score).filter(
-        models.GarminSleepDaily.sleep_date >= start_date, models.GarminSleepDaily.sleep_date <= end_date
-    ).all()
-    sleep_map = {d: float(v) for d, v in sleep_rows if v is not None}
-    evaluate_biometric(sleep_map, "Sleep Score (night before)", higher_is_better=True, unit="pts")
+    sleep_rows = (
+        db.query(models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.sleep_score)
+        .filter(
+            models.GarminSleepDaily.sleep_date >= resolved_start,
+            models.GarminSleepDaily.sleep_date <= resolved_end,
+        )
+        .all()
+    )
+    bio_inputs.append(
+        ({d: float(v) for d, v in sleep_rows if v is not None}, "Sleep Score (night before)", True, "pts")
+    )
 
-    # 2. Overnight Stress
-    stress_rows = db.query(models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.payload).filter(
-        models.GarminSleepDaily.sleep_date >= start_date, models.GarminSleepDaily.sleep_date <= end_date
-    ).all()
-    stress_map = {}
-    for d, p in stress_rows:
-        val = _dig(p, ("dailySleepDTO", "avgSleepStress"))
-        if val is not None:
-            stress_map[d] = val
-    if not stress_map:
-        stress_daily_rows = db.query(models.GarminStressDaily.stress_date, models.GarminStressDaily.overall_stress_level).filter(
-            models.GarminStressDaily.stress_date >= start_date, models.GarminStressDaily.stress_date <= end_date
-        ).all()
-        stress_map = {d: float(v) for d, v in stress_daily_rows if v is not None}
-    evaluate_biometric(stress_map, "Overnight Stress (night before)", higher_is_better=False, unit="")
+    # 2. Overnight Stress (with accurately shifted & relabelled Daytime Stress fallback)
+    stress_sleep_rows = (
+        db.query(models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.payload)
+        .filter(
+            models.GarminSleepDaily.sleep_date >= resolved_start,
+            models.GarminSleepDaily.sleep_date <= resolved_end,
+        )
+        .all()
+    )
+    sleep_stress_map = {
+        d: val
+        for d, p in stress_sleep_rows
+        if (val := _dig(p, ("dailySleepDTO", "avgSleepStress"))) is not None
+    }
+    if sleep_stress_map and len(sleep_stress_map) * 2 >= len(stress_sleep_rows):
+        bio_inputs.append((sleep_stress_map, "Overnight Stress (night before)", False, ""))
+    else:
+        stress_daily_rows = (
+            db.query(models.GarminStressDaily.stress_date, models.GarminStressDaily.overall_stress_level)
+            .filter(
+                models.GarminStressDaily.stress_date >= resolved_start - dt.timedelta(days=1),
+                models.GarminStressDaily.stress_date <= resolved_end,
+            )
+            .all()
+        )
+        daytime_stress_map = {d + dt.timedelta(days=1): float(v) for d, v in stress_daily_rows if v is not None}
+        bio_inputs.append((daytime_stress_map, "Daytime Stress (day before)", False, ""))
 
-    # 3. Overnight HRV
-    hrv_rows = db.query(models.GarminHRVDaily.hrv_date, models.GarminHRVDaily.payload).filter(
-        models.GarminHRVDaily.hrv_date >= start_date, models.GarminHRVDaily.hrv_date <= end_date
-    ).all()
+    # 3. Overnight HRV (full 8 JSON lookup paths matching lifestyle_impact.py)
+    hrv_rows = (
+        db.query(models.GarminHRVDaily.hrv_date, models.GarminHRVDaily.payload)
+        .filter(
+            models.GarminHRVDaily.hrv_date >= resolved_start,
+            models.GarminHRVDaily.hrv_date <= resolved_end,
+        )
+        .all()
+    )
     hrv_map = {}
     for d, p in hrv_rows:
         val = _dig(
             p,
             ("hrvSummary", "lastNightAvg"),
             ("hrvSummary", "lastNightAverage"),
+            ("hrvSummary", "lastNight"),
             ("hrvStatus", "lastNightAvg"),
             ("hrvStatus", "lastNightAverage"),
+            ("hrvStatus", "lastNight"),
+            ("lastNightAvg",),
+            ("lastNightAverage",),
         )
         if val is not None:
             hrv_map[d] = val
-    evaluate_biometric(hrv_map, "Overnight HRV (night before)", higher_is_better=True, unit="ms")
+    bio_inputs.append((hrv_map, "Overnight HRV (night before)", True, "ms"))
 
     # 4. Resting Heart Rate (day before)
-    rhr_rows = db.query(models.GarminRestingHeartRateDaily.heart_rate_date, models.GarminRestingHeartRateDaily.resting_heart_rate).filter(
-        models.GarminRestingHeartRateDaily.heart_rate_date >= start_date - dt.timedelta(days=1),
-        models.GarminRestingHeartRateDaily.heart_rate_date <= end_date,
-    ).all()
+    rhr_rows = (
+        db.query(
+            models.GarminRestingHeartRateDaily.heart_rate_date,
+            models.GarminRestingHeartRateDaily.resting_heart_rate,
+        )
+        .filter(
+            models.GarminRestingHeartRateDaily.heart_rate_date >= resolved_start - dt.timedelta(days=1),
+            models.GarminRestingHeartRateDaily.heart_rate_date <= resolved_end,
+        )
+        .all()
+    )
     rhr_map = {d + dt.timedelta(days=1): float(v) for d, v in rhr_rows if v is not None}
-    evaluate_biometric(rhr_map, "Resting Heart Rate (day before)", higher_is_better=False, unit="bpm")
+    bio_inputs.append((rhr_map, "Resting Heart Rate (day before)", False, "bpm"))
 
-    # 5. Hydration (% of goal, day before). CRITICAL: 0 ml or no record means unknown!
-    hydration_rows = db.query(
-        models.GarminHydrationDaily.hydration_date,
-        models.GarminHydrationDaily.consumed_ml,
-        models.GarminHydrationDaily.goal_ml,
-    ).filter(
-        models.GarminHydrationDaily.hydration_date >= start_date - dt.timedelta(days=1),
-        models.GarminHydrationDaily.hydration_date <= end_date,
-    ).all()
+    # 5. Hydration (% of goal, day before). 0 ml or missing means unknown!
+    hydration_rows = (
+        db.query(
+            models.GarminHydrationDaily.hydration_date,
+            models.GarminHydrationDaily.consumed_ml,
+            models.GarminHydrationDaily.goal_ml,
+        )
+        .filter(
+            models.GarminHydrationDaily.hydration_date >= resolved_start - dt.timedelta(days=1),
+            models.GarminHydrationDaily.hydration_date <= resolved_end,
+        )
+        .all()
+    )
     hydration_map = {}
     for h_date, consumed, goal in hydration_rows:
         if consumed is not None and consumed > 0 and goal is not None and goal > 0:
-            day_affected = h_date + dt.timedelta(days=1)
-            hydration_map[day_affected] = round((consumed / goal) * 100, 1)
-    evaluate_biometric(hydration_map, "Hydration % of goal (day before)", higher_is_better=True, unit="%")
+            hydration_map[h_date + dt.timedelta(days=1)] = round((consumed / goal) * 100, 1)
+    bio_inputs.append((hydration_map, "Hydration % of goal (day before)", True, "%"))
+
+    tested_bios = []
+    for metric_map, label, higher_is_better, unit in bio_inputs:
+        symp_vals = [metric_map[d] for d in symptom_days if d in metric_map]
+        clean_vals = [metric_map[d] for d in clean_days if d in metric_map]
+        if not symp_vals and not clean_vals:
+            continue
+        if not symp_vals or not clean_vals:
+            raw_too_early.append(
+                {
+                    "activity_id": None,
+                    "activity": label,
+                    "with_nights": min(len(symp_vals), len(clean_vals)),
+                    "source": "garmin",
+                }
+            )
+            continue
+        res = compare(symp_vals, clean_vals)
+        if res.confidence == "too_early":
+            raw_too_early.append(
+                {
+                    "activity_id": None,
+                    "activity": label,
+                    "with_nights": min(res.with_n, res.without_n),
+                    "source": "garmin",
+                }
+            )
+            continue
+        tested_bios.append((label, higher_is_better, unit, symp_vals + clean_vals, res))
+
+    biometrics: list[dict] = []
+    weak_biometrics: list[dict] = []
+    if tested_bios:
+        bio_adjusted = bh_adjust([res.p_value for *_, res in tested_bios])
+        for (label, higher_is_better, unit, pooled_vals, res), q_value in zip(tested_bios, bio_adjusted):
+            confidence = level_for(q_value, res.with_n, res.without_n)
+            symp_avg = round(res.with_mean, 1)
+            clean_avg = round(res.without_mean, 1)
+            diff = round(symp_avg - clean_avg, 1)
+            negligible = diff == 0.0 or is_negligible(res.effect, pooled_vals)
+            entry = {
+                "kind": "biometric",
+                "timing": "biometric",
+                "source": "garmin",
+                "metric": label,
+                "symptom_avg": symp_avg,
+                "clean_avg": clean_avg,
+                "effect": diff,
+                "unit": unit,
+                "with_nights": res.with_n,
+                "without_nights": res.without_n,
+                "confidence": confidence,
+                "better": (diff > 0) == higher_is_better if diff != 0.0 else False,
+            }
+            if confidence in ("strong", "some") and not negligible:
+                biometrics.append(entry)
+            else:
+                weak_biometrics.append(entry)
 
     biometrics.sort(key=lambda x: (CONFIDENCE_ORDER[x["confidence"]], -abs(x["effect"])))
-    too_early.sort(key=lambda x: (-x["with_nights"], x["activity"]))
+    weak_biometrics.sort(key=lambda x: (CONFIDENCE_ORDER[x["confidence"]], -abs(x["effect"])))
+
+    # Cross-bucket deduplication for no_clear_link
+    clue_activity_ids = {
+        item["activity_id"]
+        for item in triggers_day_before + triggers_same_day
+        if item["activity_id"] is not None
+    }
+    clue_garmin_labels = {
+        item["activity"]
+        for item in triggers_day_before + triggers_same_day
+        if item["activity_id"] is None
+    }
+
+    no_clear_link: list[dict] = []
+    seen_weak_activities: set[int] = set()
+    for item in weak_day_before + weak_same_day:
+        aid = item["activity_id"]
+        if aid is not None:
+            if aid in clue_activity_ids or aid in seen_weak_activities:
+                continue
+            seen_weak_activities.add(aid)
+        else:
+            if item["activity"] in clue_garmin_labels:
+                continue
+        no_clear_link.append(item)
+    no_clear_link.extend(weak_biometrics)
+
+    # Deduplicate too_early (suppressing anything already evaluated in day_before or same_day)
+    too_early_by_key: dict[tuple[int | None, str], dict] = {}
+    for item in raw_too_early:
+        aid = item["activity_id"]
+        if aid is not None and aid in evaluated_activity_ids:
+            continue
+        key = (aid, item["activity"])
+        prev = too_early_by_key.get(key)
+        if prev is None or item["with_nights"] > prev["with_nights"]:
+            too_early_by_key[key] = item
+    too_early = sorted(too_early_by_key.values(), key=lambda x: (-x["with_nights"], x["activity"]))
     left_out = sorted(left_out_dict.values(), key=lambda x: x["activity"])
 
+    clue_count = len(triggers_day_before) + len(triggers_same_day) + len(biometrics)
+    tested_count = clue_count + len(no_clear_link)
+    if clue_count > 0:
+        verdict_kind = "clues_found"
+    elif tested_count > 0 and len(symptom_days) >= MIN_NIGHTS and len(clean_days) >= MIN_NIGHTS:
+        verdict_kind = "looks_random"
+    else:
+        verdict_kind = "insufficient_data"
+
     return {
-        "start_date": start_date.isoformat() if start_date else None,
-        "end_date": end_date.isoformat() if end_date else None,
-        "total_days": total_days,
-        "symptom_days": num_symptom_days,
-        "clean_days": num_clean_days,
-        "frequency": round((num_symptom_days / total_days) * 100) if total_days > 0 else 0,
-        "average_severity": avg_severity,
+        "window": window,
+        "start_date": resolved_start.isoformat(),
+        "end_date": resolved_end.isoformat(),
+        "logged_days": len(active_logged_days),
+        "symptom_days": len(symptom_days),
+        "clean_days": len(clean_days),
+        "tested_count": tested_count,
+        "clue_count": clue_count,
+        "verdict_kind": verdict_kind,
         "triggers_day_before": triggers_day_before,
         "triggers_same_day": triggers_same_day,
         "biometrics": biometrics,
+        "no_clear_link": no_clear_link,
         "too_early": too_early,
         "left_out": left_out,
         "min_nights": MIN_NIGHTS,
     }
+
+
+def compute_headache_summary(
+    db: Session,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+) -> dict:
+    """Backwards-compatible combined headache summary over [start_date, end_date]."""
+    appointment = compute_appointment_summary(db, start_date=start_date, end_date=end_date)
+    triggers = compute_headache_triggers(db, window="period", start_date=start_date, end_date=end_date)
+    return {
+        **appointment,
+        "logged_days": triggers["logged_days"],
+        "tested_count": triggers["tested_count"],
+        "clue_count": triggers["clue_count"],
+        "verdict_kind": triggers["verdict_kind"],
+        "triggers_day_before": triggers["triggers_day_before"],
+        "triggers_same_day": triggers["triggers_same_day"],
+        "biometrics": triggers["biometrics"],
+        "no_clear_link": triggers["no_clear_link"],
+        "too_early": triggers["too_early"],
+        "left_out": triggers["left_out"],
+        "min_nights": triggers["min_nights"],
+    }
+
