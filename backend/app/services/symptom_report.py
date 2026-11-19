@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import math
 import statistics
 from collections import defaultdict
@@ -41,9 +42,36 @@ def _dig(payload, *paths: tuple[str, ...]) -> float | None:
     return None
 
 
+def _normalize_positions(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        candidates = value
+    elif isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            parsed = [value]
+        candidates = parsed if isinstance(parsed, list) else [str(parsed)]
+    else:
+        candidates = [str(value)]
+    positions: list[str] = []
+    for candidate in candidates:
+        label = str(candidate).strip()
+        if label and label not in positions:
+            positions.append(label)
+    return positions
+
+
+def _is_migraine_name(name: str | None) -> bool:
+    return "migraine" in (name or "").strip().lower()
+
+
 def _group_old_and_current_copies(
     db: Session, logged: dict[int, models.Activity]
 ) -> list[tuple[models.Activity, list[models.Activity]]]:
+    if not logged:
+        return []
     names = {(a.name or "").strip().lower() for a in logged.values()}
     same_named: dict[str, list[models.Activity]] = defaultdict(list)
     for activity in db.query(models.Activity).options(selectinload(models.Activity.category)).all():
@@ -65,6 +93,193 @@ def _group_old_and_current_copies(
         primaries[primary.id] = primary
         members[primary.id].append(activity)
     return [(primaries[pid], copies) for pid, copies in members.items()]
+
+
+def get_acupuncture_session_dates(db: Session) -> list[dt.date]:
+    activities = db.query(models.Activity).filter(models.Activity.name.ilike("%acupuncture%")).all()
+    if not activities:
+        return []
+    activity_ids = [a.id for a in activities]
+    moods = (
+        db.query(models.Mood.timestamp)
+        .join(models.mood_activities)
+        .filter(models.mood_activities.c.activity_id.in_(activity_ids))
+        .all()
+    )
+    return sorted({ts.astimezone(UK_TZ).date() for (ts,) in moods}, reverse=True)
+
+
+def _resolve_prior_period(
+    db: Session,
+    start_date: dt.date,
+    end_date: dt.date,
+    session_dates: list[dt.date],
+) -> dict | None:
+    total_days = (end_date - start_date).days + 1
+    session_set = set(session_dates)
+    anchor = start_date - dt.timedelta(days=1)
+    has_newer_inside = any(start_date <= s < end_date for s in session_dates)
+    earlier_sessions = [s for s in session_dates if s < anchor]
+
+    if anchor in session_set and not has_newer_inside and earlier_sessions:
+        prev_start = earlier_sessions[0] + dt.timedelta(days=1)
+        prev_end = anchor
+        comparison_type = "previous_session_gap"
+    else:
+        prev_end = start_date - dt.timedelta(days=1)
+        prev_start = prev_end - dt.timedelta(days=total_days - 1)
+        comparison_type = "equal_length_prior"
+
+    prior_from = dt.datetime.combine(prev_start, dt.time(), tzinfo=UK_TZ)
+    prior_to = dt.datetime.combine(prev_end + dt.timedelta(days=1), dt.time(), tzinfo=UK_TZ)
+    prior_moods = (
+        db.query(models.Mood)
+        .options(selectinload(models.Mood.activities).selectinload(models.Activity.category))
+        .filter(models.Mood.timestamp >= prior_from, models.Mood.timestamp < prior_to)
+        .all()
+    )
+    if not prior_moods:
+        return None
+
+    prior_symptom_days: set[dt.date] = set()
+    for mood in prior_moods:
+        m_date = mood.timestamp.astimezone(UK_TZ).date()
+        if prev_start <= m_date <= prev_end and any(is_symptom(act) for act in mood.activities):
+            prior_symptom_days.add(m_date)
+
+    prior_total = max(1, (prev_end - prev_start).days + 1)
+    return {
+        "start_date": prev_start.isoformat(),
+        "end_date": prev_end.isoformat(),
+        "total_days": prior_total,
+        "symptom_days": len(prior_symptom_days),
+        "frequency": round((len(prior_symptom_days) / prior_total) * 100),
+        "comparison_type": comparison_type,
+    }
+
+
+def compute_appointment_summary(
+    db: Session,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+) -> dict:
+    today = dt.datetime.now(UK_TZ).date()
+    end_date = end_date or today
+    start_date = start_date or (end_date - dt.timedelta(days=29))
+    if start_date > end_date:
+        raise ValueError("start_date must be on or before end_date")
+
+    total_days = (end_date - start_date).days + 1
+    session_dates = get_acupuncture_session_dates(db)
+    session_set = set(session_dates)
+
+    mood_from = dt.datetime.combine(start_date, dt.time(), tzinfo=UK_TZ)
+    mood_to = dt.datetime.combine(end_date + dt.timedelta(days=1), dt.time(), tzinfo=UK_TZ)
+    moods = (
+        db.query(models.Mood)
+        .options(
+            selectinload(models.Mood.activities).selectinload(models.Activity.category),
+            selectinload(models.Mood.activity_details),
+        )
+        .filter(models.Mood.timestamp >= mood_from, models.Mood.timestamp < mood_to)
+        .all()
+    )
+
+    symptom_days: set[dt.date] = set()
+    symptom_severities: list[float] = []
+    symptom_activities_by_id: dict[int, models.Activity] = {}
+    symptom_activity_days: dict[int, set[dt.date]] = defaultdict(set)
+    position_days: dict[str, set[dt.date]] = defaultdict(set)
+    day_raw_activities: dict[dt.date, set[int]] = defaultdict(set)
+    day_positions: dict[dt.date, set[str]] = defaultdict(set)
+
+    for mood in moods:
+        mood_date = mood.timestamp.astimezone(UK_TZ).date()
+        if not (start_date <= mood_date <= end_date):
+            continue
+
+        details_by_activity: dict[int, list[models.MoodActivityDetail]] = defaultdict(list)
+        for det in mood.activity_details:
+            details_by_activity[det.activity_id].append(det)
+
+        for activity in mood.activities:
+            if not is_symptom(activity):
+                continue
+            symptom_days.add(mood_date)
+            symptom_activities_by_id[activity.id] = activity
+            symptom_activity_days[activity.id].add(mood_date)
+            day_raw_activities[mood_date].add(activity.id)
+
+            for det in details_by_activity.get(activity.id, ()):
+                if det.severity is not None:
+                    symptom_severities.append(float(det.severity))
+                for pos in _normalize_positions(det.position):
+                    position_days[pos].add(mood_date)
+                    day_positions[mood_date].add(pos)
+
+    grouped_symptoms = _group_old_and_current_copies(db, symptom_activities_by_id)
+    primary_name_by_id: dict[int, str] = {}
+    symptom_breakdown: list[dict] = []
+    for primary, copies in grouped_symptoms:
+        name = (primary.name or "").strip()
+        days_union = set().union(*(symptom_activity_days[c.id] for c in copies))
+        for copy in copies:
+            primary_name_by_id[copy.id] = name
+        if days_union:
+            symptom_breakdown.append(
+                {
+                    "activity_id": primary.id,
+                    "activity": name,
+                    "days": len(days_union),
+                    "is_migraine": _is_migraine_name(name),
+                }
+            )
+    symptom_breakdown.sort(key=lambda item: (-item["days"], item["activity"].lower()))
+
+    position_breakdown = [
+        {"position": pos, "days": len(days)}
+        for pos, days in position_days.items()
+        if days
+    ]
+    position_breakdown.sort(key=lambda item: (-item["days"], item["position"].lower()))
+
+    daily_timeline: list[dict] = []
+    for offset in range(total_days):
+        day = start_date + dt.timedelta(days=offset)
+        names = sorted({primary_name_by_id[aid] for aid in day_raw_activities.get(day, ()) if aid in primary_name_by_id})
+        if any(_is_migraine_name(n) for n in names):
+            status = "migraine"
+        elif names:
+            status = "headache"
+        else:
+            status = "clear"
+        daily_timeline.append(
+            {
+                "date": day.isoformat(),
+                "status": status,
+                "symptoms": names,
+                "positions": sorted(day_positions.get(day, ())),
+                "has_acupuncture": day in session_set,
+            }
+        )
+
+    num_symptom_days = len(symptom_days)
+    avg_severity = round(statistics.fmean(symptom_severities), 1) if symptom_severities else None
+    previous_period = _resolve_prior_period(db, start_date, end_date, session_dates)
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "total_days": total_days,
+        "symptom_days": num_symptom_days,
+        "clean_days": total_days - num_symptom_days,
+        "frequency": round((num_symptom_days / total_days) * 100) if total_days > 0 else 0,
+        "average_severity": avg_severity,
+        "previous_period": previous_period,
+        "symptom_breakdown": symptom_breakdown,
+        "position_breakdown": position_breakdown,
+        "daily_timeline": daily_timeline,
+    }
 
 
 def compute_headache_summary(

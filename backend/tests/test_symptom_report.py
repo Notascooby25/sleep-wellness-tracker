@@ -200,3 +200,191 @@ def test_category_default_describes_night_not_in_left_out(clean_db, db):
     res2 = compute_headache_summary(db, start_date=dt.date(2026, 10, 1), end_date=dt.date(2026, 10, 10))
     left_out2 = {item["activity"]: item["reason"] for item in res2["left_out"]}
     assert "Restless" not in left_out2
+
+
+def test_appointment_summary_breakdowns_hide_zeros_and_fold_deprecated(clean_db, db):
+    from app.services.symptom_report import compute_appointment_summary
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    headache_old = models.Activity(
+        name="Headache",
+        category_id=cat_symp.id,
+        deprecated_at=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    headache_cur = models.Activity(name="Headache", category_id=cat_symp.id)
+    migraine = models.Activity(name="Migraine", category_id=cat_symp.id)
+    unlogged = models.Activity(name="Sinus Pressure", category_id=cat_symp.id)
+    db.add_all([headache_old, headache_cur, migraine, unlogged])
+    db.flush()
+
+    # Day 1: two mood entries — Headache logged twice, Migraine once, positions Left & Forehead
+    m1a = models.Mood(timestamp=dt.datetime(2026, 10, 10, 9, 0, tzinfo=dt.timezone.utc))
+    m1a.activities.append(headache_cur)
+    db.add(m1a)
+    db.flush()
+    db.add(models.MoodActivityDetail(mood_id=m1a.id, activity_id=headache_cur.id, position='["Left","Forehead"]'))
+
+    m1b = models.Mood(timestamp=dt.datetime(2026, 10, 10, 16, 0, tzinfo=dt.timezone.utc))
+    m1b.activities.extend([headache_cur, migraine])
+    db.add(m1b)
+    db.flush()
+    db.add(models.MoodActivityDetail(mood_id=m1b.id, activity_id=migraine.id, position='["Left"]'))
+
+    # Day 2: deprecated Headache with plain-string position
+    m2 = models.Mood(timestamp=dt.datetime(2026, 10, 11, 14, 0, tzinfo=dt.timezone.utc))
+    m2.activities.append(headache_old)
+    db.add(m2)
+    db.flush()
+    db.add(models.MoodActivityDetail(mood_id=m2.id, activity_id=headache_old.id, position="Left"))
+
+    # Day 3: clean day
+    db.add(models.Mood(timestamp=dt.datetime(2026, 10, 12, 14, 0, tzinfo=dt.timezone.utc), mood_score=8))
+    db.commit()
+
+    res = compute_appointment_summary(db, start_date=dt.date(2026, 10, 10), end_date=dt.date(2026, 10, 12))
+    assert res["total_days"] == 3
+    assert res["symptom_days"] == 2
+    assert res["clean_days"] == 1
+    assert res["frequency"] == 67
+
+    assert res["symptom_breakdown"] == [
+        {"activity_id": headache_cur.id, "activity": "Headache", "days": 2, "is_migraine": False},
+        {"activity_id": migraine.id, "activity": "Migraine", "days": 1, "is_migraine": True},
+    ]
+    assert res["position_breakdown"] == [
+        {"position": "Left", "days": 2},
+        {"position": "Forehead", "days": 1},
+    ]
+    assert res["daily_timeline"] == [
+        {
+            "date": "2026-10-10",
+            "status": "migraine",
+            "symptoms": ["Headache", "Migraine"],
+            "positions": ["Forehead", "Left"],
+            "has_acupuncture": False,
+        },
+        {
+            "date": "2026-10-11",
+            "status": "headache",
+            "symptoms": ["Headache"],
+            "positions": ["Left"],
+            "has_acupuncture": False,
+        },
+        {
+            "date": "2026-10-12",
+            "status": "clear",
+            "symptoms": [],
+            "positions": [],
+            "has_acupuncture": False,
+        },
+    ]
+
+
+def test_appointment_summary_severity_ignores_entries_outside_window(clean_db, db):
+    from app.services.symptom_report import compute_appointment_summary
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    db.add(headache)
+    db.flush()
+
+    m_before = models.Mood(timestamp=dt.datetime(2026, 10, 9, 14, 0, tzinfo=dt.timezone.utc))
+    m_before.activities.append(headache)
+    db.add(m_before)
+    db.flush()
+    db.add(models.MoodActivityDetail(mood_id=m_before.id, activity_id=headache.id, severity=5))
+
+    m_in = models.Mood(timestamp=dt.datetime(2026, 10, 10, 14, 0, tzinfo=dt.timezone.utc))
+    m_in.activities.append(headache)
+    db.add(m_in)
+    db.flush()
+    db.add(models.MoodActivityDetail(mood_id=m_in.id, activity_id=headache.id, severity=2))
+    db.commit()
+
+    res = compute_appointment_summary(db, start_date=dt.date(2026, 10, 10), end_date=dt.date(2026, 10, 12))
+    assert res["average_severity"] == 2.0
+
+
+def test_appointment_summary_prior_period_rules(clean_db, db):
+    from app.services.symptom_report import compute_appointment_summary
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    cat_gen = _get_or_create_category(db, "Appointments")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    acupuncture = models.Activity(name="Acupuncture", category_id=cat_gen.id)
+    db.add_all([headache, acupuncture])
+    db.flush()
+
+    # Sessions on Oct 1 and Oct 10
+    for day in (1, 10):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, day, 12, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(acupuncture)
+        db.add(m)
+
+    # Prior session gap Oct 2..Oct 10 (9 days): 3 headache days -> 33%
+    for day in (3, 5, 7):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, day, 12, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(headache)
+        db.add(m)
+
+    # Current session gap Oct 11..Oct 20 (10 days): 2 headache days -> 20%
+    for day in (12, 18):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, day, 12, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(headache)
+        db.add(m)
+    db.commit()
+
+    # 1) Viewing since latest session (Oct 11..Oct 20) -> compares to previous session gap Oct 2..Oct 10
+    res = compute_appointment_summary(db, start_date=dt.date(2026, 10, 11), end_date=dt.date(2026, 10, 20))
+    assert res["previous_period"] == {
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-10",
+        "total_days": 9,
+        "symptom_days": 3,
+        "frequency": 33,
+        "comparison_type": "previous_session_gap",
+    }
+
+    # 2) Multi-session span (Oct 2..Oct 20, contains Oct 10 inside [start, end)) -> equal-length prior (Sep 13..Oct 1)
+    # Oct 1 has a logged mood (Acupuncture) with 0 headaches -> frequency 0, NOT None
+    res_span = compute_appointment_summary(db, start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 20))
+    assert res_span["previous_period"] == {
+        "start_date": "2026-09-13",
+        "end_date": "2026-10-01",
+        "total_days": 19,
+        "symptom_days": 0,
+        "frequency": 0,
+        "comparison_type": "equal_length_prior",
+    }
+    assert any(d["date"] == "2026-10-10" and d["has_acupuncture"] for d in res_span["daily_timeline"])
+
+    # 3) Period whose prior window has zero logged moods -> previous_period is None
+    res_early = compute_appointment_summary(db, start_date=dt.date(2026, 9, 15), end_date=dt.date(2026, 9, 20))
+    assert res_early["previous_period"] is None
+
+
+def test_acupuncture_sessions_uk_bst_and_empty_db_summary(clean_db, db):
+    from app.services.symptom_report import compute_appointment_summary, get_acupuncture_session_dates
+
+    # Empty DB first
+    empty = compute_appointment_summary(db, start_date=dt.date(2026, 7, 1), end_date=dt.date(2026, 7, 3))
+    assert empty["symptom_days"] == 0
+    assert empty["frequency"] == 0
+    assert empty["previous_period"] is None
+    assert empty["symptom_breakdown"] == []
+    assert empty["position_breakdown"] == []
+    assert len(empty["daily_timeline"]) == 3
+    assert all(d["status"] == "clear" for d in empty["daily_timeline"])
+
+    # Acupuncture logged at 23:30 UTC in July (BST = UTC+1 -> 00:30 on July 11 UK time)
+    cat = _get_or_create_category(db, "Appointments")
+    acu = models.Activity(name="Acupuncture Session", category_id=cat.id)
+    db.add(acu)
+    db.flush()
+    m = models.Mood(timestamp=dt.datetime(2026, 7, 10, 23, 30, tzinfo=dt.timezone.utc))
+    m.activities.append(acu)
+    db.add(m)
+    db.commit()
+
+    assert get_acupuncture_session_dates(db) == [dt.date(2026, 7, 11)]
+
