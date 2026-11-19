@@ -22,6 +22,10 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ password })
       });
+      if (response.status === 429) {
+        status = 'Too many login attempts. Please wait a minute and try again.';
+        return;
+      }
       if (!response.ok) {
         status = 'Incorrect password.';
         return;

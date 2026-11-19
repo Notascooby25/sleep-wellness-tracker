@@ -18,6 +18,20 @@ const config = {
     csrf: {
       trustedOrigins,
     },
+    csp: {
+      mode: 'auto',
+      directives: {
+        'default-src': ['self'],
+        'script-src': ['self'],
+        'style-src': ['self', 'unsafe-inline'],
+        'img-src': ['self', 'data:', 'blob:'],
+        'font-src': ['self'],
+        'connect-src': ['self'],
+        'frame-ancestors': ['none'],
+        'base-uri': ['self'],
+        'form-action': ['self'],
+      },
+    },
     // Check for a newly deployed build every 5 minutes; the UpdateBanner shows when one is found.
     version: {
       pollInterval: 300000
