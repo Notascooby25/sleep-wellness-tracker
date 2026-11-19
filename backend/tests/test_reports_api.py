@@ -102,3 +102,23 @@ def test_acupuncture_sessions_endpoint_uses_uk_timezone(clean_db, signed_in, db)
     assert res.status_code == 200
     assert res.json() == {"sessions": ["2026-07-11"]}
 
+
+def test_report_endpoints_reject_absurdly_long_or_out_of_range_dates(clean_db, signed_in):
+    # A huge range used to build a timeline entry per day (tens of thousands of rows),
+    # and a date at the very end of the calendar crashed with a server error.
+    for path in (
+        "/reports/headache-appointment-summary",
+        "/reports/headache-summary",
+        "/reports/headache-triggers?window=period",
+    ):
+        joiner = "&" if "?" in path else "?"
+        too_long = signed_in.get(f"{path}{joiner}start_date=1900-01-01&end_date=2026-10-10")
+        assert too_long.status_code == 400, path
+        at_calendar_end = signed_in.get(f"{path}{joiner}start_date=2026-01-01&end_date=9999-12-31")
+        assert at_calendar_end.status_code == 400, path
+
+    # A normal one-year range is still fine.
+    ok = signed_in.get("/reports/headache-appointment-summary?start_date=2025-10-11&end_date=2026-10-10")
+    assert ok.status_code == 200
+    assert ok.json()["total_days"] == 365
+

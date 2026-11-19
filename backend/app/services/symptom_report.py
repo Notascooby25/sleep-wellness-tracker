@@ -23,6 +23,19 @@ MIN_BINARY_EFFECT_PCT = 5
 WORKOUT_LABEL = "Workout (day before)"
 LATE_WORKOUT_LABEL = "Late workout (after 6pm, day before)"
 LONG_WORKOUT_LABEL = "Long workout (> 45m, day before)"
+MAX_REPORT_RANGE_DAYS = 731
+EARLIEST_REPORT_DATE = dt.date(2000, 1, 1)
+LATEST_REPORT_DATE = dt.date(2100, 12, 31)
+
+
+def _check_report_range(start_date: dt.date, end_date: dt.date) -> None:
+    """Reject ranges the report can't sensibly show (also stops a huge day-by-day timeline)."""
+    if start_date > end_date:
+        raise ValueError("start_date must be on or before end_date")
+    if start_date < EARLIEST_REPORT_DATE or end_date > LATEST_REPORT_DATE:
+        raise ValueError("dates must be between 2000-01-01 and 2100-12-31")
+    if (end_date - start_date).days + 1 > MAX_REPORT_RANGE_DAYS:
+        raise ValueError(f"date range must be {MAX_REPORT_RANGE_DAYS} days or fewer")
 
 
 def _number(value) -> float | None:
@@ -168,8 +181,7 @@ def compute_appointment_summary(
     today = dt.datetime.now(UK_TZ).date()
     end_date = end_date or today
     start_date = start_date or (end_date - dt.timedelta(days=29))
-    if start_date > end_date:
-        raise ValueError("start_date must be on or before end_date")
+    _check_report_range(start_date, end_date)
 
     total_days = (end_date - start_date).days + 1
     session_dates = get_acupuncture_session_dates(db)
@@ -296,8 +308,7 @@ def _resolve_trigger_window(
     if window == "period":
         resolved_end = end_date or today
         resolved_start = start_date or (resolved_end - dt.timedelta(days=29))
-        if resolved_start > resolved_end:
-            raise ValueError("start_date must be on or before end_date")
+        _check_report_range(resolved_start, resolved_end)
         return resolved_start, resolved_end
     if window == "90d":
         return today - dt.timedelta(days=89), today
