@@ -45,42 +45,39 @@ def test_day_before_and_same_day_separation(clean_db, db):
 
     headache = models.Activity(name="Headache", category_id=cat_symp.id, report_role="symptom")
     alcohol = models.Activity(name="Red Wine", category_id=cat_gen.id, report_role="possible_cause")
+    skipped_lunch = models.Activity(name="Skipped Lunch", category_id=cat_gen.id, report_role="possible_cause")
     painkiller = models.Activity(name="Ibuprofen", category_id=cat_gen.id, report_role="reaction")
-    db.add_all([headache, alcohol, painkiller])
+    db.add_all([headache, alcohol, skipped_lunch, painkiller])
     db.flush()
 
-    # Over 10 days:
-    # Days 1..5: Wine on day D-1, headache on day D, Ibuprofen on day D
-    for d in range(1, 6):
-        date_prev = dt.date(2026, 10, d)
-        date_curr = dt.date(2026, 10, d + 1)
-        # Prev day alcohol
+    # Over 12 days (Oct 2..13):
+    # Days Oct 2..7 (6 days): Red Wine on D-1, headache + skipped_lunch + ibuprofen on D
+    for d in range(1, 7):
         m_prev = models.Mood(timestamp=dt.datetime(2026, 10, d, 20, 0, tzinfo=dt.timezone.utc))
         m_prev.activities.append(alcohol)
         db.add(m_prev)
-        # Curr day headache & ibuprofen
         m_curr = models.Mood(timestamp=dt.datetime(2026, 10, d + 1, 14, 0, tzinfo=dt.timezone.utc))
-        m_curr.activities.extend([headache, painkiller])
+        m_curr.activities.extend([headache, skipped_lunch, painkiller])
         db.add(m_curr)
 
-    # Days 6..10: clean days without wine
-    for d in range(6, 12):
+    # Days Oct 8..13 (6 clean days): logged moods without alcohol/skipped_lunch/headache
+    for d in range(7, 14):
         m_clean = models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc))
         db.add(m_clean)
 
     db.commit()
 
-    res = compute_headache_summary(db, start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 11))
+    res = compute_headache_summary(db, start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 13))
 
-    # Alcohol should be in day_before triggers, NOT same_day
     day_before_names = [item["activity"] for item in res["triggers_day_before"]]
     same_day_names = [item["activity"] for item in res["triggers_same_day"]]
+    left_out = {item["activity"]: item["reason"] for item in res["left_out"]}
 
     assert "Red Wine" in day_before_names
-    assert "Red Wine" not in same_day_names
-    # Ibuprofen should be in same_day, NOT day_before
-    assert "Ibuprofen" in same_day_names
+    assert "Skipped Lunch" in same_day_names
     assert "Ibuprofen" not in day_before_names
+    assert "Ibuprofen" not in same_day_names
+    assert left_out.get("Ibuprofen") == "reaction"
 
 
 def test_hydration_missing_or_zero_means_unknown(clean_db, db):
@@ -387,4 +384,238 @@ def test_acupuncture_sessions_uk_bst_and_empty_db_summary(clean_db, db):
     db.commit()
 
     assert get_acupuncture_session_dates(db) == [dt.date(2026, 7, 11)]
+
+
+def test_triggers_exclude_unlogged_days_from_baseline(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    cat_gen = _get_or_create_category(db, "Daily Activities")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    wine = models.Activity(name="Red Wine", category_id=cat_gen.id)
+    db.add_all([headache, wine])
+    db.flush()
+
+    # Window Oct 2..Oct 31 (30 calendar days), but user only logs on 12 days:
+    # Oct 1..6: wine logged; Oct 2..7: headache logged (6 days with wine day-before)
+    # Oct 7..12: logged without wine; Oct 8..13: clean logged days (6 days without wine day-before)
+    # Oct 14..31: completely blank (18 unlogged days)
+    for d in range(1, 7):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, d, 20, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(wine)
+        db.add(m)
+    for d in range(2, 8):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(headache)
+        db.add(m)
+    for d in range(7, 14):
+        db.add(models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc), mood_score=8))
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 31)
+    )
+    assert res["logged_days"] == 12
+    assert res["symptom_days"] == 6
+    assert res["clean_days"] == 6
+    wine_item = next(item for item in res["triggers_day_before"] if item["activity"] == "Red Wine")
+    assert wine_item["with_nights"] == 6
+    assert wine_item["without_nights"] == 6
+
+
+def test_before_sleep_never_appears_in_same_day_even_after_midnight(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    cat_sleep = _get_or_create_category(db, "Before Sleep")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    magnesium = models.Activity(name="Magnesium", category_id=cat_sleep.id)
+    db.add_all([headache, magnesium])
+    db.flush()
+
+    # 12 days (Oct 2..13):
+    # Days 2..7: Before Sleep Magnesium logged at 00:30 UTC (after midnight) + headache at 14:00 same morning
+    for d in range(2, 8):
+        m_bs = models.Mood(timestamp=dt.datetime(2026, 10, d, 0, 30, tzinfo=dt.timezone.utc))
+        m_bs.activities.append(magnesium)
+        db.add(m_bs)
+        m_h = models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc))
+        m_h.activities.append(headache)
+        db.add(m_h)
+    # Days 1 and 7..13: logged clean entries so day-before exposure baseline exists
+    db.add(models.Mood(timestamp=dt.datetime(2026, 10, 1, 14, 0, tzinfo=dt.timezone.utc)))
+    for d in range(8, 14):
+        db.add(models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc)))
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 13)
+    )
+    assert any(i["activity"] == "Magnesium" for i in res["triggers_day_before"])
+    assert all(i["activity"] != "Magnesium" for i in res["triggers_same_day"])
+    assert all(i.get("activity") != "Magnesium" for i in res["no_clear_link"])
+
+
+def test_weak_and_zero_effects_go_to_no_clear_link_and_verdict_looks_random(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    cat_gen = _get_or_create_category(db, "Daily Activities")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    coffee = models.Activity(name="Coffee", category_id=cat_gen.id)
+    db.add_all([headache, coffee])
+    db.flush()
+
+    # 20 days (Oct 2..21): 10 symptom days, 10 clean days.
+    # Coffee logged equally before/on half the symptom days and half the clean days -> 0% effect.
+    db.add(models.Mood(timestamp=dt.datetime(2026, 10, 1, 12, 0, tzinfo=dt.timezone.utc)))
+    for idx in range(20):
+        day = dt.date(2026, 10, 2) + dt.timedelta(days=idx)
+        m = models.Mood(timestamp=dt.datetime.combine(day, dt.time(12, 0), tzinfo=dt.timezone.utc))
+        if idx % 2 == 0:
+            m.activities.append(headache)
+        if idx % 4 in (0, 1):
+            m.activities.append(coffee)
+        db.add(m)
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 21)
+    )
+    assert res["triggers_day_before"] == []
+    assert res["triggers_same_day"] == []
+    assert res["clue_count"] == 0
+    assert res["tested_count"] >= 1
+    assert res["verdict_kind"] == "looks_random"
+    coffee_entries = [item for item in res["no_clear_link"] if item.get("activity") == "Coffee"]
+    assert len(coffee_entries) == 1  # deduplicated across day_before & same_day
+
+
+def test_clue_suppressed_from_no_clear_link_and_too_early_deduplicated(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    cat_gen = _get_or_create_category(db, "Daily Activities")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    wine = models.Activity(name="Red Wine", category_id=cat_gen.id)
+    rare = models.Activity(name="Sauna", category_id=cat_gen.id)
+    db.add_all([headache, wine, rare])
+    db.flush()
+
+    # Oct 1..6: Wine; Oct 2..7: Headache (strong day-before clue; weak/different same-day)
+    # Oct 7..13: clean days; Sauna logged only 3 times
+    for d in range(1, 7):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, d, 20, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(wine)
+        db.add(m)
+    for d in range(2, 8):
+        m = models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc))
+        m.activities.append(headache)
+        if d <= 4:
+            m.activities.append(rare)
+        db.add(m)
+    for d in range(8, 14):
+        db.add(models.Mood(timestamp=dt.datetime(2026, 10, d, 14, 0, tzinfo=dt.timezone.utc)))
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 2), end_date=dt.date(2026, 10, 13)
+    )
+    assert any(i["activity"] == "Red Wine" for i in res["triggers_day_before"])
+    assert all(i.get("activity") != "Red Wine" for i in res["no_clear_link"])
+    assert all(i.get("activity") != "Red Wine" for i in res["too_early"])
+    sauna_early = [i for i in res["too_early"] if i["activity"] == "Sauna"]
+    assert len(sauna_early) == 1
+
+
+def test_biometrics_hrv_paths_stress_fallback_and_negligible_filter(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    db.add(headache)
+    db.flush()
+
+    # 12 days (Oct 1..12): 6 symptom, 6 clean
+    for d in range(1, 13):
+        curr = dt.date(2026, 10, d)
+        prev = curr - dt.timedelta(days=1)
+        m = models.Mood(timestamp=dt.datetime.combine(curr, dt.time(12, 0), tzinfo=dt.timezone.utc))
+        if d <= 6:
+            m.activities.append(headache)
+            hrv_val = 30
+            stress_prev = 65
+        else:
+            hrv_val = 65
+            stress_prev = 25
+        db.add(m)
+        # HRV using "lastNight" path (not in old 4-path list)
+        db.add(models.GarminHRVDaily(hrv_date=curr, payload={"hrvSummary": {"lastNight": hrv_val}}))
+        # Stress daily on day before (no avgSleepStress in GarminSleepDaily)
+        db.add(models.GarminStressDaily(stress_date=prev, overall_stress_level=stress_prev))
+        # Sleep score identical on all days (0 diff -> should go to no_clear_link, not biometrics clues)
+        db.add(models.GarminSleepDaily(sleep_date=curr, sleep_score=75, payload={}))
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 1), end_date=dt.date(2026, 10, 12)
+    )
+    clue_metrics = {b["metric"]: b for b in res["biometrics"]}
+    assert "Overnight HRV (night before)" in clue_metrics
+    assert "Daytime Stress (day before)" in clue_metrics
+    assert "Overnight Stress (night before)" not in clue_metrics
+    assert "Sleep Score (night before)" not in clue_metrics
+    assert any(
+        item.get("kind") == "biometric" and item.get("metric") == "Sleep Score (night before)"
+        for item in res["no_clear_link"]
+    )
+
+
+def test_garmin_midnight_workout_uses_night_for_workout(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    cat_symp = _get_or_create_category(db, "Headache Issues")
+    headache = models.Activity(name="Headache", category_id=cat_symp.id)
+    db.add(headache)
+    db.flush()
+
+    # 12 days (Oct 1..12):
+    # Days 1..6: workout at 00:30 UTC on day D (which night_for_workout maps to day D, NOT D+1) + headache on day D
+    # Days 7..12: clean days without workouts
+    for d in range(1, 13):
+        curr = dt.date(2026, 10, d)
+        m = models.Mood(timestamp=dt.datetime.combine(curr, dt.time(12, 0), tzinfo=dt.timezone.utc))
+        if d <= 6:
+            m.activities.append(headache)
+            db.add(
+                models.GarminActivity(
+                    garmin_activity_id=f"mid-{d}",
+                    activity_date=curr,
+                    start_time=dt.datetime.combine(curr, dt.time(0, 30), tzinfo=dt.timezone.utc),
+                    duration_seconds=1800,
+                )
+            )
+        db.add(m)
+    db.commit()
+
+    res = compute_headache_triggers(
+        db, window="period", start_date=dt.date(2026, 10, 1), end_date=dt.date(2026, 10, 12)
+    )
+    workout = next((i for i in res["triggers_day_before"] if i["activity"] == "Workout (day before)"), None)
+    assert workout is not None
+    assert workout["effect"] == 100  # all 6 midnight workouts aligned with days 1..6 (not shifted to 2..7)
+
+
+def test_triggers_windows_and_empty_db(clean_db, db):
+    from app.services.symptom_report import compute_headache_triggers
+
+    empty_all = compute_headache_triggers(db, window="all")
+    assert empty_all["verdict_kind"] == "insufficient_data"
+    assert empty_all["logged_days"] == 0
+    assert empty_all["triggers_day_before"] == []
+
+    empty_90 = compute_headache_triggers(db, window="90d")
+    assert empty_90["window"] == "90d"
+    assert empty_90["verdict_kind"] == "insufficient_data"
+
 
