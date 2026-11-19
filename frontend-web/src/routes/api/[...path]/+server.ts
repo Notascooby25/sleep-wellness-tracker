@@ -50,7 +50,7 @@ const fetchWithRetry = async (
   throw lastError ?? new Error(`Unable to reach backend at ${targetUrl}`);
 };
 
-const proxy: RequestHandler = async ({ request, url, fetch }) => {
+const proxy: RequestHandler = async ({ request, url, fetch, getClientAddress }) => {
   // Strip any trailing slash from the path before checking SLASH_BASE_PATHS,
   // so requests like /api/categories/ are normalised to 'categories' for the set lookup.
   let targetPath = url.pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
@@ -69,6 +69,11 @@ const proxy: RequestHandler = async ({ request, url, fetch }) => {
     const incomingCookie = request.headers.get('cookie');
     if (incomingCookie) {
       outgoingHeaders['cookie'] = incomingCookie;
+    }
+    try {
+      outgoingHeaders['x-real-ip'] = getClientAddress();
+    } catch {
+      // getClientAddress may throw in non-socket test contexts
     }
 
     const uploadFilename = normalizeUploadFilename(request.headers.get('x-upload-filename'));

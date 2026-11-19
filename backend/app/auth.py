@@ -1,23 +1,35 @@
 """Single-shared-password session auth, gated by APP_PASSWORD.
 
-If APP_PASSWORD is unset, auth is disabled (local/dev convenience) — the
-Fastapi middleware in main.py skips enforcement entirely in that case.
+Requires APP_PASSWORD to be set unless AUTH_DISABLED=true is explicitly passed
+for local development, preventing accidental fail-open deployments.
 """
 import base64
 import hashlib
 import hmac
+import logging
 import os
 import time
+
+logger = logging.getLogger("app.auth")
 
 SESSION_COOKIE_NAME = "session"
 SESSION_MAX_AGE_SECONDS = 90 * 24 * 60 * 60  # 90 days
 
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "").strip()
+AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+if not APP_PASSWORD and not AUTH_DISABLED:
+    raise RuntimeError(
+        "APP_PASSWORD is not set. Set APP_PASSWORD in .env, or set AUTH_DISABLED=true for local development."
+    )
 AUTH_ENABLED = bool(APP_PASSWORD)
+
+_EXPLICIT_SESSION_SECRET = os.environ.get("APP_SESSION_SECRET", "").strip()
+if AUTH_ENABLED and not _EXPLICIT_SESSION_SECRET:
+    logger.warning("APP_SESSION_SECRET is not set; deriving session signing key from APP_PASSWORD")
 
 # Falls back to a fixed derivation from APP_PASSWORD so a token stays valid across
 # restarts even if APP_SESSION_SECRET isn't set — but setting it explicitly is preferred.
-_SESSION_SECRET = os.environ.get("APP_SESSION_SECRET", "").strip() or hashlib.sha256(
+_SESSION_SECRET = _EXPLICIT_SESSION_SECRET or hashlib.sha256(
     f"sleep-wellness-tracker::{APP_PASSWORD}".encode()
 ).hexdigest()
 

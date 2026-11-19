@@ -16,6 +16,16 @@ def test_wrong_password_is_refused(client):
     assert client.get("/mood").status_code == 401
 
 
+def test_login_rate_limits_repeated_failures(client):
+    headers = {"x-real-ip": "198.51.100.42"}
+    for _ in range(5):
+        resp = client.post("/auth/login", json={"password": "wrong"}, headers=headers)
+        assert resp.status_code == 401
+    blocked = client.post("/auth/login", json={"password": "wrong"}, headers=headers)
+    assert blocked.status_code == 429
+    assert "retry-after" in {k.lower() for k in blocked.headers.keys()}
+
+
 def test_correct_password_opens_the_app(signed_in):
     assert signed_in.get("/mood").status_code == 200
 

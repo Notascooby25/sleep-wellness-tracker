@@ -44,6 +44,12 @@ services:
       2>&1 | tee -a /var/log/app/backend/backend.log"
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     volumes:
       - /srv/shared/garmin-tokens:/app/garmin_tokens:Z
       - ${MOOD_IMAGE_STORAGE_PATH:-/srv/shared/mood-images/mood_images}:/app/uploads/mood_images:Z
@@ -71,6 +77,12 @@ services:
       - backend
     ports:
       - "127.0.0.1:8510:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging:
       driver: json-file
       options:
