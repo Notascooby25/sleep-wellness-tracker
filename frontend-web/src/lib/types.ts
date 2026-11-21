@@ -64,6 +64,7 @@ export type WeatherStatus = {
   home_location_set: boolean;
   home_location: { latitude: number; longitude: number } | null;
   days_stored: number;
+  away_days?: number;
   first_date: string | null;
   last_date: string | null;
 };

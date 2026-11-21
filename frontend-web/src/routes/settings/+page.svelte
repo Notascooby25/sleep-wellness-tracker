@@ -51,6 +51,14 @@
   const useCurrentLocation = () => {
     weatherError = '';
     weatherMessage = '';
+    if (
+      weather?.home_location_set &&
+      !confirm(
+        'Only do this if you have moved house. When you are just away, the app picks up local weather by itself. Change your home area to where you are now?'
+      )
+    ) {
+      return;
+    }
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       weatherError = 'This browser cannot share your location.';
       return;
@@ -63,7 +71,7 @@
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude
           });
-          weatherMessage = 'Home area saved. Weather history is being fetched in the background. Tap "Check progress" in a minute.';
+          weatherMessage = 'Home area saved. Weather is being fetched in the background. Tap "Check progress" in a minute. Weather already stored is kept.';
         } catch (error) {
           weatherError = `Could not save your home area: ${describeError(error)}`;
         } finally {
@@ -277,12 +285,15 @@
     The headache report can check whether changes in air pressure or temperature line up with your headaches.
     It needs your home area once. Only a rough position (to about 1 km) is stored and sent to the free Open-Meteo weather service.
   </p>
+  <p class="weather-hint">
+    When you're away from home, nothing to do: if your phone shares its location while you log, the app uses the local weather for those days instead.
+  </p>
   {#if weather}
     {#if weather.home_location_set}
       <p class="weather-state">
         Home area is set.
         {#if weather.days_stored > 0}
-          Weather stored for {weather.days_stored} days ({fmtDay(weather.first_date)} to {fmtDay(weather.last_date)}).
+          Weather stored for {weather.days_stored} days ({fmtDay(weather.first_date)} to {fmtDay(weather.last_date)}){#if weather.away_days}, including {weather.away_days} {weather.away_days === 1 ? 'day' : 'days'} away from home{/if}.
         {:else}
           No weather fetched yet.
         {/if}
@@ -293,7 +304,7 @@
   {/if}
   <div class="reminder-row">
     <button type="button" on:click={useCurrentLocation} disabled={weatherBusy}>
-      {weatherBusy ? 'Finding you…' : weather?.home_location_set ? 'Update to my current location' : 'Use my current location as home'}
+      {weatherBusy ? 'Finding you…' : weather?.home_location_set ? 'I\'ve moved house: use my current location' : 'Use my current location as home'}
     </button>
     {#if weather?.home_location_set}
       <button type="button" class="btn-clear" on:click={loadWeather}>Check progress</button>

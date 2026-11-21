@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from .. import models
 from .comparison import CONFIDENCE_ORDER, MIN_NIGHTS, bh_adjust, compare, is_negligible, level_for
 from .insight_dates import UK_TZ, is_late_workout, night_for_entry, night_for_workout
+from .weather_daily import AWAY_DISTANCE_KM, distance_km
 from .item_roles import (
     ACUPUNCTURE_PAGE,
     effective_role,
@@ -271,6 +272,14 @@ def compute_appointment_summary(
 
     checks = _load_headache_checks(db, start_date, end_date)
     symptom_days = _apply_checks(symptom_days, checks)
+    away_days = {
+        d
+        for (d,) in db.query(models.WeatherDaily.weather_date).filter(
+            models.WeatherDaily.weather_date >= start_date,
+            models.WeatherDaily.weather_date <= end_date,
+            models.WeatherDaily.is_away.is_(True),
+        )
+    }
 
     grouped_symptoms = _group_old_and_current_copies(db, symptom_activities_by_id)
     primary_name_by_id: dict[int, str] = {}
@@ -317,6 +326,7 @@ def compute_appointment_summary(
                 "has_acupuncture": day in session_set,
                 "confirmed": day in checks,
                 "onset": checks[day].onset if day in checks else None,
+                "away": day in away_days,
             }
         )
 
@@ -469,23 +479,44 @@ def _body_battery_input(db: Session, start: dt.date, end: dt.date) -> tuple[dict
     return (values, "Body Battery on waking", True, "")
 
 
+def _weather_place(is_away, latitude, longitude) -> tuple[float, float] | None:
+    """None means the home area; otherwise the rounded place the weather is for."""
+    if not is_away or latitude is None or longitude is None:
+        return None
+    return (float(latitude), float(longitude))
+
+
+def _same_place(a: tuple[float, float] | None, b: tuple[float, float] | None) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    return distance_km(a[0], a[1], b[0], b[1]) <= AWAY_DISTANCE_KM
+
+
 def _weather_inputs(db: Session, start: dt.date, end: dt.date) -> list[tuple[dict, str, bool | None, str]]:
     rows = (
         db.query(
             models.WeatherDaily.weather_date,
             models.WeatherDaily.pressure_msl_mean,
             models.WeatherDaily.temperature_max_c,
+            models.WeatherDaily.is_away,
+            models.WeatherDaily.latitude,
+            models.WeatherDaily.longitude,
         )
         .filter(models.WeatherDaily.weather_date >= start - dt.timedelta(days=1), models.WeatherDaily.weather_date <= end)
         .all()
     )
-    pressure = {d: float(p) for d, p, _ in rows if p is not None}
+    pressure = {d: float(p) for d, p, *_ in rows if p is not None}
+    place = {d: _weather_place(away, lat, lon) for d, _, _, away, lat, lon in rows}
+    # Only compare with yesterday when both days' weather is for the same place, so the
+    # day you travel (or come home) doesn't look like a sudden pressure change.
     pressure_change = {
         d: round(p - pressure[d - dt.timedelta(days=1)], 1)
         for d, p in pressure.items()
-        if start <= d <= end and (d - dt.timedelta(days=1)) in pressure
+        if start <= d <= end
+        and (d - dt.timedelta(days=1)) in pressure
+        and _same_place(place[d], place[d - dt.timedelta(days=1)])
     }
-    temp_max = {d: float(t) for d, _, t in rows if t is not None and start <= d <= end}
+    temp_max = {d: float(t) for d, _, t, *_ in rows if t is not None and start <= d <= end}
     return [
         # A falling pressure shows as a negative change, so "higher is better" here.
         (pressure_change, "Air pressure change since yesterday", True, "hPa"),

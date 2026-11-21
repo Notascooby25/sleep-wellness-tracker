@@ -468,7 +468,7 @@
 </section>
 {/if}
 
-<HeadacheCheck {date} refreshKey={headacheCheckRefresh} />
+<HeadacheCheck {date} refreshKey={headacheCheckRefresh} {latitude} {longitude} />
 
 <section class="card">
   <div class="grid two">

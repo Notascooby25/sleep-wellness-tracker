@@ -47,6 +47,7 @@ _CLEANED_TABLES = (
     "headache_checks",
     "weather_daily",
     "app_settings",
+    "day_locations",
 )
 
 

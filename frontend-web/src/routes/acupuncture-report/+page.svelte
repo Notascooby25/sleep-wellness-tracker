@@ -34,6 +34,7 @@
     has_acupuncture: boolean;
     confirmed?: boolean;
     onset?: 'woke' | 'morning' | 'afternoon' | 'evening' | null;
+    away?: boolean;
   };
 
   type PriorPeriod = {
@@ -192,6 +193,7 @@
     ? Math.max(...summary.position_breakdown.map((i) => i.days))
     : 0;
   $: hasAcupunctureInRange = Boolean(summary?.daily_timeline.some((d) => d.has_acupuncture));
+  $: hasAwayInRange = Boolean(summary?.daily_timeline.some((d) => d.away));
   $: isCompactTimeline = Boolean(summary && summary.daily_timeline.length > 60);
   $: verdict = triggers ? describeVerdict(triggers) : null;
   $: hasClues = Boolean(
@@ -260,6 +262,9 @@
     }
     if (day.has_acupuncture) {
       parts.push('Acupuncture session');
+    }
+    if (day.away) {
+      parts.push('Away from home (local weather used)');
     }
     return parts.join(' · ');
   };
@@ -562,6 +567,9 @@
             {#if day.has_acupuncture}
               <i class="acu-dot" aria-hidden="true"></i>
             {/if}
+            {#if day.away}
+              <i class="away-bar" aria-hidden="true"></i>
+            {/if}
           </button>
         {/each}
       </div>
@@ -572,6 +580,9 @@
         <span><i class="legend-swatch migraine"></i> Migraine</span>
         {#if hasAcupunctureInRange}
           <span><i class="legend-swatch acu"></i> Acupuncture</span>
+        {/if}
+        {#if hasAwayInRange}
+          <span><i class="legend-swatch away"></i> Away from home</span>
         {/if}
       </div>
 
@@ -585,6 +596,9 @@
             {/if}
             {#if inspectedDay.has_acupuncture}
               <span class="acu-tag">Acupuncture</span>
+            {/if}
+            {#if inspectedDay.away}
+              <span class="acu-tag away-tag">Away · local weather</span>
             {/if}
           </div>
           <button
@@ -1249,6 +1263,20 @@
     border-radius: 999px;
     background: var(--color-accent);
   }
+  /* Days away from home: a short bar along the bottom of the day. */
+  .away-bar {
+    position: absolute;
+    left: 25%;
+    right: 25%;
+    bottom: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--color-slate-text);
+  }
+  .timeline-grid.compact .away-bar {
+    bottom: 2px;
+    height: 2px;
+  }
   .timeline-grid.compact .acu-dot {
     top: 2px;
     right: 2px;
@@ -1286,6 +1314,12 @@
   .legend-swatch.migraine {
     background: #f9d6d5;
     border: 1px solid #d98a88;
+  }
+  .legend-swatch.away {
+    width: 12px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--color-slate-text);
   }
   .legend-swatch.acu {
     width: 8px;
