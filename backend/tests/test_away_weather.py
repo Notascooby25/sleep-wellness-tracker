@@ -87,6 +87,33 @@ def test_saving_an_entry_or_check_records_todays_location(clean_db, signed_in, d
     assert bad.status_code == 422
 
 
+def test_simultaneous_saves_for_the_same_day_do_not_fail(clean_db, db, monkeypatch):
+    """Another request created the day's row between our lookup and our insert."""
+    from app.database import SessionLocal
+
+    other = SessionLocal()
+    other.add(models.DayLocation(location_date=TODAY, latitude=MADRID[0], longitude=MADRID[1]))
+    other.commit()
+    other.close()
+
+    real_find = weather_daily._find_day_location
+    calls = {"n": 0}
+
+    def stale_find(session, day):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real_find(session, day)
+
+    monkeypatch.setattr(weather_daily, "_find_day_location", stale_find)
+    mood = models.Mood(timestamp=dt.datetime(2026, 10, 20, 12, tzinfo=dt.timezone.utc))
+    db.add(mood)
+    row = weather_daily.record_day_location(db, TODAY, 41.39, 2.17, today=TODAY)
+    db.commit()  # the surrounding save (e.g. the mood entry) still succeeds
+
+    assert db.query(models.Mood).count() == 1
+    assert db.query(models.DayLocation).count() == 1
+    assert (float(row.latitude), float(row.longitude)) == (41.39, 2.17)
+
+
 # --- Fetching weather for days away ---------------------------------------------
 
 

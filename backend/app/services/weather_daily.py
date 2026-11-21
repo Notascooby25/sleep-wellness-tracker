@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -207,6 +208,10 @@ def _valid_position(latitude, longitude) -> bool:
     return math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180
 
 
+def _find_day_location(db: Session, day: dt.date) -> models.DayLocation | None:
+    return db.query(models.DayLocation).filter(models.DayLocation.location_date == day).first()
+
+
 def record_day_location(
     db: Session, day: dt.date, latitude, longitude, today: dt.date | None = None
 ) -> models.DayLocation | None:
@@ -221,11 +226,19 @@ def record_day_location(
     if day not in (today, today - dt.timedelta(days=1)):
         return None
     lat, lon = round_location(float(latitude), float(longitude))
-    row = db.query(models.DayLocation).filter(models.DayLocation.location_date == day).first()
+    row = _find_day_location(db, day)
     if row is None:
-        row = models.DayLocation(location_date=day, latitude=lat, longitude=lon)
-        db.add(row)
-        return row
+        try:
+            # A savepoint, so if another request created the day's row a moment ago, only
+            # this insert is undone and the caller's own save (e.g. a mood entry) still goes through.
+            with db.begin_nested():
+                row = models.DayLocation(location_date=day, latitude=lat, longitude=lon)
+                db.add(row)
+            return row
+        except IntegrityError:
+            row = _find_day_location(db, day)
+            if row is None:
+                return None
     if float(row.latitude) != lat or float(row.longitude) != lon:
         # The latest position for the day wins; fetch that place's weather again.
         row.latitude = lat
