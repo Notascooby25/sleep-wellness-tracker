@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from .. import models
 from .comparison import CONFIDENCE_ORDER, MIN_NIGHTS, bh_adjust, compare, is_negligible, level_for
 from .insight_dates import UK_TZ, is_late_workout, night_for_entry, night_for_workout
+from .weather_daily import away_days, weather_for_report
 from .item_roles import (
     ACUPUNCTURE_PAGE,
     effective_role,
@@ -270,6 +271,7 @@ def compute_appointment_summary(
                     day_positions[mood_date].add(pos)
 
     checks = _load_headache_checks(db, start_date, end_date)
+    away = away_days(db, start_date, end_date)
     symptom_days = _apply_checks(symptom_days, checks)
 
     grouped_symptoms = _group_old_and_current_copies(db, symptom_activities_by_id)
@@ -315,6 +317,7 @@ def compute_appointment_summary(
                 "symptoms": names,
                 "positions": sorted(day_positions.get(day, ())),
                 "has_acupuncture": day in session_set,
+                "away": day in away,
                 "confirmed": day in checks,
                 "onset": checks[day].onset if day in checks else None,
             }
@@ -470,22 +473,16 @@ def _body_battery_input(db: Session, start: dt.date, end: dt.date) -> tuple[dict
 
 
 def _weather_inputs(db: Session, start: dt.date, end: dt.date) -> list[tuple[dict, str, bool | None, str]]:
-    rows = (
-        db.query(
-            models.WeatherDaily.weather_date,
-            models.WeatherDaily.pressure_msl_mean,
-            models.WeatherDaily.temperature_max_c,
-        )
-        .filter(models.WeatherDaily.weather_date >= start - dt.timedelta(days=1), models.WeatherDaily.weather_date <= end)
-        .all()
-    )
-    pressure = {d: float(p) for d, p, _ in rows if p is not None}
+    # Uses where you actually were on days away. Pressures are adjusted to sea level, so
+    # comparing two places on consecutive days (e.g. a travel day) still makes sense.
+    weather, _ = weather_for_report(db, start - dt.timedelta(days=1), end)
+    pressure = {d: w["pressure"] for d, w in weather.items() if w["pressure"] is not None}
     pressure_change = {
         d: round(p - pressure[d - dt.timedelta(days=1)], 1)
         for d, p in pressure.items()
         if start <= d <= end and (d - dt.timedelta(days=1)) in pressure
     }
-    temp_max = {d: float(t) for d, _, t in rows if t is not None and start <= d <= end}
+    temp_max = {d: w["temp_max"] for d, w in weather.items() if w["temp_max"] is not None and start <= d <= end}
     return [
         # A falling pressure shows as a negative change, so "higher is better" here.
         (pressure_change, "Air pressure change since yesterday", True, "hPa"),

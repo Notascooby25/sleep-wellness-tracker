@@ -272,7 +272,7 @@ def test_sync_weather_fills_history_and_recent_days(clean_db, db, monkeypatch):
     assert [url for url, _ in calls] == [weather_daily.FORECAST_URL]
 
 
-def test_home_location_route_rounds_and_resets_on_move(clean_db, signed_in, db, monkeypatch):
+def test_home_location_route_rounds_and_keeps_history_on_move(clean_db, signed_in, db, monkeypatch):
     monkeypatch.setattr(weather_daily, "_http_get_json", lambda url, params: {"hourly": {}})
 
     assert signed_in.post("/weather/sync").status_code == 400
@@ -286,10 +286,11 @@ def test_home_location_route_rounds_and_resets_on_move(clean_db, signed_in, db, 
     # Same area again keeps stored weather.
     signed_in.put("/weather/home-location", json={"latitude": 51.509, "longitude": -0.131})
     assert db.query(models.WeatherDaily).count() == 1
-    # A different area starts again.
-    signed_in.put("/weather/home-location", json={"latitude": 53.48, "longitude": -2.24})
+    # Moving home keeps the weather already stored for past days.
+    moved = signed_in.put("/weather/home-location", json={"latitude": 53.48, "longitude": -2.24})
+    assert moved.json()["home_location"] == {"latitude": 53.48, "longitude": -2.24}
     db.expire_all()
-    assert db.query(models.WeatherDaily).count() == 0
+    assert db.query(models.WeatherDaily).count() == 1
 
     status = signed_in.get("/weather/status")
     assert status.status_code == 200

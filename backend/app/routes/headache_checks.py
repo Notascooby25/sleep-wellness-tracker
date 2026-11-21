@@ -3,13 +3,14 @@
 import datetime as dt
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
 from ..database import get_db
 from ..services.insight_dates import UK_TZ
 from ..services.item_roles import is_symptom
+from ..services.weather_daily import record_day_location
 
 router = APIRouter(prefix="/headache-checks", tags=["headache-checks"])
 
@@ -20,6 +21,9 @@ MAX_LIST_DAYS = 731
 class HeadacheCheckIn(BaseModel):
     had_headache: bool
     onset: str | None = None
+    # Where the phone is now, if shared; used for the weather on days away from home.
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 def _serialize(check_date: dt.date, check: models.HeadacheCheck | None, logged: list[str]) -> dict:
@@ -80,6 +84,7 @@ def save_headache_check(check_date: dt.date, payload: HeadacheCheckIn, db: Sessi
     else:
         check.had_headache = payload.had_headache
         check.onset = onset
+    record_day_location(db, check_date, payload.latitude, payload.longitude)
     db.commit()
     db.refresh(check)
     return _serialize(check_date, check, _logged_symptoms(db, check_date))

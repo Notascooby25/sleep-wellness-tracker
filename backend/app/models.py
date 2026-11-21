@@ -312,6 +312,27 @@ class WeatherDaily(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class DayLocation(Base):
+    """Roughly where the owner was on a day, and the weather there when it was away from home.
+
+    Positions are rounded to about 1 km. Whether a day counts as "away" is decided when the
+    report runs, by distance from the current home area, so moving home never rewrites history.
+    """
+
+    __tablename__ = "day_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location_date = Column(Date, unique=True, nullable=False, index=True)
+    latitude = Column(Numeric(6, 2), nullable=False)
+    longitude = Column(Numeric(6, 2), nullable=False)
+    pressure_msl_mean = Column(Numeric(6, 1), nullable=True)  # weather here, filled in only for away days
+    temperature_max_c = Column(Numeric(5, 2), nullable=True)
+    temperature_min_c = Column(Numeric(5, 2), nullable=True)
+    weather_fetched_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class AppSetting(Base):
     """Small owner settings stored as JSON by key (e.g. the home area used for weather)."""
 

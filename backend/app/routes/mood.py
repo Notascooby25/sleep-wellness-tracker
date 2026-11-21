@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.insight_dates import UK_TZ
+from ..services.weather_daily import record_day_location
 
 router = APIRouter(prefix="/mood", tags=["mood"])
 logger = logging.getLogger("app.mood")
@@ -314,6 +316,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
         db_mood.activities = activities
 
     _replace_activity_details(db, db_mood, payload.activity_details)
+    record_day_location(db, payload.timestamp.astimezone(UK_TZ).date(), payload.latitude, payload.longitude)
 
     db.commit()
 
@@ -359,6 +362,7 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     m.activities = activities
 
     _replace_activity_details(db, m, payload.activity_details)
+    record_day_location(db, payload.timestamp.astimezone(UK_TZ).date(), payload.latitude, payload.longitude)
 
     db.commit()
     db.refresh(m)
