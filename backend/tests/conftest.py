@@ -44,6 +44,9 @@ _CLEANED_TABLES = (
     "garmin_steps_daily",
     "garmin_activities",
     "garmin_hydration_daily",
+    "headache_checks",
+    "weather_daily",
+    "app_settings",
 )
 
 

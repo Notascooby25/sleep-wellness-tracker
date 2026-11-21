@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { beforeNavigate } from '$app/navigation';
   import { getJson, postJson } from '$lib/api';
+  import HeadacheCheck from '$lib/HeadacheCheck.svelte';
   import type { Activity, ActivityDetailInput, Category, GarminLatestWrap, MoodEntry, PositionOption } from '$lib/types';
 
 
@@ -43,6 +44,7 @@
   let cameraInputEl: HTMLInputElement | null = null;
   let loadError = false;
   let latitude: number | null = null;
+  let headacheCheckRefresh = 0;
   let longitude: number | null = null;
 
   const formatUploadedAt = (iso: string | undefined) => {
@@ -419,6 +421,7 @@
       };
       await postJson('/mood/', payload);
       status = 'Entry saved.';
+      headacheCheckRefresh += 1;
       notes = '';
       imageUrls = [];
       imageUploadedAt = new Map();
@@ -464,6 +467,8 @@
   <span class="snap-pill streak-pill">{currentStreakDays} {currentStreakDays === 1 ? 'day' : 'days'}</span>
 </section>
 {/if}
+
+<HeadacheCheck {date} refreshKey={headacheCheckRefresh} />
 
 <section class="card">
   <div class="grid two">

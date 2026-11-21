@@ -11,6 +11,7 @@ from sqlalchemy import or_
 from . import auth
 from .database import SessionLocal
 from .routes import mood, categories, activities, garmin, export, lifestyle_impact, auth as auth_routes, push, reports
+from .routes import headache_checks, weather
 from .services.garmin_sync import (
     sync_activities_if_due,
     sync_sleep_if_due,
@@ -193,9 +194,31 @@ def _reminder_scheduler_loop() -> None:
         _reminder_stop.wait(_REMINDER_POLL_SECONDS)
 
 
+WEATHER_SYNC_ENABLED = _env_bool("WEATHER_SYNC_ENABLED", True)
+_WEATHER_SYNC_SECONDS = 6 * 60 * 60
+_weather_stop = threading.Event()
+_weather_thread: threading.Thread | None = None
+
+
+def _weather_sync_loop() -> None:
+    """Keep daily home-area weather topped up (does nothing until a home area is saved)."""
+    logger.info("Weather sync loop started")
+    # Let the app finish starting before the first fetch.
+    if _weather_stop.wait(60):
+        return
+    while not _weather_stop.is_set():
+        weather.run_weather_sync()
+        _weather_stop.wait(_WEATHER_SYNC_SECONDS)
+
+
 @app.on_event("startup")
 def _start_background_workers() -> None:
-    global _autosync_thread, _reminder_thread
+    global _autosync_thread, _reminder_thread, _weather_thread
+
+    if WEATHER_SYNC_ENABLED and (not _weather_thread or not _weather_thread.is_alive()):
+        _weather_stop.clear()
+        _weather_thread = threading.Thread(target=_weather_sync_loop, name="weather-sync", daemon=True)
+        _weather_thread.start()
 
     if not _reminder_thread or not _reminder_thread.is_alive():
         _reminder_stop.clear()
@@ -222,6 +245,9 @@ def _stop_background_workers() -> None:
     _reminder_stop.set()
     if _reminder_thread:
         _reminder_thread.join(timeout=5)
+    _weather_stop.set()
+    if _weather_thread:
+        _weather_thread.join(timeout=5)
 
 
 app.include_router(mood.router)
@@ -232,6 +258,8 @@ app.include_router(export.router)
 app.include_router(lifestyle_impact.router)
 app.include_router(auth_routes.router)
 app.include_router(push.router)
+app.include_router(headache_checks.router)
+app.include_router(weather.router)
 
 
 @app.get("/health")

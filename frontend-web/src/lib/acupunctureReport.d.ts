@@ -16,4 +16,5 @@ export function describeVerdict(data: {
   symptom_days: number;
   window: 'period' | '90d' | 'all';
   min_nights: number;
+  confirmed_days?: number;
 }): { headline: string; detail: string };

@@ -61,9 +61,13 @@ const windowLabel = (window) => {
 };
 
 export function describeVerdict(data) {
-  const { verdict_kind, clue_count, logged_days, symptom_days, window, min_nights } = data;
+  const { verdict_kind, clue_count, logged_days, symptom_days, window, min_nights, confirmed_days } = data;
   const scope = windowLabel(window);
-  const daysNote = `${logged_days} logged ${logged_days === 1 ? 'day' : 'days'} (${symptom_days} headache ${symptom_days === 1 ? 'day' : 'days'})`;
+  const confirmedNote =
+    typeof confirmed_days === 'number' && logged_days > 0
+      ? `; ${confirmed_days} of the ${logged_days} confirmed with the daily headache check`
+      : '';
+  const daysNote = `${logged_days} logged ${logged_days === 1 ? 'day' : 'days'} (${symptom_days} headache ${symptom_days === 1 ? 'day' : 'days'}${confirmedNote})`;
 
   if (verdict_kind === 'clues_found') {
     const noun = clue_count === 1 ? 'clue' : 'clues';
