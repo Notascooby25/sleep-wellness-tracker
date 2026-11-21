@@ -308,6 +308,10 @@ class WeatherDaily(Base):
     pressure_msl_mean = Column(Numeric(6, 1), nullable=True)  # hPa, average over the UK-local day
     temperature_max_c = Column(Numeric(5, 2), nullable=True)
     temperature_min_c = Column(Numeric(5, 2), nullable=True)
+    # True when this day's weather is for where the owner was away, not the home area.
+    is_away = Column(Boolean, default=False, nullable=False, server_default=text("FALSE"))
+    latitude = Column(Numeric(6, 2), nullable=True)  # the place the weather is for (rounded)
+    longitude = Column(Numeric(6, 2), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -319,4 +323,16 @@ class AppSetting(Base):
 
     key = Column(String(80), primary_key=True)
     value = Column(JSON, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class DayLocation(Base):
+    """Roughly where the owner was on a day (rounded to about 1 km), from entries logged that day."""
+
+    __tablename__ = "day_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location_date = Column(Date, unique=True, nullable=False, index=True)
+    latitude = Column(Numeric(6, 2), nullable=False)
+    longitude = Column(Numeric(6, 2), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

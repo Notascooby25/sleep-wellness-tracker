@@ -186,6 +186,18 @@ def _ensure_legacy_schema_compatibility() -> None:
                 text("ALTER TABLE moods ADD COLUMN IF NOT EXISTS weather_cloud_cover INTEGER")
             )
 
+        # Daily weather: which place each day's weather is for (blank = home area).
+        if inspector.has_table("weather_daily"):
+            weather_columns = {col["name"] for col in inspector.get_columns("weather_daily")}
+            for column, ddl in (
+                ("is_away", "BOOLEAN NOT NULL DEFAULT FALSE"),
+                ("latitude", "NUMERIC(6, 2)"),
+                ("longitude", "NUMERIC(6, 2)"),
+            ):
+                if column not in weather_columns:
+                    logger.warning("Adding missing weather_daily.%s column", column)
+                    conn.execute(text(f"ALTER TABLE weather_daily ADD COLUMN IF NOT EXISTS {column} {ddl}"))
+
         position_column = detail_columns.get("position")
         if position_column and inspector.has_table("mood_activity_details"):
             position_type = str(position_column.get("type", "")).upper()

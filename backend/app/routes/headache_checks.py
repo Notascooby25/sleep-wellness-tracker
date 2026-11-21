@@ -10,6 +10,7 @@ from .. import models
 from ..database import get_db
 from ..services.insight_dates import UK_TZ
 from ..services.item_roles import is_symptom
+from ..services.weather_daily import record_location_if_today
 
 router = APIRouter(prefix="/headache-checks", tags=["headache-checks"])
 
@@ -20,6 +21,9 @@ MAX_LIST_DAYS = 731
 class HeadacheCheckIn(BaseModel):
     had_headache: bool
     onset: str | None = None
+    # Where the phone was when answering; only used when answering for today.
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 def _serialize(check_date: dt.date, check: models.HeadacheCheck | None, logged: list[str]) -> dict:
@@ -82,6 +86,10 @@ def save_headache_check(check_date: dt.date, payload: HeadacheCheckIn, db: Sessi
         check.onset = onset
     db.commit()
     db.refresh(check)
+    try:
+        record_location_if_today(db, check_date, payload.latitude, payload.longitude)
+    except Exception:
+        db.rollback()
     return _serialize(check_date, check, _logged_symptoms(db, check_date))
 
 

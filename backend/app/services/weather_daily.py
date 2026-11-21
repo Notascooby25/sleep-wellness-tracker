@@ -9,6 +9,7 @@ needs no key. Only a rounded home position (about 1 km) is ever sent.
 import datetime as dt
 import json
 import logging
+import math
 import statistics
 import urllib.parse
 import urllib.request
@@ -30,10 +31,57 @@ RECENT_DAYS = 10
 MAX_BACKFILL_DAYS = 3 * 365
 ARCHIVE_CHUNK_DAYS = 366
 LOCATION_DECIMALS = 2
+# Further than this from home counts as "away" (air pressure is much the same across a region).
+AWAY_DISTANCE_KM = 25
+# The forecast service also covers this many past days; older away days use the archive.
+FORECAST_PAST_DAYS = 60
 
 
 def round_location(latitude: float, longitude: float) -> tuple[float, float]:
     return round(latitude, LOCATION_DECIMALS), round(longitude, LOCATION_DECIMALS)
+
+
+def distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Straight-line distance between two points on the Earth's surface."""
+    r1, r2 = math.radians(lat1), math.radians(lat2)
+    d_lat = r2 - r1
+    d_lon = math.radians(lon2 - lon1)
+    a = math.sin(d_lat / 2) ** 2 + math.cos(r1) * math.cos(r2) * math.sin(d_lon / 2) ** 2
+    return 6371.0 * 2 * math.asin(math.sqrt(min(1.0, a)))
+
+
+def is_away_from(home: dict | None, latitude: float, longitude: float) -> bool:
+    if home is None:
+        return False
+    return distance_km(home["latitude"], home["longitude"], latitude, longitude) > AWAY_DISTANCE_KM
+
+
+def record_day_location(db: Session, day: dt.date, latitude: float, longitude: float) -> None:
+    """Remember roughly where the owner was on a day (the latest position logged that day wins)."""
+    lat, lon = round_location(latitude, longitude)
+    row = db.query(models.DayLocation).filter(models.DayLocation.location_date == day).first()
+    if row is None:
+        db.add(models.DayLocation(location_date=day, latitude=lat, longitude=lon))
+    else:
+        row.latitude = lat
+        row.longitude = lon
+    db.commit()
+
+
+def record_location_if_today(db: Session, logged_at: dt.datetime | dt.date, latitude, longitude) -> None:
+    """Only a position shared on the day itself says where you were; back-dated entries are skipped."""
+    if latitude is None or longitude is None:
+        return
+    try:
+        lat, lon = float(latitude), float(longitude)
+    except (TypeError, ValueError):
+        return
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return
+    day = logged_at.astimezone(UK_TZ).date() if isinstance(logged_at, dt.datetime) else logged_at
+    if day != dt.datetime.now(UK_TZ).date():
+        return
+    record_day_location(db, day, lat, lon)
 
 
 def get_home_location(db: Session) -> dict | None:
@@ -110,10 +158,18 @@ def _fetch_range(url: str, latitude: float, longitude: float, extra: dict) -> di
     return daily_from_hourly(_http_get_json(url, params))
 
 
-def _store_days(db: Session, days: dict[dt.date, dict], last_complete_day: dt.date) -> int:
+def _store_days(
+    db: Session,
+    days: dict[dt.date, dict],
+    last_complete_day: dt.date,
+    *,
+    place: tuple[float, float],
+    away: bool,
+    skip: set[dt.date] | frozenset = frozenset(),
+) -> int:
     stored = 0
     for day, values in days.items():
-        if day > last_complete_day or all(v is None for v in values.values()):
+        if day > last_complete_day or day in skip or all(v is None for v in values.values()):
             continue
         row = db.query(models.WeatherDaily).filter(models.WeatherDaily.weather_date == day).first()
         if row is None:
@@ -122,6 +178,8 @@ def _store_days(db: Session, days: dict[dt.date, dict], last_complete_day: dt.da
         row.pressure_msl_mean = values["pressure_msl_mean"]
         row.temperature_max_c = values["temperature_max_c"]
         row.temperature_min_c = values["temperature_min_c"]
+        row.is_away = away
+        row.latitude, row.longitude = place
         stored += 1
     db.commit()
     return stored
@@ -148,9 +206,11 @@ def sync_weather(db: Session, today: dt.date | None = None) -> dict:
     yesterday = today - dt.timedelta(days=1)
     recent_start = today - dt.timedelta(days=RECENT_DAYS)
     stored = 0
-
-    # 1. Older days from the archive, only where missing.
+    home = (lat, lon)
     start = _backfill_start(db, today)
+    away_days = _away_days(db, location, start, yesterday)
+
+    # 1. Older home days from the archive, only where missing (days away are handled below).
     archive_end = recent_start - dt.timedelta(days=1)
     if start <= archive_end:
         have = {
@@ -159,10 +219,11 @@ def sync_weather(db: Session, today: dt.date | None = None) -> dict:
                 models.WeatherDaily.weather_date >= start,
                 models.WeatherDaily.weather_date <= archive_end,
                 models.WeatherDaily.pressure_msl_mean.isnot(None),
+                models.WeatherDaily.is_away.is_(False),
             )
         }
         missing = [start + dt.timedelta(days=i) for i in range((archive_end - start).days + 1)]
-        missing = [d for d in missing if d not in have]
+        missing = [d for d in missing if d not in have and d not in away_days]
         if missing:
             chunk_start = missing[0]
             final = missing[-1]
@@ -174,22 +235,78 @@ def sync_weather(db: Session, today: dt.date | None = None) -> dict:
                     lon,
                     {"start_date": chunk_start.isoformat(), "end_date": chunk_end.isoformat()},
                 )
-                stored += _store_days(db, days, yesterday)
+                stored += _store_days(db, days, yesterday, place=home, away=False, skip=set(away_days))
                 chunk_start = chunk_end + dt.timedelta(days=1)
 
-    # 2. Recent days from the forecast service (always refreshed; today is skipped as incomplete).
+    # 2. Recent home days from the forecast service (always refreshed; today is skipped as incomplete).
     days = _fetch_range(FORECAST_URL, lat, lon, {"past_days": RECENT_DAYS + 1, "forecast_days": 1})
-    stored += _store_days(db, {d: v for d, v in days.items() if d >= recent_start}, yesterday)
-    return {"status": "ok", "stored": stored}
+    recent = {d: v for d, v in days.items() if d >= recent_start}
+    stored += _store_days(db, recent, yesterday, place=home, away=False, skip=set(away_days))
+
+    # 3. Days away: the weather where you actually were.
+    stored += _sync_away_days(db, away_days, today, recent_start)
+    return {"status": "ok", "stored": stored, "away_days": len(away_days)}
+
+
+def _away_days(db: Session, home: dict, start: dt.date, end: dt.date) -> dict[dt.date, tuple[float, float]]:
+    rows = (
+        db.query(models.DayLocation)
+        .filter(models.DayLocation.location_date >= start, models.DayLocation.location_date <= end)
+        .all()
+    )
+    result: dict[dt.date, tuple[float, float]] = {}
+    for row in rows:
+        lat, lon = float(row.latitude), float(row.longitude)
+        if is_away_from(home, lat, lon):
+            result[row.location_date] = (lat, lon)
+    return result
+
+
+def _sync_away_days(
+    db: Session, away_days: dict[dt.date, tuple[float, float]], today: dt.date, recent_start: dt.date
+) -> int:
+    if not away_days:
+        return 0
+    stored_rows = {
+        row.weather_date: row
+        for row in db.query(models.WeatherDaily).filter(models.WeatherDaily.weather_date.in_(list(away_days)))
+    }
+    stored = 0
+    for day, (lat, lon) in sorted(away_days.items()):
+        row = stored_rows.get(day)
+        up_to_date = (
+            row is not None
+            and row.is_away
+            and row.pressure_msl_mean is not None
+            and row.latitude is not None
+            and (float(row.latitude), float(row.longitude)) == (lat, lon)
+            and day < recent_start
+        )
+        if up_to_date:
+            continue
+        url = FORECAST_URL if day >= today - dt.timedelta(days=FORECAST_PAST_DAYS) else ARCHIVE_URL
+        try:
+            days = _fetch_range(url, lat, lon, {"start_date": day.isoformat(), "end_date": day.isoformat()})
+        except Exception:
+            logger.warning("Could not fetch away weather for %s", day, exc_info=True)
+            continue
+        stored += _store_days(db, {day: days[day]} if day in days else {}, today - dt.timedelta(days=1), place=(lat, lon), away=True)
+    return stored
 
 
 def weather_status(db: Session) -> dict:
     count = db.query(models.WeatherDaily).filter(models.WeatherDaily.pressure_msl_mean.isnot(None)).count()
+    away = (
+        db.query(models.WeatherDaily)
+        .filter(models.WeatherDaily.pressure_msl_mean.isnot(None), models.WeatherDaily.is_away.is_(True))
+        .count()
+    )
     first = db.query(models.WeatherDaily.weather_date).order_by(models.WeatherDaily.weather_date.asc()).first()
     last = db.query(models.WeatherDaily.weather_date).order_by(models.WeatherDaily.weather_date.desc()).first()
     return {
         "home_location_set": get_home_location(db) is not None,
         "days_stored": count,
+        "away_days": away,
         "first_date": first[0].isoformat() if first else None,
         "last_date": last[0].isoformat() if last else None,
     }

@@ -261,6 +261,7 @@ def test_appointment_summary_breakdowns_hide_zeros_and_fold_deprecated(clean_db,
             "has_acupuncture": False,
             "confirmed": False,
             "onset": None,
+            "away": False,
         },
         {
             "date": "2026-10-11",
@@ -270,6 +271,7 @@ def test_appointment_summary_breakdowns_hide_zeros_and_fold_deprecated(clean_db,
             "has_acupuncture": False,
             "confirmed": False,
             "onset": None,
+            "away": False,
         },
         {
             "date": "2026-10-12",
@@ -279,6 +281,7 @@ def test_appointment_summary_breakdowns_hide_zeros_and_fold_deprecated(clean_db,
             "has_acupuncture": False,
             "confirmed": False,
             "onset": None,
+            "away": False,
         },
     ]
 

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.weather_daily import record_location_if_today
 
 router = APIRouter(prefix="/mood", tags=["mood"])
 logger = logging.getLogger("app.mood")
@@ -285,6 +286,15 @@ def _fetch_weather_for_timestamp(lat: float, lon: float, timestamp: dt.datetime)
         logger.warning(f"Failed to fetch weather from Open-Meteo: {e}")
     return None
 
+def _remember_where_you_were(db: Session, logged_at, latitude, longitude) -> None:
+    """Feeds 'away from home' weather; a failure here must never stop the entry saving."""
+    try:
+        record_location_if_today(db, logged_at, latitude, longitude)
+    except Exception:
+        db.rollback()
+        logger.warning("Could not record the day's location", exc_info=True)
+
+
 @router.post("", response_model=schemas.MoodRead)
 def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)):
     image_urls = _normalize_image_urls(payload.image_url, payload.image_urls)
@@ -316,6 +326,7 @@ def create_mood_entry(payload: schemas.MoodCreate, db: Session = Depends(get_db)
     _replace_activity_details(db, db_mood, payload.activity_details)
 
     db.commit()
+    _remember_where_you_were(db, payload.timestamp, payload.latitude, payload.longitude)
 
     db.refresh(db_mood)
     return _serialize_mood(db_mood)
@@ -361,6 +372,7 @@ def update_mood_entry(entry_id: int, payload: schemas.MoodUpdate, db: Session = 
     _replace_activity_details(db, m, payload.activity_details)
 
     db.commit()
+    _remember_where_you_were(db, payload.timestamp, payload.latitude, payload.longitude)
     db.refresh(m)
 
     current_image_urls = set(_get_mood_image_urls(m))
