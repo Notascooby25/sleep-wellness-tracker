@@ -90,6 +90,7 @@ The palette feels like a crisp morning sky fading into a calm evening.
 ### Status
 - **Error** (#b42318) on **Error Wash** (#fee4e2): Problems and the offline banner.
 - **Success Text** (#22543d) on **Success Wash** (#d4edda): Confirmations.
+- **Warning Text** (#6b4c03) on **Warning Wash** (#fff8e6), with **Warning Border** (#f4d47a): gentle nudges, such as "please rate your sleep", and the logging-streak pill.
 
 All colours live in `frontend-web/src/tokens.css`; styles use `var(--color-…)` and not raw hex values. Shades of blue that were within a barely visible distance (CIE76 ΔE ≤ 4) of a token were folded into it. The pages still hold some one-off colours as raw hex values (status greens, ambers and reds for the mood scale, warnings and charts); those are deliberate data and status colours, not part of the blue palette.
 

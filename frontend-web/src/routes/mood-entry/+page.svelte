@@ -33,6 +33,12 @@
   let date = localIso.slice(0, 10);
   let time = localIso.slice(11, 16);
   let status = '';
+  // Errors are flagged when they are set, so the message style never depends on its wording.
+  let statusIsError = false;
+  const setStatus = (message: string, isError = false) => {
+    status = message;
+    statusIsError = isError;
+  };
   let busy = false;
   let activeCategoryId: number | null = null;
   let currentStreakDays = 0;
@@ -254,19 +260,19 @@
     if (files.length === 0) return;
 
     imageUploadBusy = true;
-    status = '';
+    setStatus('');
     let uploadedCount = 0;
     try {
       const uploadedUrls: string[] = [];
       for (const file of files) {
-        status = files.length > 1 ? `Preparing photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Preparing photo...';
+        setStatus(files.length > 1 ? `Preparing photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Preparing photo...');
         const uploadFile = await prepareUploadFile(file);
         if (uploadFile.size > MAX_UPLOAD_BYTES) {
-          status = 'Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.';
+          setStatus('Image upload failed: Unable to compress below 10 MB. Please choose a smaller photo.', true);
           input.value = '';
           return;
         }
-        status = files.length > 1 ? `Uploading photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Uploading photo...';
+        setStatus(files.length > 1 ? `Uploading photo ${uploadedUrls.length + 1} of ${files.length}...` : 'Uploading photo...');
         const uploaded = await fileToImageUrl(uploadFile);
         uploadedUrls.push(uploaded.image_url);
         if (uploaded.uploaded_at) imageUploadedAt.set(uploaded.image_url, uploaded.uploaded_at);
@@ -274,18 +280,18 @@
       }
       imageUrls = [...imageUrls, ...uploadedUrls];
       imageUploadedAt = new Map(imageUploadedAt);
-      status = `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'photo' : 'photos'} attached.`;
+      setStatus(`${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'photo' : 'photos'} attached.`);
     } catch (error) {
       const message = String(error);
       const partialUploadSuffix = uploadedCount > 0 ? ` ${uploadedCount} ${uploadedCount === 1 ? 'photo was' : 'photos were'} attached before the failure.` : '';
       if (message.includes('Content-length of') && message.includes('exceeds limit')) {
-        status = `Image upload failed: Upload payload exceeded server limit.${partialUploadSuffix}`;
+        setStatus(`Image upload failed: Upload payload exceeded server limit.${partialUploadSuffix}`, true);
       } else if (message.includes('Upstream backend unavailable')) {
-        status = `Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.${partialUploadSuffix}`;
+        setStatus(`Image upload failed: Backend temporarily unavailable. Please retry in a few seconds.${partialUploadSuffix}`, true);
       } else if (message.includes('Failed to fetch')) {
-        status = `Image upload failed: Network error while uploading. Please check your connection and retry.${partialUploadSuffix}`;
+        setStatus(`Image upload failed: Network error while uploading. Please check your connection and retry.${partialUploadSuffix}`, true);
       } else {
-        status = `Image upload failed: ${describeError(error)}${partialUploadSuffix}`;
+        setStatus(`Image upload failed: ${describeError(error)}${partialUploadSuffix}`, true);
       }
     } finally {
       imageUploadBusy = false;
@@ -302,12 +308,14 @@
     }
   };
 
-  const moodColors: Record<number, { bg: string; active: string; label: string }> = {
-    1: { bg: '#c8f3d6', active: '#1f9d53', label: 'Green' },
-    2: { bg: '#e6f5a7', active: '#8fae14', label: 'Green-yellow' },
-    3: { bg: '#ffe991', active: '#d19b00', label: 'Yellow' },
-    4: { bg: '#ffd1a4', active: '#e27a1b', label: 'Orange' },
-    5: { bg: '#ffc2be', active: '#d9423a', label: 'Red' },
+  // Mood-scale data colours. A selected score keeps its soft colour and gets a thick dark border,
+  // so dark text stays readable on every one (white on the strong colours failed contrast).
+  const moodColors: Record<number, { bg: string; label: string }> = {
+    1: { bg: '#c8f3d6', label: 'Green' },
+    2: { bg: '#e6f5a7', label: 'Green-yellow' },
+    3: { bg: '#ffe991', label: 'Yellow' },
+    4: { bg: '#ffd1a4', label: 'Orange' },
+    5: { bg: '#ffc2be', label: 'Red' },
   };
 
   const FALLBACK_POSITION_OPTIONS = ['Left', 'Right', 'Front', 'Back-Left', 'Back-Right', 'Bilateral'];
@@ -389,14 +397,14 @@
         activeCategoryId = categories[0]?.id ?? null;
       }
     } catch (error) {
-      status = `Load error: ${describeError(error)}`;
+      setStatus(`Load error: ${describeError(error)}`, true);
       loadError = true;
     }
   };
 
   const submitEntry = async () => {
     if (sleepRatingMissing) {
-      status = 'Please choose a sleep rating (1 = great, 5 = poor) to save your morning entry.';
+      setStatus('Please choose a sleep rating (1 = great, 5 = poor) to save your morning entry.', true);
       if (typeof document !== 'undefined') {
         const el = document.getElementById('sleep-rating-section');
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -404,7 +412,7 @@
       return;
     }
     busy = true;
-    status = '';
+    setStatus('');
     try {
       const timestamp = new Date(`${date}T${time}:00`).toISOString();
       const payload: MoodEntry = {
@@ -420,7 +428,7 @@
         longitude
       };
       await postJson('/mood/', payload);
-      status = 'Entry saved.';
+      setStatus('Entry saved.');
       headacheCheckRefresh += 1;
       notes = '';
       imageUrls = [];
@@ -429,7 +437,7 @@
       activityDetails = new Map();
       subjectiveSleepRating = null;
     } catch (error) {
-      status = `Save failed: ${describeError(error)}`;
+      setStatus(`Save failed: ${describeError(error)}`, true);
     } finally {
       busy = false;
     }
@@ -470,73 +478,76 @@
 
 <HeadacheCheck {date} refreshKey={headacheCheckRefresh} {latitude} {longitude} />
 
-<section class="card">
+<section class="card entry-card" aria-labelledby="entry-title">
+  <h2 id="entry-title" class="sr-only">Your entry</h2>
   <div class="grid two">
     <label>
-      <div class="label">Date</div>
+      <span class="label field-label">Date</span>
       <input type="date" bind:value={date} />
     </label>
     <label>
-      <div class="label">Time</div>
+      <span class="label field-label">Time</span>
       <input type="time" bind:value={time} />
     </label>
   </div>
 
-  <div style="margin-top:0.8rem;">
-    <div class="label">Overall Mood <small style="color:var(--color-neutral-text-faint);">(1 = great, 5 = struggling)</small></div>
+  <div class="entry-block">
+    <div class="label" id="mood-score-label">Overall Mood <small class="hint">(1 = great, 5 = struggling)</small></div>
     {#if ratingRequired()}
-      <div class="mood-pills">
+      <div class="mood-pills" role="group" aria-labelledby="mood-score-label">
         {#each [1,2,3,4,5] as score}
           <button type="button"
             class="mood-pill"
             class:mood-pill-active={moodScore === score}
-            style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
+            aria-pressed={moodScore === score}
+            style="--pill-bg:{moodColors[score].bg};"
             on:click={() => (moodScore = score)}
-          ><span>{score}</span><small>{moodColors[score].label}</small>{moodScore === score ? ' ✓' : ''}</button>
+          ><span>{score}{moodScore === score ? ' ✓' : ''}</span><small>{moodColors[score].label}</small></button>
         {/each}
       </div>
-      <p class="label" style="margin-top:0.3rem;">Selected mood score: {moodScore}</p>
+      <p class="label pill-caption">Selected mood score: {moodScore}</p>
     {:else}
       <p class="badge-info">Rating not required for selected activities</p>
     {/if}
   </div>
 
   {#if sleepRatingVisible}
-  <div style="margin-top:0.8rem;" id="sleep-rating-section">
-    <div class="label">
+  <div class="entry-block" id="sleep-rating-section">
+    <div class="label" id="sleep-rating-label">
       Last Night's Sleep
-      <small style="color: {sleepRatingMissing ? 'var(--color-worse, var(--color-worse))' : 'var(--color-neutral-text-faint)'}; font-weight: {sleepRatingMissing ? '700' : 'normal'};">
+      <small class="hint" class:hint-required={sleepRatingMissing}>
         ({sleepRatingMissing ? 'required' : 'optional'}; 1 = great, 5 = poor)
       </small>
     </div>
-    <div class="mood-pills">
+    <div class="mood-pills" role="group" aria-labelledby="sleep-rating-label">
       {#each [1,2,3,4,5] as score}
         <button type="button"
           class="mood-pill"
           class:mood-pill-active={subjectiveSleepRating === score}
-          style="--pill-bg:{moodColors[score].bg};--pill-active:{moodColors[score].active};"
+          aria-pressed={subjectiveSleepRating === score}
+          style="--pill-bg:{moodColors[score].bg};"
           on:click={() => (subjectiveSleepRating = subjectiveSleepRating === score ? null : score)}
-        ><span>{score}</span><small>{moodColors[score].label}</small>{subjectiveSleepRating === score ? ' ✓' : ''}</button>
+        ><span>{score}{subjectiveSleepRating === score ? ' ✓' : ''}</span><small>{moodColors[score].label}</small></button>
       {/each}
     </div>
-    <p class="label" style="margin-top:0.3rem;">
+    <p class="label pill-caption">
       {subjectiveSleepRating == null ? (sleepRatingMissing ? 'Please tap a score from 1 to 5' : 'Tap a value or leave blank') : `Sleep rating: ${subjectiveSleepRating}`}
     </p>
   </div>
   {/if}
 
-  <label style="margin-top: 0.8rem; display: block;">
-    <div class="label">Notes</div>
+  <label class="entry-block notes-field">
+    <span class="label field-label">Notes</span>
     <textarea rows="3" bind:value={notes}></textarea>
   </label>
 
   <div class="image-upload-wrap">
-    <div class="label">Photos <small style="color:var(--color-neutral-text-faint);">(optional)</small></div>
+    <div class="label">Photos <small class="hint">(optional)</small></div>
     <div class="image-upload-actions">
       <button type="button" on:click={openCameraPicker} disabled={busy || imageUploadBusy}>Take Photo</button>
       <button type="button" on:click={openGalleryPicker} disabled={busy || imageUploadBusy}>Upload Image</button>
       {#if imageUploadBusy}
-        <span class="label" style="margin:0;">Uploading...</span>
+        <span class="label inline-note">Uploading...</span>
       {/if}
     </div>
 
@@ -579,18 +590,18 @@
     </p>
   {/if}
 
-  <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+  <div class="entry-actions">
     <button type="button" class="btn-primary" disabled={busy} on:click={submitEntry}>Save Entry</button>
     <button type="button" disabled={busy} on:click={load}>Refresh</button>
   </div>
-  {#if status}<p class="status-msg" role="status" class:status-error={status.includes('failed') || status.includes('Please choose')}>{status}</p>{/if}
+  {#if status}<p class="status-msg" role="status" class:status-error={statusIsError}>{status}</p>{/if}
   {#if loadError}<button type="button" class="btn-clear" on:click={load}>Retry loading</button>{/if}
 </section>
 
-<section class="card">
+<section class="card" aria-labelledby="activities-title">
   <div class="acts-header">
-    <h3 style="margin:0;">Activities</h3>
-    <span class="label" style="flex:1;margin:0;">Tap chips to toggle, then switch categories using tabs.</span>
+    <h2 id="activities-title" class="acts-title">Activities</h2>
+    <span class="label acts-hint">Tap chips to toggle, then switch categories using tabs.</span>
     <button type="button" class="btn-clear" on:click={clearSelected}>Clear</button>
   </div>
 
@@ -599,7 +610,7 @@
       {#each Array.from(selected) as id}
         {@const act = activities.find(a => a.id === id)}
         {#if act}
-          <button type="button" class="chip chip-selected" on:click={() => toggle(id)}>{act.name} ×</button>
+          <button type="button" class="chip chip-selected" aria-label={`Remove ${act.name}`} on:click={() => toggle(id)}>{act.name} ×</button>
         {/if}
       {/each}
     </div>
@@ -613,12 +624,13 @@
         <div class="detail-row">
           <div class="detail-name">{act.name}</div>
           {#if needsPosition(act)}
-            <div class="detail-options">
+            <div class="detail-options" role="group" aria-label={`${act.name} position`}>
               <span class="detail-label">Position:</span>
               {#each POSITION_OPTIONS as position}
                 <button type="button"
                   class="chip detail-chip"
                   class:chip-selected={row.detail.positions.includes(position)}
+                  aria-pressed={row.detail.positions.includes(position)}
                   on:click={() => togglePosition(row.id, position)}
                 >{position}</button>
               {/each}
@@ -649,16 +661,17 @@
   {#if categories.length === 0}
     <p>No categories found.</p>
   {:else}
-    <div class="cat-tabs">
+    <div class="cat-tabs" role="group" aria-label="Activity categories">
       {#each categories as cat}
         <button type="button"
           class="cat-tab"
           class:cat-tab-active={activeCategoryId === cat.id}
+          aria-pressed={activeCategoryId === cat.id}
           on:click={() => (activeCategoryId = cat.id)}
         >
           {cat.name}
           {#if byCategory(cat.id).some(a => selected.has(a.id))}
-            <span class="cat-dot"></span>
+            <span class="cat-dot" aria-hidden="true"></span><span class="sr-only">(has selections)</span>
           {/if}
         </button>
       {/each}
@@ -666,11 +679,12 @@
 
     {#if categories.find((c) => c.id === activeCategoryId)}
       {@const catActivities = byCategory(activeCategoryId as number)}
-      <div class="chips">
+      <div class="chips" role="group" aria-label={categories.find((c) => c.id === activeCategoryId)?.name}>
         {#each catActivities as activity}
           <button type="button"
             class="chip"
             class:chip-selected={selected.has(activity.id)}
+            aria-pressed={selected.has(activity.id)}
             on:click={() => toggle(activity.id)}
           >{activity.name}</button>
         {:else}
@@ -685,21 +699,27 @@
   .garmin-snap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .snap-label { font-size: 0.78rem; font-weight: 700; color: var(--color-neutral-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .snap-pill { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.8rem; color: var(--color-link); }
-  .streak-pill { background: #fff3c4; border-color: #f4d47a; color: #6b4c03; font-weight: 700; }
+  .streak-pill { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); font-weight: 700; }
+  .entry-block { margin-top: 0.8rem; }
+  .notes-field { display: block; }
+  .field-label { display: block; }
+  .hint { color: var(--color-neutral-text-muted); }
+  .hint-required { color: var(--color-worse); font-weight: 700; }
+  .pill-caption { margin-top: 0.3rem; }
+  .inline-note { margin: 0; }
+  .entry-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   .mood-pills { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
   .mood-pill {
     flex: 1 1 0; min-width: 52px; max-width: 100px;
-    padding: 0.55rem 0.15rem; border-radius: 14px; border: 2px solid transparent;
+    /* The 3px border is always there (transparent until selected) so selecting never shifts the layout. */
+    padding: 0.5rem 0.15rem; border-radius: 14px; border: 3px solid transparent;
     background: var(--pill-bg); color: var(--color-neutral-text);
-    font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.12s;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: border-color 0.12s, background-color 0.12s;
     display: flex; flex-direction: column; align-items: center; line-height: 1.05;
   }
-  .mood-pill small { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; }
-  .mood-pill-active {
-    background: var(--pill-active) !important; border-color: var(--pill-active) !important;
-    color: var(--color-neutral-bg) !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
-  }
-  .mood-pill-active small { opacity: 1; }
+  .mood-pill small { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .mood-pill-active { border-color: var(--color-neutral-text); font-weight: 800; }
   .badge-info { font-size: 0.84rem; color: var(--color-neutral-text-muted); background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 8px; padding: 0.35rem 0.6rem; margin-top: 0.35rem; }
   .image-upload-wrap { margin-top: 0.9rem; }
   .image-upload-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
@@ -713,15 +733,14 @@
     object-fit: cover;
     border-radius: 10px;
     border: 1px solid var(--color-input-border);
-    box-shadow: 0 4px 14px rgba(12, 33, 62, 0.08);
   }
   .btn-primary { background: var(--color-accent); color: var(--color-neutral-bg); border-color: var(--color-accent-border); }
   .btn-clear { background: transparent; border-color: var(--color-input-border); color: var(--color-neutral-text-muted); font-size: 0.84rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
   .sleep-required-notice {
     font-size: 0.86rem;
-    color: #7a4f01;
-    background: #fff8e6;
-    border: 1px solid #f6d892;
+    color: var(--color-warning-text);
+    background: var(--color-warning-bg);
+    border: 1px solid var(--color-warning-border);
     border-radius: 10px;
     padding: 0.45rem 0.75rem;
     margin-top: 0.75rem;
@@ -729,15 +748,17 @@
     line-height: 1.35;
   }
   .status-msg { font-size: 0.88rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
-  .status-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
+  .status-error { color: var(--color-error); background: var(--color-error-bg); border: 1px solid var(--color-error); }
   .acts-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
+  .acts-title { margin: 0; font-size: 1.17rem; }
+  .acts-hint { flex: 1; margin: 0; }
   .selected-summary { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-surface-muted); }
   .cat-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 2px solid var(--color-surface-muted); margin-bottom: 0.6rem; padding-bottom: 0.35rem; }
   .cat-tab { position: relative; background: transparent; border: 1px solid var(--color-primary); border-radius: 999px; padding: 0.3rem 0.65rem; font-size: 0.82rem; color: var(--color-link); cursor: pointer; }
   .cat-tab-active { background: var(--color-primary); border-color: var(--color-primary-border-soft); font-weight: 700; }
   .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); margin-left: 4px; vertical-align: middle; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
-  .chip { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); color: var(--color-primary-content); border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: all 0.1s; }
+  .chip { background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); color: var(--color-primary-content); border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.84rem; cursor: pointer; transition: background-color 0.1s, border-color 0.1s, color 0.1s; }
   .chip-selected { background: var(--color-accent); border-color: var(--color-accent-border); color: var(--color-neutral-bg); }
   .activity-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.7rem; padding: 0.5rem 0.6rem; background: var(--color-bg-start); border: 1px solid var(--color-neutral-border); border-radius: 10px; }
   .detail-row { display: flex; flex-direction: column; gap: 0.35rem; }
@@ -747,4 +768,22 @@
   .detail-chip { font-size: 0.78rem; padding: 0.22rem 0.6rem; }
   .detail-quantity { display: inline-flex; align-items: center; gap: 0.5rem; }
   .detail-quantity input { width: 6rem; padding: 0.25rem 0.4rem; border-radius: 6px; border: 1px solid var(--color-input-border); font-size: 0.9rem; }
+
+  /* Touch screens: every control on this page meets the 44px minimum target. Mouse sizes are unchanged. */
+  @media (pointer: coarse) {
+    .entry-card button,
+    .chip,
+    .cat-tab,
+    .btn-clear,
+    .detail-quantity input {
+      min-height: 44px;
+    }
+    .chip,
+    .cat-tab,
+    .btn-clear {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
 </style>
