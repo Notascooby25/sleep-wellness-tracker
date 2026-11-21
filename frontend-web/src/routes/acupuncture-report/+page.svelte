@@ -32,6 +32,7 @@
     symptoms: string[];
     positions: string[];
     has_acupuncture: boolean;
+    away?: boolean;
     confirmed?: boolean;
     onset?: 'woke' | 'morning' | 'afternoon' | 'evening' | null;
   };
@@ -192,6 +193,7 @@
     ? Math.max(...summary.position_breakdown.map((i) => i.days))
     : 0;
   $: hasAcupunctureInRange = Boolean(summary?.daily_timeline.some((d) => d.has_acupuncture));
+  $: hasAwayInRange = Boolean(summary?.daily_timeline.some((d) => d.away));
   $: isCompactTimeline = Boolean(summary && summary.daily_timeline.length > 60);
   $: verdict = triggers ? describeVerdict(triggers) : null;
   $: hasClues = Boolean(
@@ -260,6 +262,9 @@
     }
     if (day.has_acupuncture) {
       parts.push('Acupuncture session');
+    }
+    if (day.away) {
+      parts.push('Away from home');
     }
     return parts.join(' · ');
   };
@@ -562,6 +567,9 @@
             {#if day.has_acupuncture}
               <i class="acu-dot" aria-hidden="true"></i>
             {/if}
+            {#if day.away}
+              <i class="away-bar" aria-hidden="true"></i>
+            {/if}
           </button>
         {/each}
       </div>
@@ -572,6 +580,9 @@
         <span><i class="legend-swatch migraine"></i> Migraine</span>
         {#if hasAcupunctureInRange}
           <span><i class="legend-swatch acu"></i> Acupuncture</span>
+        {/if}
+        {#if hasAwayInRange}
+          <span><i class="legend-swatch away"></i> Away from home</span>
         {/if}
       </div>
 
@@ -585,6 +596,9 @@
             {/if}
             {#if inspectedDay.has_acupuncture}
               <span class="acu-tag">Acupuncture</span>
+            {/if}
+            {#if inspectedDay.away}
+              <span class="acu-tag away-tag">Away from home</span>
             {/if}
           </div>
           <button
@@ -1255,6 +1269,20 @@
     width: 4px;
     height: 4px;
   }
+  .away-bar {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--color-slate-text);
+  }
+  .timeline-grid.compact .away-bar {
+    left: 3px;
+    right: 3px;
+    bottom: 2px;
+  }
 
   .legend {
     display: flex;
@@ -1293,6 +1321,12 @@
     border-radius: 999px;
     background: var(--color-accent);
   }
+  .legend-swatch.away {
+    width: 11px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--color-slate-text);
+  }
 
   .day-detail {
     margin-top: 0.75rem;
@@ -1320,6 +1354,11 @@
     background: var(--color-primary);
     color: var(--color-primary-content);
     border: 1px solid var(--color-primary-border);
+  }
+  .away-tag {
+    background: var(--color-surface-muted);
+    color: var(--color-slate-text);
+    border-color: var(--color-neutral-border);
   }
   .detail-close {
     flex-shrink: 0;

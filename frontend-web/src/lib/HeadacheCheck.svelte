@@ -7,6 +7,9 @@
   export let date: string;
   /** Bump this after saving an entry so items just logged are picked up. */
   export let refreshKey = 0;
+  /** Where the phone is now, if it shared its location (used for weather on days away). */
+  export let latitude: number | null = null;
+  export let longitude: number | null = null;
 
   const ONSETS: { value: HeadacheOnset; label: string }[] = [
     { value: 'woke', label: 'Woke with it' },
@@ -55,7 +58,12 @@
     saving = true;
     error = '';
     try {
-      check = await putJson<HeadacheCheckDay>(`/headache-checks/${date}`, { had_headache: hadHeadache, onset });
+      check = await putJson<HeadacheCheckDay>(`/headache-checks/${date}`, {
+        had_headache: hadHeadache,
+        onset,
+        latitude,
+        longitude
+      });
     } catch (err) {
       error = `Couldn't save: ${describeError(err)}`;
     } finally {

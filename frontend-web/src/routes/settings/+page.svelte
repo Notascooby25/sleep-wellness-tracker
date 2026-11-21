@@ -55,6 +55,14 @@
       weatherError = 'This browser cannot share your location.';
       return;
     }
+    if (
+      weather?.home_location_set &&
+      !confirm(
+        'Change your home area to where you are now?\n\nOnly do this if you have moved house. Days away from home are picked up automatically when you log, so you do not need this when travelling. Weather already stored for past days is kept.'
+      )
+    ) {
+      return;
+    }
     weatherBusy = true;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -276,6 +284,9 @@
   <p class="weather-hint">
     The headache report can check whether changes in air pressure or temperature line up with your headaches.
     It needs your home area once. Only a rough position (to about 1 km) is stored and sent to the free Open-Meteo weather service.
+  </p>
+  <p class="weather-hint">
+    Travelling? Nothing to do. When you log an entry or answer "Headache today?" more than 25 km from home, that day uses the weather where you were.
   </p>
   {#if weather}
     {#if weather.home_location_set}
