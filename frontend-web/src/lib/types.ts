@@ -49,3 +49,21 @@ export type MoodEntry = {
 export type GarminLatestWrap<T> = {
   data: T | null;
 };
+
+export type HeadacheOnset = 'woke' | 'morning' | 'afternoon' | 'evening';
+
+export type HeadacheCheckDay = {
+  date: string;
+  answered: boolean;
+  had_headache: boolean | null;
+  onset: HeadacheOnset | null;
+  logged_symptoms: string[];
+};
+
+export type WeatherStatus = {
+  home_location_set: boolean;
+  home_location: { latitude: number; longitude: number } | null;
+  days_stored: number;
+  first_date: string | null;
+  last_date: string | null;
+};

@@ -82,6 +82,42 @@ def _is_migraine_name(name: str | None) -> bool:
     return "migraine" in (name or "").strip().lower()
 
 
+# When a headache started, as UK local time. Same-day items logged from this time on
+# came after the headache began, so they can't have caused it.
+ONSET_CUTOFFS = {
+    "woke": dt.time(0, 0),
+    "morning": dt.time(6, 0),
+    "afternoon": dt.time(12, 0),
+    "evening": dt.time(17, 0),
+}
+
+
+def _load_headache_checks(db: Session, start: dt.date, end: dt.date) -> dict[dt.date, models.HeadacheCheck]:
+    """The owner's daily yes/no answers. Where one exists it decides the day, whatever was tapped."""
+    rows = (
+        db.query(models.HeadacheCheck)
+        .filter(models.HeadacheCheck.check_date >= start, models.HeadacheCheck.check_date <= end)
+        .all()
+    )
+    return {row.check_date: row for row in rows}
+
+
+def _apply_checks(symptom_days: set[dt.date], checks: dict[dt.date, models.HeadacheCheck]) -> set[dt.date]:
+    result = set(symptom_days)
+    for day, check in checks.items():
+        if check.had_headache:
+            result.add(day)
+        else:
+            result.discard(day)
+    return result
+
+
+def _logged_after_onset(logged_at: dt.datetime, check: models.HeadacheCheck | None) -> bool:
+    if check is None or not check.had_headache or check.onset not in ONSET_CUTOFFS:
+        return False
+    return logged_at.astimezone(UK_TZ).time() >= ONSET_CUTOFFS[check.onset]
+
+
 def _group_old_and_current_copies(
     db: Session, logged: dict[int, models.Activity]
 ) -> list[tuple[models.Activity, list[models.Activity]]]:
@@ -153,7 +189,8 @@ def _resolve_prior_period(
         .filter(models.Mood.timestamp >= prior_from, models.Mood.timestamp < prior_to)
         .all()
     )
-    if not prior_moods:
+    prior_checks = _load_headache_checks(db, prev_start, prev_end)
+    if not prior_moods and not prior_checks:
         return None
 
     prior_symptom_days: set[dt.date] = set()
@@ -161,6 +198,7 @@ def _resolve_prior_period(
         m_date = mood.timestamp.astimezone(UK_TZ).date()
         if prev_start <= m_date <= prev_end and any(is_symptom(act) for act in mood.activities):
             prior_symptom_days.add(m_date)
+    prior_symptom_days = _apply_checks(prior_symptom_days, prior_checks)
 
     prior_total = max(1, (prev_end - prev_start).days + 1)
     return {
@@ -231,6 +269,9 @@ def compute_appointment_summary(
                     position_days[pos].add(mood_date)
                     day_positions[mood_date].add(pos)
 
+    checks = _load_headache_checks(db, start_date, end_date)
+    symptom_days = _apply_checks(symptom_days, checks)
+
     grouped_symptoms = _group_old_and_current_copies(db, symptom_activities_by_id)
     primary_name_by_id: dict[int, str] = {}
     symptom_breakdown: list[dict] = []
@@ -261,12 +302,12 @@ def compute_appointment_summary(
     for offset in range(total_days):
         day = start_date + dt.timedelta(days=offset)
         names = sorted({primary_name_by_id[aid] for aid in day_raw_activities.get(day, ()) if aid in primary_name_by_id})
-        if any(_is_migraine_name(n) for n in names):
-            status = "migraine"
-        elif names:
-            status = "headache"
-        else:
+        if day not in symptom_days:
             status = "clear"
+        elif any(_is_migraine_name(n) for n in names):
+            status = "migraine"
+        else:
+            status = "headache"
         daily_timeline.append(
             {
                 "date": day.isoformat(),
@@ -274,6 +315,8 @@ def compute_appointment_summary(
                 "symptoms": names,
                 "positions": sorted(day_positions.get(day, ())),
                 "has_acupuncture": day in session_set,
+                "confirmed": day in checks,
+                "onset": checks[day].onset if day in checks else None,
             }
         )
 
@@ -293,6 +336,7 @@ def compute_appointment_summary(
         "symptom_breakdown": symptom_breakdown,
         "position_breakdown": position_breakdown,
         "daily_timeline": daily_timeline,
+        "confirmed_days": len(checks),
     }
 
 
@@ -341,6 +385,114 @@ def _collect_explicit_left_out(db: Session) -> dict[int, dict]:
     return left_out_dict
 
 
+USUAL_LOOKBACK_NIGHTS = 14
+USUAL_MIN_NIGHTS = 5
+
+
+def _minutes_of_day(moment: dt.datetime, evening_wraps: bool) -> int:
+    local = moment.astimezone(UK_TZ)
+    minutes = local.hour * 60 + local.minute
+    # Bedtimes after midnight count as "late", not as early the same day.
+    if evening_wraps and minutes < 12 * 60:
+        minutes += 24 * 60
+    return minutes
+
+
+def _difference_from_usual(times_by_day: dict[dt.date, int], start: dt.date, end: dt.date) -> dict[dt.date, float]:
+    """How many minutes each night's time was from the median of the nights before it."""
+    result: dict[dt.date, float] = {}
+    ordered = sorted(times_by_day)
+    for day in ordered:
+        if not (start <= day <= end):
+            continue
+        earlier = [
+            times_by_day[d]
+            for d in ordered
+            if day - dt.timedelta(days=USUAL_LOOKBACK_NIGHTS) <= d < day
+        ]
+        if len(earlier) < USUAL_MIN_NIGHTS:
+            continue
+        result[day] = float(abs(times_by_day[day] - statistics.median(earlier)))
+    return result
+
+
+def _sleep_timing_inputs(db: Session, start: dt.date, end: dt.date) -> list[tuple[dict, str, bool | None, str]]:
+    rows = (
+        db.query(
+            models.GarminSleepDaily.sleep_date,
+            models.GarminSleepDaily.total_sleep_minutes,
+            models.GarminSleepDaily.sleep_start,
+            models.GarminSleepDaily.sleep_end,
+        )
+        .filter(
+            models.GarminSleepDaily.sleep_date >= start - dt.timedelta(days=USUAL_LOOKBACK_NIGHTS + 1),
+            models.GarminSleepDaily.sleep_date <= end,
+        )
+        .all()
+    )
+    length_map: dict[dt.date, float] = {}
+    bedtimes: dict[dt.date, int] = {}
+    waketimes: dict[dt.date, int] = {}
+    for day, total_minutes, sleep_start, sleep_end in rows:
+        if start <= day <= end and total_minutes:
+            length_map[day] = round(total_minutes / 60, 2)
+        if sleep_start is not None:
+            bedtimes[day] = _minutes_of_day(sleep_start, evening_wraps=True)
+        if sleep_end is not None:
+            waketimes[day] = _minutes_of_day(sleep_end, evening_wraps=False)
+    return [
+        (length_map, "Sleep length (night before)", True, "h"),
+        (_difference_from_usual(bedtimes, start, end), "Bedtime away from your usual (night before)", False, "min"),
+        (_difference_from_usual(waketimes, start, end), "Wake-up time away from your usual", False, "min"),
+    ]
+
+
+def _body_battery_input(db: Session, start: dt.date, end: dt.date) -> tuple[dict, str, bool, str]:
+    values: dict[dt.date, float] = {}
+    battery_rows = (
+        db.query(models.GarminBodyBatteryDaily.battery_date, models.GarminBodyBatteryDaily.morning_value)
+        .filter(models.GarminBodyBatteryDaily.battery_date >= start, models.GarminBodyBatteryDaily.battery_date <= end)
+        .all()
+    )
+    for day, value in battery_rows:
+        if value is not None:
+            values[day] = float(value)
+    # The sleep record's wake-up reading is the more precise one when present.
+    sleep_rows = (
+        db.query(models.GarminSleepDaily.sleep_date, models.GarminSleepDaily.body_battery_wakeup)
+        .filter(models.GarminSleepDaily.sleep_date >= start, models.GarminSleepDaily.sleep_date <= end)
+        .all()
+    )
+    for day, value in sleep_rows:
+        if value is not None:
+            values[day] = float(value)
+    return (values, "Body Battery on waking", True, "")
+
+
+def _weather_inputs(db: Session, start: dt.date, end: dt.date) -> list[tuple[dict, str, bool | None, str]]:
+    rows = (
+        db.query(
+            models.WeatherDaily.weather_date,
+            models.WeatherDaily.pressure_msl_mean,
+            models.WeatherDaily.temperature_max_c,
+        )
+        .filter(models.WeatherDaily.weather_date >= start - dt.timedelta(days=1), models.WeatherDaily.weather_date <= end)
+        .all()
+    )
+    pressure = {d: float(p) for d, p, _ in rows if p is not None}
+    pressure_change = {
+        d: round(p - pressure[d - dt.timedelta(days=1)], 1)
+        for d, p in pressure.items()
+        if start <= d <= end and (d - dt.timedelta(days=1)) in pressure
+    }
+    temp_max = {d: float(t) for d, _, t in rows if t is not None and start <= d <= end}
+    return [
+        # A falling pressure shows as a negative change, so "higher is better" here.
+        (pressure_change, "Air pressure change since yesterday", True, "hPa"),
+        (temp_max, "Highest temperature that day", None, "°C"),
+    ]
+
+
 def compute_headache_triggers(
     db: Session,
     window: str = "90d",
@@ -356,6 +508,7 @@ def compute_headache_triggers(
             "start_date": None,
             "end_date": None,
             "logged_days": 0,
+            "confirmed_days": 0,
             "symptom_days": 0,
             "clean_days": 0,
             "tested_count": 0,
@@ -380,6 +533,8 @@ def compute_headache_triggers(
         .filter(models.Mood.timestamp >= mood_from, models.Mood.timestamp < mood_to)
         .all()
     )
+
+    checks = _load_headache_checks(db, resolved_start, resolved_end)
 
     active_logged_days: set[dt.date] = set()
     exposure_logged_days: set[dt.date] = set()
@@ -415,13 +570,18 @@ def compute_headache_triggers(
             day_affected = mood_date + dt.timedelta(days=1)
             if in_window(day_affected):
                 day_before_item_days[activity.id].add(day_affected)
-            if in_window(mood_date):
+            if in_window(mood_date) and not _logged_after_onset(mood.timestamp, checks.get(mood_date)):
                 same_day_item_days[activity.id].add(mood_date)
 
         if has_symptom_on_mood and in_window(mood_date):
             symptom_days.add(mood_date)
 
+    # A day with a yes/no answer counts as logged, and the answer decides what kind of day it was.
+    active_logged_days |= set(checks)
+    symptom_days = _apply_checks(symptom_days, checks)
     clean_days = active_logged_days - symptom_days
+    # Only days with entries tell us what was (or wasn't) done that day.
+    same_day_eligible_days = active_logged_days & exposure_logged_days
     day_before_eligible_days = {
         d
         for d in active_logged_days
@@ -453,7 +613,7 @@ def compute_headache_triggers(
 
         with_sd = set().union(*(same_day_item_days[a.id] for a in copies)) & active_logged_days
         if with_sd:
-            without_sd = active_logged_days - with_sd
+            without_sd = same_day_eligible_days - with_sd
             candidates_same_day.append((primary.id, name, with_sd, without_sd, "activity"))
 
     # Garmin Workouts (day before)
@@ -685,6 +845,12 @@ def compute_headache_triggers(
             hydration_map[h_date + dt.timedelta(days=1)] = round((consumed / goal) * 100, 1)
     bio_inputs.append((hydration_map, "Hydration % of goal (day before)", True, "%"))
 
+    bio_inputs.extend(_sleep_timing_inputs(db, resolved_start, resolved_end))
+    bio_inputs.append(_body_battery_input(db, resolved_start, resolved_end))
+    weather_inputs = _weather_inputs(db, resolved_start, resolved_end)
+    bio_inputs.extend(weather_inputs)
+    weather_labels = {label for _, label, _, _ in weather_inputs}
+
     tested_bios = []
     for metric_map, label, higher_is_better, unit in bio_inputs:
         symp_vals = [metric_map[d] for d in symptom_days if d in metric_map]
@@ -697,7 +863,7 @@ def compute_headache_triggers(
                     "activity_id": None,
                     "activity": label,
                     "with_nights": min(len(symp_vals), len(clean_vals)),
-                    "source": "garmin",
+                    "source": "weather" if label in weather_labels else "garmin",
                 }
             )
             continue
@@ -708,7 +874,7 @@ def compute_headache_triggers(
                     "activity_id": None,
                     "activity": label,
                     "with_nights": min(res.with_n, res.without_n),
-                    "source": "garmin",
+                    "source": "weather" if label in weather_labels else "garmin",
                 }
             )
             continue
@@ -727,7 +893,7 @@ def compute_headache_triggers(
             entry = {
                 "kind": "biometric",
                 "timing": "biometric",
-                "source": "garmin",
+                "source": "weather" if label in weather_labels else "garmin",
                 "metric": label,
                 "symptom_avg": symp_avg,
                 "clean_avg": clean_avg,
@@ -736,7 +902,8 @@ def compute_headache_triggers(
                 "with_nights": res.with_n,
                 "without_nights": res.without_n,
                 "confidence": confidence,
-                "better": (diff > 0) == higher_is_better if diff != 0.0 else False,
+                # Neutral measures (e.g. temperature) have no "better" direction.
+                "better": (diff > 0) == higher_is_better if diff != 0.0 and higher_is_better is not None else False,
             }
             if confidence in ("strong", "some") and not negligible:
                 biometrics.append(entry)
@@ -799,6 +966,7 @@ def compute_headache_triggers(
         "start_date": resolved_start.isoformat(),
         "end_date": resolved_end.isoformat(),
         "logged_days": len(active_logged_days),
+        "confirmed_days": len(checks),
         "symptom_days": len(symptom_days),
         "clean_days": len(clean_days),
         "tested_count": tested_count,
@@ -825,6 +993,7 @@ def compute_headache_summary(
     return {
         **appointment,
         "logged_days": triggers["logged_days"],
+        "confirmed_days": triggers["confirmed_days"],
         "tested_count": triggers["tested_count"],
         "clue_count": triggers["clue_count"],
         "verdict_kind": triggers["verdict_kind"],

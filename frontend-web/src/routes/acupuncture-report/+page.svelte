@@ -32,6 +32,8 @@
     symptoms: string[];
     positions: string[];
     has_acupuncture: boolean;
+    confirmed?: boolean;
+    onset?: 'woke' | 'morning' | 'afternoon' | 'evening' | null;
   };
 
   type PriorPeriod = {
@@ -55,6 +57,7 @@
     symptom_breakdown: SymptomBreakdownItem[];
     position_breakdown: PositionBreakdownItem[];
     daily_timeline: TimelineDay[];
+    confirmed_days?: number;
   };
 
   type TriggerItem = {
@@ -74,7 +77,7 @@
   type BiometricItem = {
     kind?: 'biometric';
     timing?: 'biometric';
-    source?: 'garmin';
+    source?: 'garmin' | 'weather';
     metric: string;
     symptom_avg: number;
     clean_avg: number;
@@ -95,6 +98,7 @@
     start_date: string | null;
     end_date: string | null;
     logged_days: number;
+    confirmed_days?: number;
     symptom_days: number;
     clean_days: number;
     tested_count: number;
@@ -231,14 +235,26 @@
 
   const dayNumber = (iso: string) => String(Number(iso.slice(8, 10)));
 
+  const ONSET_WORDS: Record<string, string> = {
+    woke: 'woke with it',
+    morning: 'started in the morning',
+    afternoon: 'started in the afternoon',
+    evening: 'started in the evening'
+  };
+
+  // What the day was, in words. Your daily yes/no answer decides; tapped items are listed too.
+  const daySummary = (day: TimelineDay) => {
+    if (day.status === 'clear') {
+      if (day.symptoms.length === 0) return day.confirmed ? 'No headache (your answer)' : 'Clear day';
+      return `No headache (your answer) · also logged ${day.symptoms.join(', ')}`;
+    }
+    const what = day.symptoms.length > 0 ? day.symptoms.join(', ') : 'Headache (your answer)';
+    return day.onset ? `${what} · ${ONSET_WORDS[day.onset] ?? ''}` : what;
+  };
+
   const dayTooltip = (day: TimelineDay) => {
     const label = fmtDayHeading(day.date);
-    const parts: string[] = [label];
-    if (day.symptoms.length > 0) {
-      parts.push(day.symptoms.join(', '));
-    } else {
-      parts.push('Clear day');
-    }
+    const parts: string[] = [label, daySummary(day)];
     if (day.positions.length > 0) {
       parts.push(`Position: ${day.positions.join(', ')}`);
     }
@@ -563,11 +579,7 @@
         <div class="day-detail" role="region" aria-label="Selected day details">
           <div class="day-detail-text">
             <strong>{fmtDayHeading(inspectedDay.date)}</strong>
-            {#if inspectedDay.symptoms.length > 0}
-              <span> · {inspectedDay.symptoms.join(', ')}</span>
-            {:else}
-              <span> · Clear day</span>
-            {/if}
+            <span> · {daySummary(inspectedDay)}</span>
             {#if inspectedDay.positions.length > 0}
               <span class="detail-muted"> · Position: {inspectedDay.positions.join(', ')}</span>
             {/if}
@@ -778,8 +790,8 @@
       <!-- Biometrics clues -->
       {#if triggers.biometrics.length > 0}
         <div class="clue-group">
-          <h4>Contributing biometrics (Garmin)</h4>
-          <p class="group-desc">Garmin readings that showed a clear gap before headache days vs clear logged days.</p>
+          <h4>Body and weather readings</h4>
+          <p class="group-desc">Garmin and weather readings that showed a clear gap on headache days vs clear logged days.</p>
           <ul class="impact-list">
             {#each triggers.biometrics as bio (bio.metric)}
               <li class="impact-row">

@@ -14,6 +14,8 @@
     type PushSubscriptionRow,
     type ReminderSchedule
   } from '$lib/push';
+  import { api, putJson } from '$lib/api';
+  import type { WeatherStatus } from '$lib/types';
 
   const appVersion = __APP_VERSION__;
   // BUILD_DATE is injected by vite.config.ts
@@ -30,7 +32,71 @@
   let reminderError = '';
   let subscriptionError = '';
 
+  let weather: WeatherStatus | null = null;
+  let weatherBusy = false;
+  let weatherMessage = '';
+  let weatherError = '';
+
+  const loadWeather = async () => {
+    try {
+      weather = await api<WeatherStatus>(`/weather/status?fresh=${Date.now()}`);
+    } catch (error) {
+      weatherError = `Could not load weather status: ${describeError(error)}`;
+    }
+  };
+
+  const fmtDay = (iso: string | null) =>
+    iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  const useCurrentLocation = () => {
+    weatherError = '';
+    weatherMessage = '';
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      weatherError = 'This browser cannot share your location.';
+      return;
+    }
+    weatherBusy = true;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          weather = await putJson<WeatherStatus>('/weather/home-location', {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+          weatherMessage = 'Home area saved. Weather history is being fetched in the background. Tap "Check progress" in a minute.';
+        } catch (error) {
+          weatherError = `Could not save your home area: ${describeError(error)}`;
+        } finally {
+          weatherBusy = false;
+        }
+      },
+      () => {
+        weatherBusy = false;
+        weatherError = 'Location was not shared. Allow location for this site in your browser settings, then try again.';
+      },
+      { enableHighAccuracy: false, timeout: 20000 }
+    );
+  };
+
+  const addHeadacheCheckPreset = async () => {
+    busyReminders = true;
+    reminderError = '';
+    try {
+      await createReminder({
+        time_of_day: '21:00',
+        message: 'Headache today? Quick yes/no on Mood Entry',
+        enabled: true
+      });
+      await load();
+    } catch (error) {
+      reminderError = `Could not add reminder: ${describeError(error)}`;
+    } finally {
+      busyReminders = false;
+    }
+  };
+
   const load = async () => {
+    loadWeather();
     try {
       reminders = await listReminders();
     } catch (error) {
@@ -199,6 +265,42 @@
       + Add 21:30 Evening Check-In
     </button>
   </div>
+  <div class="preset-row">
+    <span><strong>Headache check:</strong> a 21:00 nudge to answer "Headache today?" on Mood Entry.</span>
+    <button type="button" on:click={addHeadacheCheckPreset} disabled={busyReminders}>+ Add 21:00 Headache Check</button>
+  </div>
+</section>
+
+<section class="card weather-card" aria-labelledby="weather-title">
+  <h3 id="weather-title" style="margin:0 0 0.5rem;">Weather for the headache report</h3>
+  <p class="weather-hint">
+    The headache report can check whether changes in air pressure or temperature line up with your headaches.
+    It needs your home area once. Only a rough position (to about 1 km) is stored and sent to the free Open-Meteo weather service.
+  </p>
+  {#if weather}
+    {#if weather.home_location_set}
+      <p class="weather-state">
+        Home area is set.
+        {#if weather.days_stored > 0}
+          Weather stored for {weather.days_stored} days ({fmtDay(weather.first_date)} to {fmtDay(weather.last_date)}).
+        {:else}
+          No weather fetched yet.
+        {/if}
+      </p>
+    {:else}
+      <p class="weather-state">No home area set yet.</p>
+    {/if}
+  {/if}
+  <div class="reminder-row">
+    <button type="button" on:click={useCurrentLocation} disabled={weatherBusy}>
+      {weatherBusy ? 'Finding you…' : weather?.home_location_set ? 'Update to my current location' : 'Use my current location as home'}
+    </button>
+    {#if weather?.home_location_set}
+      <button type="button" class="btn-clear" on:click={loadWeather}>Check progress</button>
+    {/if}
+  </div>
+  {#if weatherMessage}<p class="weather-ok" role="status">{weatherMessage}</p>{/if}
+  {#if weatherError}<p class="notif-warn" role="alert">{weatherError}</p>{/if}
 </section>
 
 <section class="card grid two">
@@ -243,6 +345,11 @@
   }
 
   .reminder-card { margin-bottom: 0.75rem; }
+  .weather-card { margin-bottom: 0.75rem; }
+  .weather-hint { margin: 0 0 0.6rem; color: var(--color-neutral-text-muted); font-size: 0.88rem; }
+  .weather-state { margin: 0 0 0.4rem; font-size: 0.9rem; color: var(--color-neutral-text); }
+  .weather-ok { margin: 0.6rem 0 0; font-size: 0.84rem; color: var(--color-success-text); background: var(--color-success-bg); border-radius: 8px; padding: 0.3rem 0.6rem; }
+  .preset-row { margin-top: 0.6rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: var(--color-surface-subtle); border: 1px solid var(--color-input-border); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.84rem; color: var(--color-primary-content); }
   .reminder-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.4rem 0; }
   .chk { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
   .chk input { width: auto; }

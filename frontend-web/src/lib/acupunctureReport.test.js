@@ -115,3 +115,26 @@ test('describeVerdict returns plain-English headlines for clues_found, looks_ran
   assert.match(shortPeriod.headline, /not enough data/i);
   assert.match(shortPeriod.detail, /90 days|all time/i);
 });
+
+test('describeVerdict mentions how many days the daily headache check confirmed', () => {
+  const confirmed = describeVerdict({
+    verdict_kind: 'looks_random',
+    clue_count: 0,
+    logged_days: 30,
+    symptom_days: 8,
+    window: 'period',
+    min_nights: 5,
+    confirmed_days: 18,
+  });
+  assert.match(confirmed.detail, /30 logged days \(8 headache days; 18 of the 30 confirmed with the daily headache check\)/);
+
+  const older = describeVerdict({
+    verdict_kind: 'looks_random',
+    clue_count: 0,
+    logged_days: 30,
+    symptom_days: 8,
+    window: 'period',
+    min_nights: 5,
+  });
+  assert.doesNotMatch(older.detail, /confirmed/);
+});

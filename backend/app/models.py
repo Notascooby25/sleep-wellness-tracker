@@ -283,3 +283,40 @@ class ReminderSchedule(Base):
     enabled = Column(Boolean, default=True, nullable=False)
     last_fired_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class HeadacheCheck(Base):
+    """The owner's once-a-day answer to "Headache today?" (decides headache vs clear days)."""
+
+    __tablename__ = "headache_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    check_date = Column(Date, unique=True, nullable=False, index=True)
+    had_headache = Column(Boolean, nullable=False)
+    onset = Column(String(16), nullable=True)  # woke / morning / afternoon / evening (only when had_headache)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WeatherDaily(Base):
+    """Daily weather at the owner's home area (from Open-Meteo), for every day, not just logged ones."""
+
+    __tablename__ = "weather_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    weather_date = Column(Date, unique=True, nullable=False, index=True)
+    pressure_msl_mean = Column(Numeric(6, 1), nullable=True)  # hPa, average over the UK-local day
+    temperature_max_c = Column(Numeric(5, 2), nullable=True)
+    temperature_min_c = Column(Numeric(5, 2), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class AppSetting(Base):
+    """Small owner settings stored as JSON by key (e.g. the home area used for weather)."""
+
+    __tablename__ = "app_settings"
+
+    key = Column(String(80), primary_key=True)
+    value = Column(JSON, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
