@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.23.1 (2026-11-21)
+
+**Mood Entry is easier to tap and read.** On a phone, the activity chips, category tabs, position chips and buttons are now full fingertip size (44px), so mis-taps are less likely. A selected mood or sleep score keeps its soft colour and gets a thick dark border and a tick, instead of white text on a strong colour, which was hard to read. Screen readers now say which scores, chips and categories are selected. A failed page load now shows as a red error instead of a green "success" box. The hints such as "(1 = great, 5 = struggling)" are a little darker, and the amber and red message boxes use the app's standard colours.
+
 ## 4.23.0 (2026-11-21)
 
 **Local weather when you're away from home.** When you save an entry or answer "Headache today?" and your phone shares its location, the app now remembers roughly where you were that day (to about 1 km). If you were more than 25 km from home, the headache report uses the local weather for that day instead of your home weather. The pressure "change since yesterday" is only compared between days at the same place, so travelling doesn't look like a sudden pressure drop. Days away show a small bar on the report's day strip, with an "Away from home" key. Entries for past days don't record where your phone is now. The home-area button in Settings now reads "I've moved house: use my current location", asks you to confirm, and no longer deletes the weather already stored.
