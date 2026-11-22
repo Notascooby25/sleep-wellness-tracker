@@ -3,7 +3,7 @@
 ## Protection Layout
 
 1. Database dumps and mood-image archives are created on the NUC at `/srv/shared/backups`.
-2. `push_srv_to_synology.sh` mirrors the `/srv` tree to the DS223 at `/volume1/Backups/nuc-server` (see [NAS Mirror](#nas-mirror)): the backup artifacts plus the three app folders and `shared/{mood-images,garmin-tokens,logs}`.
+2. `push_srv_to_synology.sh` mirrors the `/srv` tree to the DS223 at `/volume1/Backups/nuc-server` (see [NAS Mirror](#nas-mirror)): the backup artifacts plus the three app folders, `runsync/backups` and `shared/{mood-images,garmin-tokens,logs}`.
 3. The backup artifacts (only) are copied through the `gdrive-crypt` rclone crypt remote to Google Drive. File names and contents stored in Drive are encrypted by the crypt remote. App folders and `.env` files are never sent to Google (the Garmin token tarball travels inside the encrypted backup copy).
 
 Google copy uses `rclone copy`, not `rclone sync`, so Google retention is independent of local retention and an accidental local deletion does not delete remote copies. After each upload `sync_backups_to_google.sh` also checks that the producers are current (see [Google Copy: Freshness and Heartbeat](#google-copy-freshness-and-heartbeat)), and `backup_host_config.sh` adds a daily snapshot of the host's own configuration to what travels off the host (see [Host Config Snapshot](#host-config-snapshot)).
@@ -65,6 +65,7 @@ Create local data, then replicate it and verify both destinations:
   shared/garmin-tokens/    mirror
   shared/logs/             mirror, no version history
   sleepwell/  audio-scrobbler-app/  UK-Expense-Tracker/    mirrors
+  runsync/backups/         mirror (only this folder; the rest of /srv/runsync is not copied)
   _versions/<UTC time>/    files changed or deleted by a mirror run, pruned after 30 days
 ```
 
@@ -73,6 +74,7 @@ Create local data, then replicate it and verify both destinations:
 - The NAS folder `nuc-server` is mode 700 (`chmod 700`), so other NAS users can't read the mirrored secrets even where a source file is 644 on the NUC. DSM admins still can.
 - Mirrors include secrets (`.env`, `.env.production`, `secrets.toml`, `garmin_tokens.json`) with their permissions preserved. This is a convenience copy on the NAS only; the scrobbler's `.env.production` must still be kept in your password manager (see its DISASTER_RECOVERY.md).
 - The audio-scrobbler backup pipeline (systemd timer, `gdrive-crypt:AudioScrobblerBackups`) is separate and untouched. Mirroring its folder just gives its dumps a second copy on the NAS under `audio-scrobbler-app/backups/`.
+- runsync is mirrored differently from the other apps: only `/srv/runsync/backups` is copied (to `runsync/backups/` on the NAS), so its `.env` and the rest of `/srv/runsync` never reach the NAS. Files matching `.env*`, `*.tmp` and `*.lock` inside that folder are skipped too.
 - Live restore of a mirrored folder: `rsync -a <nas>:/volume1/Backups/nuc-server/<name>/ /srv/<name>/`. To get back a deleted or overwritten file, look in `_versions/`.
 
 ### NAS settings (not in git)

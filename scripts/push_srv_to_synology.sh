@@ -8,6 +8,7 @@
 #   shared/garmin-tokens/   mirror
 #   shared/logs/            mirror (no version history)
 #   sleepwell/  audio-scrobbler-app/  UK-Expense-Tracker/    mirrors
+#   runsync/backups/        mirror (only this folder; the rest of /srv/runsync is not copied)
 #
 # shared/postgres-data is deliberately NOT copied: it is unreadable to this user,
 # and a file-level copy of a live Postgres directory is not a usable backup. The
@@ -157,6 +158,8 @@ sync_dir mirror-nover shared/logs
 sync_dir mirror       sleepwell           "${APP_EXCLUDES[@]}"
 sync_dir mirror       audio-scrobbler-app "${APP_EXCLUDES[@]}"
 sync_dir mirror       UK-Expense-Tracker  "${APP_EXCLUDES[@]}"
+# runsync: only its backups folder is mirrored, never the rest of /srv/runsync (.env etc.).
+sync_dir mirror       runsync/backups     "${BACKUP_EXCLUDES[@]}"
 
 if (( ! DRY_RUN )); then
     log "Pruning NAS version history older than ${VERSION_DAYS} days"
