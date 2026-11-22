@@ -56,6 +56,7 @@ jobs:
           bash scripts/tests/test_sync_backups_to_google.sh
           bash scripts/tests/test_host_config_and_cron.sh
           bash scripts/tests/test_db_backup_schedule.sh
+          bash scripts/tests/test_push_srv_runsync.sh
 
   lint:
     runs-on: ubuntu-latest
