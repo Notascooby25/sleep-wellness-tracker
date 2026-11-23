@@ -62,7 +62,7 @@ NAS layout mirrors `/srv`:
   sleepwell/               mirror
   audio-scrobbler-app/     mirror   (first time this app is on the NAS)
   UK-Expense-Tracker/      mirror
-  runsync/backups/         mirror   (only this folder; the rest of /srv/runsync is not copied)
+  runsync/                 mirror   (whole folder, including its backups/ and .env)
   _versions/<UTC time>/    files a mirror run replaced or deleted, pruned after 30 days
   _old-layout/             the previous layout, parked; delete after ~2026-10-20
 ```
@@ -133,8 +133,7 @@ The owner accepts losing at most 6 hours of recent data, so the **sleepwell DB d
 1. **Don't point your backups at another app's directory.** Keep your artifacts inside your own `/srv/<app>` folder (scrobbler: `/srv/audio-scrobbler-app/backups`). The mirror carries them to the NAS under your own folder, correctly filed. Writing into `/srv/shared/backups` files them under sleepwell's Google path and its append-only NAS tree. (Expense tracker already writes its tarballs there; that works and is covered by sleepwell's Google copy.)
 2. **Never rsync or copy a live Postgres data directory.** Back databases up with `pg_dump` and keep the dumps.
 3. **Everything in your `/srv/<app>` folder is mirrored every 6 hours, secrets included.** Don't leave stray copies of secrets lying around (e.g. old `.env.production.bak-*`); they will be mirrored too. Keep large regenerable data out of the app folder, or ask for an exclude. Keep secret files mode 600 (like `.env` and `.env.production`) unless a container reads them through a bind mount, where a stricter mode could break the app.
-4. **A new folder under `/srv` is not picked up automatically.** Adding a new app means one line in `push_srv_to_synology.sh`: `sync_dir mirror <folder-name> "${APP_EXCLUDES[@]}"`. (runsync is the exception: only its `backups` folder is mirrored, with `sync_dir mirror runsync/backups "${BACKUP_EXCLUDES[@]}"`.)
-5. **Don't edit the NAS cron job or its script from another repo.** Make the change in the sleepwell repo and deploy it with `git pull` on the NUC.
+4. **A new folder under `/srv` is not picked up automatically.** Adding a new app means one line in `push_srv_to_synology.sh`: `sync_dir mirror <folder-name> "${APP_EXCLUDES[@]}"`.5. **Don't edit the NAS cron job or its script from another repo.** Make the change in the sleepwell repo and deploy it with `git pull` on the NUC.
 6. **Keep your own recovery secrets off the NUC too.** The NAS copy of `.env.production` is a convenience, not a replacement for a password-manager copy (see the scrobbler DR doc). Two secrets are in *no* backup at all and must be in a password manager: `~/.config/rclone/rclone.conf` (the crypt passwords: without them every Google copy is unreadable) and the expense tracker's `.streamlit/secrets.toml` (kept out of the Google-bound archive on purpose; the NAS folder mirror holds a copy).
 7. **Check the NUC, not just the repo, before assuming something is deployed.** The live crontab and the checkouts have drifted from the repos before.
 
