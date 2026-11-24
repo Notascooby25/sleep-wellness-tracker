@@ -334,29 +334,123 @@ def test_twins_flagged(signed_in, world):
     assert find(items, "Bathroom")["logged_with"] == ["Cold"]
 
 
-FALLBACKS_LOW = "Your last sleep score was 60. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
-
-
-def _advice_world(world, alcohol_nights):
+def test_advice_explains_bad_night_from_yesterday_without_skipping_phrasing(signed_in, world):
+    world.item("Chest infection", category="Health")
     for day in range(1, 21):
-        drank = day % 2 == 0 and day <= alcohol_nights * 2
-        world.log(d(day), ["Alcohol"] if drank else ["Reading"] if day % 4 == 1 else ["Journaling"])
-        world.sleep(d(day + 1), 60 if drank else 85)
-    world.sleep(d(22), 60)
+        ill = day % 2 == 0
+        world.log(d(day), ["Chest infection"] if ill else ["Reading"], hour=14 if ill else 21)
+        world.sleep(d(day + 1), 58 if ill else 82)
+    world.log(d(21), ["Chest infection"], hour=14)
+    world.sleep(d(22), 58)
     world.done()
 
-
-def test_advice_warns_about_confident_harm(signed_in, world, monkeypatch):
-    _advice_world(world, alcohol_nights=10)
-    from app.routes import lifestyle_impact
-
-    monkeypatch.setattr(lifestyle_impact, "_today", lambda: END)
     advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
-    assert advice.startswith("Your last sleep score was 60. On nights after Alcohol")
-    assert "points lower" in advice and "skipping" in advice
+    assert "Last night's sleep score was 58" in advice
+    assert "below your 4-week average" in advice
+    assert "Yesterday included Chest infection" in advice
+    assert "points lower" in advice
+    assert "skipping" not in advice.lower()
 
 
-def test_advice_ignores_weak_results(signed_in, world, monkeypatch):
+def test_advice_ignores_old_item_not_logged_yesterday(signed_in, world):
+    world.item("Chest infection", category="Health")
+    for day in range(1, 21):
+        ill = day <= 8
+        world.log(d(day), ["Chest infection"] if ill else ["Reading"], hour=14 if ill else 21)
+        world.sleep(d(day + 1), 58 if ill else 82)
+    world.log(d(21), ["Reading"], hour=21)
+    world.sleep(d(22), 58)
+    world.done()
+
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Chest infection" not in advice
+    assert "Last night's sleep score was 58" in advice
+    assert "below your 4-week average" in advice
+
+
+def test_advice_explains_good_night_from_garmin_workout(signed_in, world):
+    for day in range(1, 21):
+        worked_out = day % 2 == 0
+        world.log(d(day), ["Reading"], hour=21)
+        if worked_out:
+            world.db.add(models.GarminActivity(
+                garmin_activity_id=f"w{day}",
+                activity_date=d(day),
+                start_time=dt.datetime.combine(d(day), dt.time(10), tzinfo=UTC),
+                duration_seconds=2400,
+            ))
+        world.sleep(d(day + 1), 88 if worked_out else 70)
+    world.log(d(21), ["Reading"], hour=21)
+    world.db.add(models.GarminActivity(
+        garmin_activity_id="w21",
+        activity_date=d(21),
+        start_time=dt.datetime.combine(d(21), dt.time(10), tzinfo=UTC),
+        duration_seconds=2400,
+    ))
+    world.sleep(d(22), 88)
+    world.done()
+
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "above your 4-week average" in advice
+    assert "Yesterday included Workout" in advice
+    assert "points higher" in advice
+
+
+def test_advice_caps_after_four_consecutive_days_and_resets_after_gap(signed_in, world):
+    world.item("Chest infection", category="Health")
+    for day in range(1, 7):
+        world.log(d(day), ["Chest infection"], hour=14)
+        world.sleep(d(day + 1), 58)
+    for day in range(7, 17):
+        world.log(d(day), ["Reading"], hour=21)
+        world.sleep(d(day + 1), 82)
+    # 4 consecutive days (days 17..20 -> nights 18..21): 4th day still shown
+    for day in range(17, 21):
+        world.log(d(day), ["Chest infection"], hour=14)
+        world.sleep(d(day + 1), 58)
+    world.done()
+
+    day4_advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Chest infection" in day4_advice
+
+    # 5th consecutive day (day 21 -> night 22): suppressed
+    world.log(d(21), ["Chest infection"], hour=14)
+    world.sleep(d(22), 58)
+    world.done()
+    day5_advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Chest infection" not in day5_advice
+
+    # Gap day without it (day 22 -> night 23), then returns on day 23 -> night 24: shown again
+    world.log(d(22), ["Reading"], hour=21)
+    world.sleep(d(23), 82)
+    world.log(d(23), ["Chest infection"], hour=14)
+    world.sleep(d(24), 58)
+    world.done()
+    reset_advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Chest infection" in reset_advice
+
+
+def test_advice_checks_overnight_stress_when_sleep_score_steady(signed_in, world):
+    for day in range(1, 21):
+        late_meal = day % 2 == 0
+        world.log(d(day), ["Late meal"] if late_meal else ["Reading"], hour=21)
+        world.sleep(
+            d(day + 1),
+            76 if late_meal else 77,
+            payload={"dailySleepDTO": {"avgSleepStress": 42.0 if late_meal else 20.0}},
+        )
+    world.log(d(21), ["Late meal"], hour=21)
+    world.sleep(d(22), 76, payload={"dailySleepDTO": {"avgSleepStress": 42.0}})
+    world.done()
+
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "close to your 4-week average" in advice
+    assert "Overnight stress" in advice
+    assert "Late meal" in advice
+    assert "higher" in advice
+
+
+def test_advice_ignores_weak_results_even_when_logged_yesterday(signed_in, world):
     with_scores = [70, 98, 64, 96, 62, 92]
     without_scores = [70, 80, 72, 78, 71, 79]
     for i in range(6):
@@ -364,14 +458,34 @@ def test_advice_ignores_weak_results(signed_in, world, monkeypatch):
         world.sleep(d(2 * i + 2), with_scores[i])
         world.log(d(2 * i + 2), ["Reading"])
         world.sleep(d(2 * i + 3), without_scores[i])
+    world.log(d(13), ["Maybe"])
     world.sleep(d(14), 60)
     world.done()
-    from app.routes import lifestyle_impact
 
-    monkeypatch.setattr(lifestyle_impact, "_today", lambda: END)
     maybe = find(impact(signed_in, days=84)["items"], "Maybe")
     assert maybe["confidence"] == "weak"
-    assert signed_in.get("/lifestyle-impact/advice").json()["advice"] == FALLBACKS_LOW
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Maybe" not in advice
+    assert "Last night's sleep score was 60" in advice
+
+
+def test_advice_ordinary_morning_and_null_latest_row(signed_in, world):
+    assert "4-week baseline" in signed_in.get("/lifestyle-impact/advice").json()["advice"]
+
+    for day in range(1, 15):
+        world.log(d(day), ["Reading"], hour=21)
+        world.sleep(d(day + 1), 76, payload={"dailySleepDTO": {"avgSleepStress": 22.0}})
+        world.db.add(models.GarminHRVDaily(
+            hrv_date=d(day + 1), weekly_avg=52, payload={"hrvSummary": {"lastNightAvg": 52}}
+        ))
+    # Unscored placeholder row for tomorrow shouldn't hide last night's real score
+    world.sleep(d(16), None)
+    world.done()
+
+    advice = signed_in.get("/lifestyle-impact/advice").json()["advice"]
+    assert "Last night's sleep score was 76" in advice
+    assert "4-week average of 76" in advice
+    assert "steady" in advice.lower()
 
 
 def test_same_name_items_merged(signed_in, world):
