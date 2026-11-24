@@ -138,7 +138,14 @@ def _group_old_and_current_copies(
     return [(primaries[pid], copies) for pid, copies in members.items()]
 
 
-def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.date | None = None) -> dict:
+def compute_lifestyle_impact(
+    db: Session,
+    metric: str,
+    days: int,
+    end_date: dt.date | None = None,
+    *,
+    include_nights: bool = False,
+) -> dict:
     higher_is_better = _METRICS[metric]["higher_is_better"]
     end_date = end_date or _today()
     start_date = end_date - dt.timedelta(days=days - 1)
@@ -159,10 +166,23 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
     activities: dict[int, models.Activity] = {}
     item_nights: dict[int, set[dt.date]] = defaultdict(set)
     logged_categories: dict[dt.date, set] = defaultdict(set)
+    active_nights: set[dt.date] = set()
     for mood in moods:
+        if not mood.activities:
+            quick_night = night_for_entry(mood.timestamp, False)
+            if in_window(quick_night):
+                active_nights.add(quick_night)
+            continue
         for activity in mood.activities:
             category_name = activity.category.name if activity.category is not None else None
-            night = night_for_entry(mood.timestamp, is_before_sleep(category_name))
+            before_sleep = is_before_sleep(category_name)
+            night = night_for_entry(mood.timestamp, before_sleep)
+            if effective_role(activity) == "describes_night" and not before_sleep:
+                described_night = mood.timestamp.astimezone(UK_TZ).date()
+                if in_window(described_night):
+                    active_nights.add(described_night)
+            elif in_window(night):
+                active_nights.add(night)
             if not in_window(night):
                 continue
             activities[activity.id] = activity
@@ -184,12 +204,16 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
                 left_out.append({"activity_id": primary.id, "activity": name, "reason": role})
             continue
         with_set = set().union(*(item_nights[a.id] for a in copies))
-        category_ids = {a.category_id for a in copies}
-        without_set = {
-            night
-            for night, categories in logged_categories.items()
-            if categories & category_ids and night not in with_set
-        }
+        primary_category = primary.category.name if primary.category is not None else None
+        if is_before_sleep(primary_category):
+            category_ids = {a.category_id for a in copies}
+            without_set = {
+                night
+                for night, categories in logged_categories.items()
+                if categories & category_ids and night not in with_set
+            }
+        else:
+            without_set = active_nights - with_set
         candidates.append((primary.id, name, with_set, without_set))
 
     workout_rows = (
@@ -259,7 +283,8 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
     for item in items:
         by_nights[item["_nights"]].append(item["activity"])
     for item in items:
-        twins = by_nights[item.pop("_nights")]
+        nights_set = item["_nights"] if include_nights else item.pop("_nights")
+        twins = by_nights[nights_set]
         item["logged_with"] = sorted(name for name in twins if name != item["activity"])
 
     items.sort(key=lambda item: (CONFIDENCE_ORDER[item["confidence"]], -abs(item["effect"])))
@@ -296,35 +321,109 @@ def _today() -> dt.date:
     return dt.datetime.now(UK_TZ).date()
 
 
-def _advice_from_item(score: int, item: dict) -> str:
-    name, size = item["activity"], abs(item["effect"])
-    if item["better"]:
-        return (
-            f"Your last sleep score was {score}. On nights after {name}, your sleep score has been "
-            f"about {size:.0f} points higher. Worth making time for it tonight."
-        )
-    return (
-        f"Your last sleep score was {score}. On nights after {name}, your sleep score has been "
-        f"about {size:.0f} points lower. Worth skipping it tonight."
-    )
+_CONSECUTIVE_CAP_DAYS = 4
+_SWING_THRESHOLD = 4.0
+
+
+def _consecutive_streak(nights: frozenset[dt.date], target_night: dt.date) -> int:
+    streak = 0
+    cursor = target_night
+    while cursor in nights:
+        streak += 1
+        cursor -= dt.timedelta(days=1)
+    return streak
+
+
+def _matching_yesterday_cause(
+    db: Session,
+    metric: str,
+    target_night: dt.date,
+    delta: float,
+) -> dict | None:
+    impact = compute_lifestyle_impact(db, metric, 84, target_night, include_nights=True)
+    for item in impact["items"]:
+        if item["confidence"] not in ("strong", "some"):
+            continue
+        nights = item.get("_nights") or frozenset()
+        if target_night not in nights:
+            continue
+        if _consecutive_streak(nights, target_night) > _CONSECUTIVE_CAP_DAYS:
+            continue
+        if (delta > 0 and item["effect"] > 0) or (delta < 0 and item["effect"] < 0):
+            return item
+    return None
 
 
 @router.get("/advice")
 def get_daily_advice(db: Session = Depends(get_db)):
-    latest_sleep = db.query(models.GarminSleepDaily).order_by(models.GarminSleepDaily.sleep_date.desc()).first()
-    impact = compute_lifestyle_impact(db, "sleep_score", 84, _today())
-    evidence = [
-        item for item in impact["items"] if item["confidence"] in ("strong", "some") and item["activity_id"] is not None
-    ]
+    latest_sleep = (
+        db.query(models.GarminSleepDaily)
+        .filter(models.GarminSleepDaily.sleep_score.isnot(None))
+        .order_by(models.GarminSleepDaily.sleep_date.desc())
+        .first()
+    )
+    if latest_sleep is None or latest_sleep.sleep_score is None:
+        return {"advice": "Keep logging your sleep and activities to build your 4-week baseline."}
 
-    advice_msg = "Keep logging your activities to receive personalized predictive advice!"
-    if latest_sleep and latest_sleep.sleep_score is not None:
-        score = latest_sleep.sleep_score
-        if evidence:
-            advice_msg = _advice_from_item(score, evidence[0])
-        elif score < 75:
-            advice_msg = f"Your last sleep score was {score}. Your body needs more rest. Try taking it easy and going to bed a bit earlier tonight."
+    target_night = latest_sleep.sleep_date
+    score = round(latest_sleep.sleep_score)
+    start_28 = target_night - dt.timedelta(days=27)
+
+    sleep_28, _ = _metric_by_night(db, "sleep_score", start_28, target_night)
+    sleep_diff: float | None = None
+    if len(sleep_28) >= 3:
+        avg_score = round(statistics.fmean(sleep_28.values()))
+        sleep_diff = score - avg_score
+        if abs(sleep_diff) < _SWING_THRESHOLD:
+            lead = f"Last night's sleep score was {score}, close to your 4-week average of {avg_score}."
+        elif sleep_diff > 0:
+            lead = f"Last night's sleep score was {score} ({sleep_diff} above your 4-week average of {avg_score})."
         else:
-            advice_msg = f"Great sleep score of {score}! You're primed for a highly productive day."
+            lead = f"Last night's sleep score was {score} ({abs(sleep_diff)} below your 4-week average of {avg_score})."
+    else:
+        lead = f"Last night's sleep score was {score}."
 
-    return {"advice": advice_msg}
+    if sleep_diff is not None and abs(sleep_diff) >= _SWING_THRESHOLD:
+        cause = _matching_yesterday_cause(db, "sleep_score", target_night, sleep_diff)
+        if cause is not None:
+            size = abs(cause["effect"])
+            direction = "higher" if cause["effect"] > 0 else "lower"
+            return {
+                "advice": (
+                    f"{lead} Yesterday included {cause['activity']} — across {cause['with_nights']} nights "
+                    f"in the last 12 weeks, your sleep score has averaged {size:.0f} points {direction} afterwards."
+                )
+            }
+
+    secondary_notes: list[str] = []
+    for metric, metric_title, unit in (
+        ("overnight_hrv", "Overnight HRV", "ms "),
+        ("overnight_stress", "Overnight stress", ""),
+    ):
+        vals, _ = _metric_by_night(db, metric, start_28, target_night)
+        if target_night not in vals or len(vals) < 3:
+            continue
+        delta = vals[target_night] - statistics.fmean(vals.values())
+        if abs(delta) >= _SWING_THRESHOLD:
+            cause = _matching_yesterday_cause(db, metric, target_night, delta)
+            if cause is not None:
+                size = abs(cause["effect"])
+                direction = "higher" if cause["effect"] > 0 else "lower"
+                return {
+                    "advice": (
+                        f"{lead} {metric_title} was {direction} than usual — yesterday included "
+                        f"{cause['activity']}, and across {cause['with_nights']} nights in the last 12 weeks, "
+                        f"{metric_title.lower()} has averaged {size:.0f} {unit}{direction} afterwards."
+                    )
+                }
+            direction = "higher" if delta > 0 else "lower"
+            secondary_notes.append(f"{metric_title.lower()} was {direction} than usual")
+        else:
+            secondary_notes.append(f"{metric_title.lower()} steady")
+
+    if secondary_notes:
+        if all(note.endswith("steady") for note in secondary_notes) and len(secondary_notes) == 2:
+            return {"advice": f"{lead} Overnight HRV and stress were steady."}
+        return {"advice": f"{lead} {'; '.join(secondary_notes).capitalize()}."}
+
+    return {"advice": lead}
