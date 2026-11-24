@@ -13,7 +13,7 @@
   let latestBattery: BatteryLatest | null = null;
   let latestHrv: HrvLatest | null = null;
   let latestStress: StressLatest | null = null;
-  let adviceMessage: string = "Loading your personalized advice...";
+  let adviceMessage: string = "Loading last night's takeaway...";
   let loadError = false;
   let isLoading = true;
   let lastSyncDate: string | null = null;
@@ -48,7 +48,7 @@
       latestBattery = batteryWrap?.data || null;
       latestHrv = hrvWrap?.data || null;
       latestStress = stressWrap?.data || null;
-      adviceMessage = adviceWrap?.advice || "Keep logging your activities to receive personalized predictive advice!";
+      adviceMessage = adviceWrap?.advice || "Keep logging your sleep and activities to build your 4-week baseline.";
       lastSyncDate = latestSleep?.date || latestBattery?.date || latestHrv?.date || latestStress?.date || null;
 
       const todayStr = getTodayDateStr();
@@ -59,7 +59,7 @@
         return localStr === todayStr;
       }) || null;
     } catch (error) {
-      adviceMessage = "Unable to load advice right now. Please check server connectivity.";
+      adviceMessage = "Unable to load last night's takeaway right now. Please check server connectivity.";
       loadError = true;
     } finally {
       isLoading = false;
@@ -286,7 +286,7 @@
   </section>
 
   <section class="card advice-card" aria-live="polite">
-    <h3>Predictive Advice</h3>
+    <h3>Last Night's Takeaway</h3>
     <p>{adviceMessage}</p>
   </section>
 
