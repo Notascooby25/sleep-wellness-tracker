@@ -87,6 +87,48 @@ def test_unlogged_evening_is_not_a_without_night(signed_in, world):
     assert alcohol["without_nights"] == 6
 
 
+def test_health_item_counts_active_days_and_quick_checkins_as_without(signed_in, world):
+    world.item("Infection", category="Health")
+    for day in range(1, 7):
+        world.log(d(day), ["Infection"], hour=14)
+        world.sleep(d(day + 1), 58)
+    for day in range(7, 14):
+        world.log(d(day), ["Reading"], hour=21)
+        world.sleep(d(day + 1), 82)
+    for day in range(14, 21):
+        stamp = dt.datetime(d(day).year, d(day).month, d(day).day, 18, tzinfo=UTC)
+        world.db.add(models.Mood(timestamp=stamp, mood_score=1, activities=[]))
+        world.sleep(d(day + 1), 84)
+    for day in range(21, 25):
+        world.sleep(d(day + 1), 85)
+    world.done()
+
+    infection = find(impact(signed_in)["items"], "Infection")
+    assert infection["with_nights"] == 6
+    assert infection["without_nights"] == 14
+    assert infection["better"] is False
+    assert infection["effect"] < -20
+
+
+def test_before_sleep_still_requires_before_sleep_entry_for_without(signed_in, world):
+    world.item("Walk", category="Lifestyle")
+    for day in range(1, 13):
+        world.log(d(day), ["Alcohol"] if day <= 6 else ["Reading"])
+        world.sleep(d(day + 1), 60 if day <= 6 else 80)
+    for day in range(13, 19):
+        world.log(d(day), ["Walk"], hour=14)
+        world.sleep(d(day + 1), 82)
+    for day in range(19, 23):
+        stamp = dt.datetime(d(day).year, d(day).month, d(day).day, 18, tzinfo=UTC)
+        world.db.add(models.Mood(timestamp=stamp, mood_score=2, activities=[]))
+        world.sleep(d(day + 1), 82)
+    world.done()
+
+    alcohol = find(impact(signed_in)["items"], "Alcohol")
+    assert alcohol["with_nights"] == 6
+    assert alcohol["without_nights"] == 6
+
+
 def test_night_items_and_habits_left_out(signed_in, world):
     world.item("Woke During Night", category="During Sleep")
     world.item("Meditation", report_role="habit")

@@ -159,10 +159,23 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
     activities: dict[int, models.Activity] = {}
     item_nights: dict[int, set[dt.date]] = defaultdict(set)
     logged_categories: dict[dt.date, set] = defaultdict(set)
+    active_nights: set[dt.date] = set()
     for mood in moods:
+        if not mood.activities:
+            quick_night = night_for_entry(mood.timestamp, False)
+            if in_window(quick_night):
+                active_nights.add(quick_night)
+            continue
         for activity in mood.activities:
             category_name = activity.category.name if activity.category is not None else None
-            night = night_for_entry(mood.timestamp, is_before_sleep(category_name))
+            before_sleep = is_before_sleep(category_name)
+            night = night_for_entry(mood.timestamp, before_sleep)
+            if effective_role(activity) == "describes_night" and not before_sleep:
+                described_night = mood.timestamp.astimezone(UK_TZ).date()
+                if in_window(described_night):
+                    active_nights.add(described_night)
+            elif in_window(night):
+                active_nights.add(night)
             if not in_window(night):
                 continue
             activities[activity.id] = activity
@@ -184,12 +197,16 @@ def compute_lifestyle_impact(db: Session, metric: str, days: int, end_date: dt.d
                 left_out.append({"activity_id": primary.id, "activity": name, "reason": role})
             continue
         with_set = set().union(*(item_nights[a.id] for a in copies))
-        category_ids = {a.category_id for a in copies}
-        without_set = {
-            night
-            for night, categories in logged_categories.items()
-            if categories & category_ids and night not in with_set
-        }
+        primary_category = primary.category.name if primary.category is not None else None
+        if is_before_sleep(primary_category):
+            category_ids = {a.category_id for a in copies}
+            without_set = {
+                night
+                for night, categories in logged_categories.items()
+                if categories & category_ids and night not in with_set
+            }
+        else:
+            without_set = active_nights - with_set
         candidates.append((primary.id, name, with_set, without_set))
 
     workout_rows = (
