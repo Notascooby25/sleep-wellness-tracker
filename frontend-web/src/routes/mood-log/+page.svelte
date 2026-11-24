@@ -206,7 +206,7 @@
 
 <section class="hero">
   <h1>Mood Log</h1>
-  <p>Review, edit, and remove mood entries.</p>
+  <p>Review, edit, and remove mood entries. <a href="/garmin-log">View Garmin Log →</a></p>
 </section>
 
 <section class="card">
