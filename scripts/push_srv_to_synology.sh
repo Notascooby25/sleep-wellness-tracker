@@ -7,7 +7,7 @@
 #   shared/mood-images/     mirror
 #   shared/garmin-tokens/   mirror
 #   shared/logs/            mirror (no version history)
-#   sleepwell/  audio-scrobbler-app/  UK-Expense-Tracker/  runsync/    mirrors
+#   sleepwell/  audio-scrobbler-app/  UK-Expense-Tracker/  runsync/  runsync-getfit/    mirrors
 #
 # shared/postgres-data is deliberately NOT copied: it is unreadable to this user,
 # and a file-level copy of a live Postgres directory is not a usable backup. The
@@ -158,6 +158,7 @@ sync_dir mirror       sleepwell           "${APP_EXCLUDES[@]}"
 sync_dir mirror       audio-scrobbler-app "${APP_EXCLUDES[@]}"
 sync_dir mirror       UK-Expense-Tracker  "${APP_EXCLUDES[@]}"
 sync_dir mirror       runsync             "${APP_EXCLUDES[@]}"
+sync_dir mirror       runsync-getfit      "${APP_EXCLUDES[@]}"
 
 if (( ! DRY_RUN )); then
     log "Pruning NAS version history older than ${VERSION_DAYS} days"

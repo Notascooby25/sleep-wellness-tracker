@@ -14,11 +14,13 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 S=$T/srv; H=$T/home; BIN=$T/bin; LOG=$T/rsync.log
 mkdir -p "$BIN" "$H/.ssh" "$H/.config" "$S/shared/backups" "$S/shared/mood-images" "$S/shared/garmin-tokens" \
          "$S/shared/logs" "$S/sleepwell" "$S/audio-scrobbler-app" "$S/UK-Expense-Tracker" \
-         "$S/runsync/backups" "$S/runsync/other"
+         "$S/runsync/backups" "$S/runsync/other" "$S/runsync-getfit/data"
 for d in shared/mood-images shared/garmin-tokens shared/logs sleepwell audio-scrobbler-app UK-Expense-Tracker; do echo x > "$S/$d/f"; done
 echo dump > "$S/runsync/backups/runsync_1.dump"
 echo SECRET > "$S/runsync/.env"
 echo other > "$S/runsync/other/f"
+echo SECRET > "$S/runsync-getfit/.env"
+echo data > "$S/runsync-getfit/data/f"
 echo k > "$H/.ssh/key"
 
 printf '#!/bin/sh\nexit 0\n' > "$BIN/ssh"
@@ -40,7 +42,18 @@ check "keeps replaced files in _versions"                grep -qF -- "/_versions
 check "does NOT exclude .env (copied like other apps)"   bash -c "! grep -qF -- '--exclude=.env' <<<\"\$1\"" _ "$RS"
 check "skips .git/ and node_modules/ like other apps"    bash -c "grep -qF -- '--exclude=.git/' <<<\"\$1\" && grep -qF -- '--exclude=node_modules/' <<<\"\$1\"" _ "$RS"
 check "never copies a postgres data directory"           grep -qF -- "--exclude=postgres-data/" <<<"$RS"
-check "one runsync call only (no separate backups call)" test "$(grep -cF -- "$S/runsync" "$LOG")" -eq 1
+check "one runsync call only (no separate backups call)" test "$(grep -cF -- "$S/runsync/ " "$LOG")" -eq 1
+
+echo "== the whole runsync-getfit folder is mirrored too"
+RG=$(grep -F -- "$S/runsync-getfit/ " "$LOG" || true)
+check "rsync called for the runsync-getfit folder"       test -n "$RG"
+check "destination is runsync-getfit/ on the NAS"        grep -qF "u@nas.invalid:/volume1/test/nuc/runsync-getfit/" <<<"$RG"
+check "uses --delete (a mirror)"                         grep -qF -- "--delete" <<<"$RG"
+check "keeps replaced files in _versions"                grep -qF -- "/_versions/" <<<"$RG"
+check "does NOT exclude .env (copied like other apps)"   bash -c "! grep -qF -- '--exclude=.env' <<<\"\$1\"" _ "$RG"
+check "skips .git/ and node_modules/ like other apps"    bash -c "grep -qF -- '--exclude=.git/' <<<\"\$1\" && grep -qF -- '--exclude=node_modules/' <<<\"\$1\"" _ "$RG"
+check "never copies a postgres data directory"           grep -qF -- "--exclude=postgres-data/" <<<"$RG"
+check "one runsync-getfit call only"                     test "$(grep -cF -- "$S/runsync-getfit/ " "$LOG")" -eq 1
 
 echo "== other targets still synced"
 for d in shared/backups shared/mood-images shared/garmin-tokens shared/logs sleepwell audio-scrobbler-app UK-Expense-Tracker; do
@@ -52,6 +65,14 @@ rm -rf "$S/runsync"; : > "$LOG"
 run > "$T/run2.log" 2>&1; RC=$?
 check "exits non-zero"                                   test $RC -ne 0
 check "failure names runsync"                            has "$T/run2.log" "FAILED runsync: source directory missing"
+check "runsync-getfit still synced after the failure"    grep -qF "$S/runsync-getfit/ " "$LOG"
+
+echo "== missing runsync-getfit is reported, others still run"
+mkdir -p "$S/runsync"; echo x > "$S/runsync/f"; rm -rf "$S/runsync-getfit"; : > "$LOG"
+run > "$T/run3.log" 2>&1; RC=$?
+check "exits non-zero"                                   test $RC -ne 0
+check "failure names runsync-getfit"                     has "$T/run3.log" "FAILED runsync-getfit: source directory missing"
+check "runsync still synced after the failure"           grep -qF "$S/runsync/ " "$LOG"
 check "other targets still synced after the failure"     grep -qF "$S/UK-Expense-Tracker/" "$LOG"
 
 summary
