@@ -63,6 +63,7 @@ NAS layout mirrors `/srv`:
   audio-scrobbler-app/     mirror   (first time this app is on the NAS)
   UK-Expense-Tracker/      mirror
   runsync/                 mirror   (whole folder, including its backups/ and .env)
+  runsync-getfit/          mirror   (whole folder, including its .env)
   _versions/<UTC time>/    files a mirror run replaced or deleted, pruned after 30 days
   _old-layout/             the previous layout, parked; delete after ~2026-10-20
 ```

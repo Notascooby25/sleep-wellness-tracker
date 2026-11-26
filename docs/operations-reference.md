@@ -138,7 +138,7 @@ Script: [scripts/push_srv_to_synology.sh](scripts/push_srv_to_synology.sh) (repl
 
 - Destination: `/volume1/Backups/nuc-server`, mirroring the layout of `/srv`
   - `shared/backups/` — DB dumps + manifests (append-only)
-  - `shared/{mood-images,garmin-tokens,logs}/` and the `sleepwell`, `audio-scrobbler-app`, `UK-Expense-Tracker`, `runsync` app folders — mirrors
+  - `shared/{mood-images,garmin-tokens,logs}/` and the `sleepwell`, `audio-scrobbler-app`, `UK-Expense-Tracker`, `runsync`, `runsync-getfit` app folders — mirrors
   - `_versions/<UTC>/` — files changed/deleted by mirror runs, pruned after 30 days
 - Auth: SSH key at `$SSH_KEY`, port `8022`; `NAS_USER`/`NAS_HOST` come from `~/.config/nas-sync.env` on the NUC (not committed).
 - Uses `rsync -az`; `postgres-data/` is never copied (the `.dump` files are the DB backup).
